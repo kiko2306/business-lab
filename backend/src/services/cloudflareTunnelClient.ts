@@ -110,6 +110,28 @@ export async function testCloudflareTunnelAccess({
 }
 
 /**
+ * The zone for `baseDomain` and the account that holds it, from the token alone
+ * (Zone → Zone → Read, which the token already needs — start.sh does the same
+ * lookup). Lets Settings skip asking the owner for the two IDs (plan.md §785).
+ */
+export async function lookupZone(apiToken: string, baseDomain: string): Promise<{ zoneId: string; accountId: string }> {
+  const response = await requestJson<CloudflareApiEnvelope<{ id: string; account?: { id?: string } }[]>>(
+    `${API_BASE}/zones?name=${encodeURIComponent(baseDomain)}&per_page=1`,
+    { headers: { Authorization: `Bearer ${apiToken}` } }
+  );
+
+  if (response.statusCode !== 200 || !response.body?.success) {
+    throw new Error(`Unable to look up ${baseDomain} in Cloudflare: ${response.body?.errors?.[0]?.message || response.statusCode}`);
+  }
+
+  const zone = response.body.result?.[0];
+  if (!zone?.id || !zone.account?.id) {
+    throw new Error(`${baseDomain} was not found in the Cloudflare account this token can see.`);
+  }
+  return { zoneId: zone.id, accountId: zone.account.id };
+}
+
+/**
  * How many zones the API token can see. A per-zone-scoped token
  * (Zone Resources → Specific zone) returns 1 (or 0 before the zone exists);
  * an account-level token returns every zone in the account — that wider set

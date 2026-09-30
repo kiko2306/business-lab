@@ -185,8 +185,10 @@ export const schemas = {
     npmEmail: Joi.string().trim().email().max(255).required(),
     // Optional: omit to keep the previously saved password unchanged.
     npmPassword: Joi.string().min(1).max(255).optional(),
-    cloudflareAccountId: Joi.string().trim().alphanum().length(32).required(),
-    cloudflareZoneId: Joi.string().trim().alphanum().length(32).required(),
+    // Optional overrides: left blank, the account and zone are looked up from the
+    // saved token and the base domain (resolveCloudflareIds, plan.md §785).
+    cloudflareAccountId: Joi.string().trim().alphanum().length(32).allow('').optional(),
+    cloudflareZoneId: Joi.string().trim().alphanum().length(32).allow('').optional(),
     cloudflareTunnelId: Joi.string().trim().min(1).max(255).required(),
   }),
   serviceEnvUpdate: Joi.object({

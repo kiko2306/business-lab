@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { requestJson } from '../utils/httpJson';
-import { countTokenZones, ensureIngressRoute, testCloudflareTunnelAccess } from './cloudflareTunnelClient';
+import { countTokenZones, ensureIngressRoute, lookupZone, testCloudflareTunnelAccess } from './cloudflareTunnelClient';
 
 vi.mock('../utils/httpJson', () => ({
   requestJson: vi.fn(),
@@ -253,5 +253,34 @@ describe('countTokenZones', () => {
       raw: '',
     });
     await expect(countTokenZones('token')).rejects.toThrow(/Unable to list Cloudflare zones: not allowed/);
+  });
+});
+
+// plan.md §785: the account and zone IDs follow from the token and the domain,
+// so the dashboard looks them up instead of asking the owner to paste them.
+describe('lookupZone', () => {
+  it('returns the zone id and its account id for the base domain', async () => {
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 200,
+      body: { success: true, result: [{ id: 'z'.repeat(32), name: 'example.com', account: { id: 'a'.repeat(32) } }] },
+      raw: '',
+    });
+
+    await expect(lookupZone('token', 'example.com')).resolves.toEqual({ zoneId: 'z'.repeat(32), accountId: 'a'.repeat(32) });
+    expect(String(mockedRequestJson.mock.calls[0][0])).toContain('/zones?name=example.com');
+  });
+
+  it('says the domain is not in this Cloudflare account when nothing matches', async () => {
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body: { success: true, result: [] }, raw: '' });
+    await expect(lookupZone('token', 'nope.example')).rejects.toThrow(/nope\.example.*not.*(found|in)/i);
+  });
+
+  it('surfaces Cloudflare\'s own message when the token cannot read zones', async () => {
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 403,
+      body: { success: false, errors: [{ message: 'Authentication error' }] },
+      raw: '',
+    });
+    await expect(lookupZone('token', 'example.com')).rejects.toThrow('Authentication error');
   });
 });

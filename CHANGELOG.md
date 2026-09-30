@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.156.3] — 2026-09-30
+
+### Settings
+
+- Derive the Cloudflare account and zone IDs from the token instead of asking for them
+
 ## [0.156.2] — 2026-09-30
 
 ### Frontend

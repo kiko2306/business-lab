@@ -20,6 +20,7 @@ import { readAppEnvValue } from '../services/appEnv';
 import { MAIL_SETTINGS_KEYS, defaultPort, getMailConfig } from '../utils/mailSettings';
 import { testMailConnection } from '../services/mailTest';
 import { EXPOSURE_SETTINGS_KEYS, getExposureConfig, getNpmApiUrl } from '../utils/exposureSettings';
+import { resolveCloudflareIds } from '../services/exposureIds';
 import {
   DEFAULT_TIMEZONE,
   DEFAULT_UPDATE_BRANCH,
@@ -415,11 +416,23 @@ router.get('/exposure', async (_req: Request, res: Response) => {
 // PUT /api/settings/exposure — save first-start exposure provisioning config
 // ---------------------------------------------------------------------------
 router.put('/exposure', validateBody(schemas.exposureGlobalSettings), async (req: Request, res: Response) => {
+  let ids: { cloudflareAccountId: string; cloudflareZoneId: string };
+  try {
+    ids = await resolveCloudflareIds({
+      baseDomain: req.body.baseDomain,
+      token: await getStoredToken(),
+      cloudflareAccountId: req.body.cloudflareAccountId,
+      cloudflareZoneId: req.body.cloudflareZoneId,
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : 'Unable to look up the Cloudflare account and zone.' });
+  }
+
   const values: Record<string, string> = {
     [EXPOSURE_SETTINGS_KEYS.baseDomain]: req.body.baseDomain,
     [EXPOSURE_SETTINGS_KEYS.npmEmail]: req.body.npmEmail,
-    [EXPOSURE_SETTINGS_KEYS.cloudflareAccountId]: req.body.cloudflareAccountId,
-    [EXPOSURE_SETTINGS_KEYS.cloudflareZoneId]: req.body.cloudflareZoneId,
+    [EXPOSURE_SETTINGS_KEYS.cloudflareAccountId]: ids.cloudflareAccountId,
+    [EXPOSURE_SETTINGS_KEYS.cloudflareZoneId]: ids.cloudflareZoneId,
     [EXPOSURE_SETTINGS_KEYS.cloudflareTunnelId]: req.body.cloudflareTunnelId,
   };
 

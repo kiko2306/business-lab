@@ -34995,3 +34995,46 @@ Asked the user to check it by hand; not confirmed either way in this session.
 Recorded honestly rather than assumed — everything else about the upgrade is
 solid enough that the item is closed, but this one sub-check stays open if
 login trouble ever surfaces on Twenty.
+
+## 785. Settings derives the Cloudflare account and zone IDs instead of asking for them
+
+Closes the README item: the tunnel token already carries Zone → Zone → Read,
+so the account and zone IDs the Settings form used to require can be looked
+up from the token and the base domain instead of pasted in by hand (principle
+3 — automate what the system can already derive).
+
+`cloudflareTunnelClient.ts` gained `lookupZone(token, baseDomain)`
+(`GET /zones?name=...`, the same call `start.sh` already makes) returning the
+zone id and its owning account id. `exposureIds.ts`'s `resolveCloudflareIds`
+sits in front of it: a value the owner typed under the new **Advanced**
+disclosure is an override and wins; a blank one is derived. `PUT
+/api/settings/exposure` calls it before writing, so a bad/missing token
+surfaces as a 400 with a plain message rather than a save that silently
+carries stale IDs forward. `validation.ts`'s two ID fields moved from
+`required` to optional (`allow('')`) — the route, not the schema, is what
+decides whether an ID is present.
+
+Frontend: `cloudflareAccountId`/`cloudflareZoneId` dropped their `required`
+validator, the two inputs moved under a collapsed `<details class="exposure-advanced">`
+with a hint that they're derived, and the loaded values are no longer patched
+into the form (leaving it blank means a changed domain gets looked up fresh
+on next save rather than carrying the old zone along silently).
+
+**Test-first caught a real bug before it shipped.** The spec
+(`network-settings.component.spec.ts`) wrote `patchValue({ cloudflareZoneId:
+' ' + 'y'.repeat(32) + ' ' })` and expected the trimmed value to reach the
+save call. It didn't: `Validators.maxLength(32)` counts the *untrimmed*
+value, so a 32-char ID with one stray space either side reads as 34 and fails
+validation — and `saveExposure()` returns silently on an invalid form, so the
+save just didn't happen, with only a generic "complete required fields"
+message that doesn't mention length at all. Fixed with a small
+`trimmedMaxLength()` validator (trims before comparing, same as the value
+actually sent) instead of teaching users to never have trailing whitespace.
+
+Also fixed in passing: a numbering collision. The working tree had this
+change staged under "plan.md §784" throughout (comments and test names) from
+before this session's Twenty beta-test writeup landed and took that number —
+renumbered every reference to §785 (this section) so the citations resolve.
+
+Backend 1293 tests + typecheck, frontend 153 tests + build all pass. Version
+bump: see CHANGELOG. README item deleted.

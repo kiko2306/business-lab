@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormsModule, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { sanitizePastedText } from '../../core/input-sanitize';
@@ -16,6 +16,12 @@ import { ToastService } from '../../core/toast.service';
 import { PanelComponent } from '../../components/panel/panel.component';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
+
+// Trims before counting, unlike Validators.maxLength — so a value that is only
+// too long because of leading/trailing whitespace doesn't fail (plan.md §785).
+function trimmedMaxLength(max: number): (control: AbstractControl) => ValidationErrors | null {
+  return (control: AbstractControl) => ((control.value ?? '') as string).trim().length > max ? { maxlength: true } : null;
+}
 
 /**
  * Networking settings — the Cloudflare Tunnel token and the first-start
@@ -46,8 +52,13 @@ export class NetworkSettingsComponent implements OnInit {
     baseDomain: ['', [Validators.required, Validators.maxLength(255)]],
     npmEmail: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
     npmPassword: ['', [Validators.maxLength(255)]],
-    cloudflareAccountId: ['', [Validators.required, Validators.maxLength(32)]],
-    cloudflareZoneId: ['', [Validators.required, Validators.maxLength(32)]],
+    // Overrides only; blank means the backend looks them up (plan.md §785).
+    // trimmedMaxLength, not Validators.maxLength: a pasted ID with trailing
+    // whitespace is exactly 32 chars once trimmed, but Validators.maxLength
+    // counts the untrimmed value and silently blocked the save with no
+    // visible reason (caught by the spec, plan.md §785).
+    cloudflareAccountId: ['', [trimmedMaxLength(32)]],
+    cloudflareZoneId: ['', [trimmedMaxLength(32)]],
     cloudflareTunnelId: ['', [Validators.required, Validators.maxLength(255)]],
   });
 
@@ -211,10 +222,14 @@ export class NetworkSettingsComponent implements OnInit {
     const payload: ExposureSettingsInput = {
       baseDomain: value.baseDomain.trim(),
       npmEmail: value.npmEmail.trim(),
-      cloudflareAccountId: value.cloudflareAccountId.trim(),
-      cloudflareZoneId: value.cloudflareZoneId.trim(),
       cloudflareTunnelId: value.cloudflareTunnelId.trim(),
     };
+    if (value.cloudflareAccountId.trim()) {
+      payload.cloudflareAccountId = value.cloudflareAccountId.trim();
+    }
+    if (value.cloudflareZoneId.trim()) {
+      payload.cloudflareZoneId = value.cloudflareZoneId.trim();
+    }
     if (value.npmPassword) {
       payload.npmPassword = value.npmPassword;
     }
@@ -271,8 +286,6 @@ export class NetworkSettingsComponent implements OnInit {
           this.exposureForm.patchValue({
             baseDomain: settings.baseDomain ?? '',
             npmEmail: settings.npmEmail ?? '',
-            cloudflareAccountId: settings.cloudflareAccountId ?? '',
-            cloudflareZoneId: settings.cloudflareZoneId ?? '',
             cloudflareTunnelId: settings.cloudflareTunnelId ?? '',
           });
         },

@@ -115,20 +115,6 @@
           </div>
         </div>
         <div class="col-12 col-md-6">
-          <label class="form-label fw-semibold" for="exposureCloudflareAccountId">{{ 'networkSettings.field.cloudflareAccountId' | t }}</label>
-          <input id="exposureCloudflareAccountId" class="form-control" formControlName="cloudflareAccountId" />
-          <div *ngIf="exposureValidationMessage('cloudflareAccountId', 'networkSettings.field.cloudflareAccountId' | t)" class="text-danger small mt-2">
-            {{ exposureValidationMessage('cloudflareAccountId', 'networkSettings.field.cloudflareAccountId' | t) }}
-          </div>
-        </div>
-        <div class="col-12 col-md-6">
-          <label class="form-label fw-semibold" for="exposureCloudflareZoneId">{{ 'networkSettings.field.cloudflareZoneId' | t }}</label>
-          <input id="exposureCloudflareZoneId" class="form-control" formControlName="cloudflareZoneId" />
-          <div *ngIf="exposureValidationMessage('cloudflareZoneId', 'networkSettings.field.cloudflareZoneId' | t)" class="text-danger small mt-2">
-            {{ exposureValidationMessage('cloudflareZoneId', 'networkSettings.field.cloudflareZoneId' | t) }}
-          </div>
-        </div>
-        <div class="col-12 col-md-6">
           <label class="form-label fw-semibold" for="exposureNpmApiUrl">{{ 'networkSettings.field.npmApiUrl' | t }}</label>
           <input id="exposureNpmApiUrl" class="form-control" [value]="exposureSettings?.npmApiUrl ?? ''" readonly disabled />
           <div class="form-text">{{ 'networkSettings.npmApiUrlHint' | t }}</div>
@@ -171,6 +157,25 @@
           <span *ngIf="testingExposure" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
           {{ 'networkSettings.testConnectionButton' | t }}
         </button>
+        <!-- The account and zone follow from the token and the domain, so the backend looks
+             them up on save (plan.md §785); typing here only overrides that. -->
+        <details class="exposure-advanced col-12">
+          <summary>{{ 'networkSettings.advanced.summary' | t }}</summary>
+          <p class="form-text mb-2">{{ 'networkSettings.advanced.hint' | t }}</p>
+          <p *ngIf="exposureSettings?.cloudflareAccountId || exposureSettings?.cloudflareZoneId" class="small text-body-secondary mb-2">
+            {{ 'networkSettings.advanced.found' | t:{ account: exposureSettings?.cloudflareAccountId ?? '—', zone: exposureSettings?.cloudflareZoneId ?? '—' } }}
+          </p>
+          <div class="row g-3">
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="exposureCloudflareAccountId">{{ 'networkSettings.field.cloudflareAccountId' | t }}</label>
+              <input id="exposureCloudflareAccountId" class="form-control" formControlName="cloudflareAccountId" />
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="exposureCloudflareZoneId">{{ 'networkSettings.field.cloudflareZoneId' | t }}</label>
+              <input id="exposureCloudflareZoneId" class="form-control" formControlName="cloudflareZoneId" />
+            </div>
+          </div>
+        </details>
       </div>
     </form>
 

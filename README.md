@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.156.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.156.3** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -223,8 +223,14 @@ item is deleted.
       strip shows app state only; add the last successful backup and a pending update once
       Home can read them cheaply. Also `layout`: compact tiles with icons instead of fixed
       12rem cards.
-- [ ] **Settings: derive the Cloudflare IDs** — tunnel, account and zone IDs from the token,
-      any override under Advanced. Backend work; needs a `beta` test against the real tunnel.
+- [ ] **Beta-test the derived Cloudflare account/zone IDs (plan.md §785)** — on
+      `beta`, open Settings → Networking with the account/zone fields blank
+      under **Advanced**, save, and confirm the exposure config ends up with
+      the right IDs (check the saved settings, or that exposure still works)
+      without typing either one. Then type an override under Advanced, save,
+      and confirm that value wins instead of a fresh lookup. Also try saving
+      with no Cloudflare token stored yet and confirm the error is the plain
+      "save the token first" message, not a raw exception.
 
 - [ ] **Audit Home, Apps, Backups and Settings on a real render (plan.md §777)** — after the
       items above: `/impeccable audit` for contrast (the 0.68-0.78rem uppercase labels),

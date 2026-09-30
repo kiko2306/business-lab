@@ -320,8 +320,9 @@ export interface ExposureSettingsInput {
   baseDomain: string;
   npmEmail: string;
   npmPassword?: string;
-  cloudflareAccountId: string;
-  cloudflareZoneId: string;
+  /** Overrides; omitted, the backend derives both from the saved token and the base domain. */
+  cloudflareAccountId?: string;
+  cloudflareZoneId?: string;
   cloudflareTunnelId: string;
 }
 
