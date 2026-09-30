@@ -34639,3 +34639,8 @@ On `beta` (0.153.13, `1008773`): after restarting Immich, `immich-immich-db-1` r
 restarted (08:23:25), so the run did not exercise a freshly restarted Immich. Accepted;
 the OOM cause (§755) was the memory limit, now raised. Closes the §755/§756 item.
 The §757 Apps-page polish item stays open: it needs eyes in pt-PT.
+
+## 760. §757's beta test: the Apps page polish checks out
+
+Checked by the user on `beta` (0.153.13) in pt-PT: state badges read Portuguese, the
+dialogs announce their titles, and the search focus ring still shows. Closes the §757 item.

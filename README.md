@@ -209,11 +209,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **Beta-test the Apps page polish (plan.md §757)** — after `beta` is updated, open
-      Apps in pt-PT: each app's state badge reads Portuguese (`em execução`, `parado`);
-      the Settings dialog and the startup-log popup announce their title to a screen
-      reader (or `aria-labelledby` in devtools); the search box's focus ring still shows.
-
 - [ ] **Beta-test that a bumped image-check date moves exactly one app (plan.md §750, §751)**
       — the code-only half is **confirmed** (§751: run 113, 1m47s, zero
       `SERVICE_UPDATE` audit rows). What is left is the positive case: bump one
