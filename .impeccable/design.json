@@ -1,0 +1,282 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-30T08:14:14.111930+00:00",
+  "title": "Design System: Homelab Management Dashboard",
+  "extensions": {
+    "colorMeta": {
+      "canvas-dark": {
+        "role": "neutral",
+        "displayName": "Page Slate",
+        "canonical": "#1e293b",
+        "tonalRamp": [
+          "#1a2333",
+          "#2d3e59",
+          "#415980",
+          "#5574a7",
+          "#7a93bb",
+          "#a1b2cf",
+          "#c7d2e3",
+          "#eef1f6"
+        ]
+      },
+      "surface-dark": {
+        "role": "neutral",
+        "displayName": "Card Slate",
+        "canonical": "#26303f",
+        "tonalRamp": [
+          "#1d2430",
+          "#334054",
+          "#495c78",
+          "#5f779d",
+          "#8296b4",
+          "#a6b4ca",
+          "#cbd3df",
+          "#eff2f5"
+        ]
+      },
+      "well-dark": {
+        "role": "neutral",
+        "displayName": "Well Slate",
+        "canonical": "#0f172a",
+        "tonalRamp": [
+          "#141f38",
+          "#233663",
+          "#334e8e",
+          "#4265b9",
+          "#6b87ca",
+          "#96aada",
+          "#c1cde9",
+          "#ecf0f8"
+        ]
+      },
+      "border-dark": {
+        "role": "neutral",
+        "displayName": "Rule Slate",
+        "canonical": "#334155",
+        "tonalRamp": [
+          "#1d2530",
+          "#334054",
+          "#485c79",
+          "#5e789d",
+          "#8296b4",
+          "#a6b5ca",
+          "#cbd3e0",
+          "#eff2f5"
+        ]
+      },
+      "ink-dark": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#e2e8f0",
+        "tonalRamp": [
+          "#1a2532",
+          "#2e4059",
+          "#425c7f",
+          "#5678a6",
+          "#7b96bb",
+          "#a1b5cf",
+          "#c8d3e2",
+          "#eef2f6"
+        ]
+      },
+      "primary": {
+        "role": "primary",
+        "displayName": "Interface Blue",
+        "canonical": "#0d6efd",
+        "tonalRamp": [
+          "#011f4c",
+          "#013786",
+          "#024ebf",
+          "#0266f9",
+          "#3888fd",
+          "#72abfe",
+          "#accdfe",
+          "#e6f0ff"
+        ]
+      },
+      "success": {
+        "role": "semantic",
+        "displayName": "Running Green",
+        "canonical": "#198754",
+        "tonalRamp": [
+          "#0c4128",
+          "#157247",
+          "#1ea365",
+          "#27d484",
+          "#56e0a0",
+          "#87e9bc",
+          "#b8f2d7",
+          "#e9fbf3"
+        ]
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Failure Red",
+        "canonical": "#dc3545",
+        "tonalRamp": [
+          "#410b10",
+          "#73141d",
+          "#a51d2a",
+          "#d62536",
+          "#e15462",
+          "#ea8690",
+          "#f3b8bd",
+          "#fbe9eb"
+        ]
+      },
+      "warning": {
+        "role": "semantic",
+        "displayName": "Attention Amber",
+        "canonical": "#ffc107",
+        "tonalRamp": [
+          "#4c3900",
+          "#876500",
+          "#c19100",
+          "#fbbd00",
+          "#ffcd37",
+          "#ffdb71",
+          "#ffeaab",
+          "#fff9e5"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "page-title": {
+        "displayName": "Page title",
+        "purpose": "One per page."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Group headings and summary labels, uppercase."
+      },
+      "stat": {
+        "displayName": "Stat",
+        "purpose": "Summary counts, tabular numerals."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card",
+        "value": "0 2px 6px rgba(0,0,0,.3), 0 22px 45px -22px rgba(0,0,0,.65)",
+        "purpose": "Panels and cards, alpha scaled by --app-shadow-k."
+      },
+      {
+        "name": "service-row",
+        "value": "0 3px 8px rgba(2,6,23,.22), 0 18px 34px -18px rgba(2,6,23,.6)",
+        "purpose": "App rows (dark)."
+      },
+      {
+        "name": "dialog",
+        "value": "0 1rem 3rem rgba(0,0,0,.55)",
+        "purpose": "Modals."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-quick",
+        "value": "0.12s-0.15s ease",
+        "purpose": "Hover colour, chevron rotation, tile lift."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "576px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "992px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Service Row",
+      "kind": "card",
+      "refersTo": "service-row",
+      "description": "One app: name, state, needs, actions.",
+      "html": "<div class=\"ds-row\"><span class=\"ds-icon\">🖥️</span><div class=\"ds-main\"><span class=\"ds-name\">Nextcloud</span> <span class=\"ds-badge ds-ok\">running</span><div class=\"ds-sub\">Files and calendars</div></div><div class=\"ds-actions\"><button class=\"ds-btn ds-start\" disabled>Start</button><button class=\"ds-btn ds-stop\">Stop</button><button class=\"ds-btn ds-set\">Settings</button></div></div>",
+      "css": ".ds-row{display:flex;align-items:center;gap:.85rem;padding:.55rem .85rem;background:#26303f;color:#e2e8f0;border:1px solid #334155;border-radius:.6rem;box-shadow:0 3px 8px rgba(2,6,23,.22),0 18px 34px -18px rgba(2,6,23,.6);font:14px Inter,system-ui,sans-serif}.ds-icon{width:2.25rem;height:2.25rem;display:inline-flex;align-items:center;justify-content:center;border-radius:.6rem;background:rgba(13,110,253,.12)}.ds-main{flex:1}.ds-name{font-weight:600}.ds-badge{font-size:.75rem;padding:.2rem .5rem;border-radius:.4rem;color:#fff}.ds-ok{background:#198754}.ds-sub{font-size:.8125rem;color:#cbd5e1}.ds-actions{display:flex;gap:.4rem}.ds-btn{min-width:4.25rem;padding:.25rem .5rem;border-radius:.25rem;font-size:.875rem;background:transparent;cursor:pointer}.ds-start{background:#198754;border:1px solid #198754;color:#fff}.ds-start:disabled{opacity:.65}.ds-stop{border:1px solid #dc3545;color:#dc3545}.ds-stop:hover{background:#dc3545;color:#fff}.ds-set{border:1px solid #6c757d;color:#cbd5e1}.ds-btn:focus-visible{outline:2px solid #0d6efd;outline-offset:2px}"
+    },
+    {
+      "name": "Summary Tile",
+      "kind": "card",
+      "refersTo": "summary-tile",
+      "description": "A count with a coloured label.",
+      "html": "<div class=\"ds-tile\"><span class=\"ds-tl\">Running</span><strong>28</strong></div>",
+      "css": ".ds-tile{display:flex;flex-direction:column;gap:.35rem;padding:1.1rem 1.15rem;width:9rem;background:#26303f;border:1px solid #334155;border-radius:.9rem;box-shadow:0 3px 8px rgba(2,6,23,.2),0 24px 44px -22px rgba(2,6,23,.6);transition:transform .14s ease}.ds-tile:hover{transform:translateY(-2px)}.ds-tl{font:600 .78rem Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:#4ade80}.ds-tile strong{font:700 1.75rem/1.1 Inter,system-ui,sans-serif;color:#e2e8f0;font-variant-numeric:tabular-nums}"
+    },
+    {
+      "name": "Nav Link",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Pill nav; the active route is filled.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-link\" href=\"#\">Home</a><a class=\"ds-link ds-active\" href=\"#\">Apps</a><a class=\"ds-link\" href=\"#\">Backups</a></nav>",
+      "css": ".ds-nav{display:flex;gap:.15rem;font:500 .875rem Inter,system-ui,sans-serif}.ds-link{padding:.35rem .75rem;border-radius:999px;color:#cbd5e1;text-decoration:none;transition:color .12s,background-color .12s}.ds-link:hover,.ds-link:focus-visible{color:#fff;background:#0f172a}.ds-active{color:#fff;background:#334155;font-weight:600}"
+    },
+    {
+      "name": "Search Pill",
+      "kind": "input",
+      "refersTo": "search",
+      "description": "Icon, field and Clear as one pill.",
+      "html": "<div class=\"ds-search\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 16 16\" fill=\"none\"><circle cx=\"7\" cy=\"7\" r=\"4.5\" stroke=\"currentColor\" stroke-width=\"1.6\"/><path d=\"M10.5 10.5L14 14\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"/></svg><input type=\"search\" placeholder=\"Search apps\"></div>",
+      "css": ".ds-search{display:flex;align-items:center;gap:.4rem;width:20rem;padding:.35rem 1rem;background:#26303f;color:#cbd5e1;border:1px solid #334155;border-radius:999px}.ds-search input{flex:1;background:transparent;border:0;outline:0;color:#e2e8f0;font:1rem Inter,system-ui,sans-serif}.ds-search:focus-within{box-shadow:0 0 0 .2rem rgba(13,110,253,.25)}"
+    },
+    {
+      "name": "Dependency Chip",
+      "kind": "chip",
+      "refersTo": "dependency-chip",
+      "description": "Needs-chip with status dot; dashed when optional, amber when down.",
+      "html": "<span class=\"ds-chip\"><i></i>Authelia</span> <span class=\"ds-chip ds-opt ds-down\"><i></i>Tailscale</span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;gap:.3rem;padding:.05rem .4rem;border:1px solid #334155;border-radius:1rem;background:#26303f;color:#cbd5e1;font:.75rem Inter,system-ui,sans-serif}.ds-chip i{width:.45rem;height:.45rem;border-radius:50%;background:#198754}.ds-opt{border-style:dashed}.ds-down{background:#332701;border-color:#664d03;color:#ffda6a}.ds-down i{background:#ffc107}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Control Room",
+    "overview": "A room of slate surfaces where nothing shouts until something needs attention. Operate surface for a non-technical client; colour is reserved for meaning.",
+    "keyCharacteristics": [
+      "Slate canvas, one card colour a step above it, hairline borders plus a soft two-layer shadow for lift.",
+      "State colours carry meaning only; the accent blue appears on focus rings and primary actions.",
+      "Compact full-width rows for apps rather than a grid of large cards.",
+      "Dependency and blocked-start reasons sit next to the control they explain."
+    ],
+    "rules": [
+      {
+        "name": "The Meaning-Only Colour Rule",
+        "body": "Green, red and amber mean state and nothing else. A decorative use of them makes a healthy box look broken.",
+        "section": "colors"
+      },
+      {
+        "name": "The Both-Themes Rule",
+        "body": "Every colour lives as a token with light and dark values kept in step; component CSS never hard-codes a theme colour, and reads the primary through --bs-primary-rgb.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Numerals Rule",
+        "body": "Counts and versions use font-variant-numeric: tabular-nums so they do not jitter as state changes.",
+        "section": "typography"
+      },
+      {
+        "name": "The Diffuse-Only Rule",
+        "body": "Shadows are offset and soft. No zero-blur block shadows, no coloured halos except the focus ring.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do express every colour through a token with light and dark values, and read the primary via --bs-primary-rgb.",
+      "Do put the reason next to a disabled control.",
+      "Do route every visible string through the translate service, with en and pt-PT keys together.",
+      "Do give every dialog role=\"dialog\", aria-modal and a name from its heading."
+    ],
+    "donts": [
+      "Don't use green, red or amber for anything but state.",
+      "Don't add hard offset shadows, gradient text, or glass and blur as decoration.",
+      "Don't nest cards inside cards.",
+      "Don't put layout in inline style attributes; use a class."
+    ]
+  }
+}
