@@ -34810,3 +34810,14 @@ the app, four seconds apart (container `StartedAt`).
 and the raw text only lives in the startup dialog/toast. **Not observed:** the "Starting…"
 button (no visible `starting` state), the "N need you" headline, the LAN fallback link.
 Left running after the test: IT Tools, Authelia, Web Terminal, Paperless (all restarted).
+
+## 774. "Show details" for a failed start: keep the start error client-side
+
+§773's failure: a failed start leaves the container `created`/`restarting`, `status.ts`
+maps that to `error` with no message, so the row had no Show details. Fix in
+`ServiceStateService`: remember the start failure text (same `details`/`message` the
+startup dialog gets) per app and overlay it as `error` on status pushes while the app is
+`error` and the backend gave none; drop it once the app leaves `error`. Rejected: storing it
+in the backend `status.ts` — the text only exists in the failed POST response, and a
+backend copy would need persistence for something a reload can lose without harm.
+Test: `service-state.service.spec.ts`. The "Starting…" button remains unobserved.

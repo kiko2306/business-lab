@@ -62,6 +62,8 @@ export class ServiceStateService {
   // and not just the container logs.
   private readonly startupEventsSubject = new Subject<StartupActionEvent>();
 
+  private readonly startFailures: Record<string, string> = {};
+
   private pollingSubscription?: Subscription;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private reconnectAttempt = 0;
@@ -165,7 +167,19 @@ export class ServiceStateService {
   }
 
   private applyStatusResponse(response: ServiceStatusResponse): void {
-    this.servicesSubject.next(response.services);
+    // A failed start leaves the container `created`/`restarting`, which the
+    // backend reports as `error` with no message; without this the row's
+    // "Show details" has nothing to show. Forget the text once the app leaves
+    // `error`, so a later unrelated error doesn't show a stale failure.
+    const services = response.services.map((svc) => {
+      if (svc.state !== 'error') {
+        delete this.startFailures[svc.name];
+        return svc;
+      }
+      const failure = this.startFailures[svc.name];
+      return svc.error || !failure ? svc : { ...svc, error: failure };
+    });
+    this.servicesSubject.next(services);
     this.summarySubject.next(response.summary);
     this.lastUpdatedSubject.next(response.timestamp);
     this.hostLanIpSubject.next(response.hostLanIp ?? null);
@@ -337,11 +351,9 @@ export class ServiceStateService {
             const message = extractErrorMessage(error, `Unable to ${action} ${serviceName}.`);
             this.toast.error(message);
             if (action !== 'stop') {
-              this.startupEventsSubject.next({
-                serviceName,
-                ok: false,
-                message: extractStartFailureDetail(error) ?? message,
-              });
+              const detail = extractStartFailureDetail(error) ?? message;
+              this.startFailures[serviceName] = detail;
+              this.startupEventsSubject.next({ serviceName, ok: false, message: detail });
             }
             ok = false;
             return EMPTY;

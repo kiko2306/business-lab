@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.155.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.155.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -209,14 +209,12 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Apps page (impeccable critique, plan.md §761)
 
-- [ ] **Apps page: "Show details" never appears for a real failed start (plan.md §773)** —
-      beta test FAILED this part. A failed start leaves a container in `created`/`restarting`,
-      which `status.ts` maps to `state: 'error'` with no `error` string, so the row shows
-      "Couldn't start X. Try again" but no Show details; the raw failure text only reaches
-      the startup-log dialog and a toast. Fix: keep the last start failure message
-      (`startupEvents`) per app and render it under Show details. Test first. Also still
-      unseen on beta: the "Starting…" Start button (the box goes stopped → running with no
-      visible `starting` state).
+- [ ] **Beta-test "Show details" after a real failed start (plan.md §774)** — on `beta`,
+      hold an app's port with a listener (e.g. IT Tools, 10490), press Start: the row must
+      show "Couldn't start X. Try again" *and* a "Show details" with the compose failure
+      text. Free the port, Try again → running; stop it and break it another way → no stale
+      text. Still unseen: the "Starting…" Start button (the box goes stopped → running with
+      no visible `starting` state). Delete once seen.
 
 - [ ] **Beta-test the "Local network" row link (plan.md §772, §773)** — the Running panel is
       gone, the Running tile filters, public links and Settings ports passed. Still unseen:

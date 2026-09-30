@@ -62,6 +62,34 @@ describe('ServiceStateService', () => {
     expect(toast.success).toHaveBeenCalledWith('Service started');
   }));
 
+  // plan.md §773: a failed start leaves the container `created`/`restarting`,
+  // which status maps to `error` with no message, so "Show details" had nothing
+  // to show. The start failure text fills that gap until the app recovers.
+  it('shows the last start failure as the error of an errored app with none', fakeAsync(() => {
+    let seen: { name: string; state: string; error?: string }[] = [];
+    service.services$.subscribe((s) => (seen = (s ?? []) as never));
+    service.startService('it-tools');
+    httpMock
+      .expectOne(`${API_BASE_URL}/services/it-tools/start`)
+      .flush({ message: 'short', details: 'port is already allocated' }, { status: 500, statusText: 'Server Error' });
+    tick();
+    (service as any).applyStatusResponse({
+      ...emptyStatus(),
+      services: [{ name: 'it-tools', state: 'error' }],
+    });
+    expect(seen[0].error).toBe('port is already allocated');
+
+    (service as any).applyStatusResponse({
+      ...emptyStatus(),
+      services: [{ name: 'it-tools', state: 'running' }],
+    });
+    (service as any).applyStatusResponse({
+      ...emptyStatus(),
+      services: [{ name: 'it-tools', state: 'error' }],
+    });
+    expect(seen[0].error).toBeUndefined();
+  }));
+
   const emptyStatus = () => ({
     services: [],
     summary: { total: 0, running: 0, stopped: 0, error: 0, starting: 0 },
