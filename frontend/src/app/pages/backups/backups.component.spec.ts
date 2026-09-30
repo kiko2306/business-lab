@@ -148,6 +148,62 @@ describe('BackupsComponent', () => {
     fixture.detectChanges();
   });
 
+  // plan.md §776: every dialog closes on Escape when it offers a way out, and
+  // never while the work behind it is still running.
+  describe('dialog keyboard and severity', () => {
+    const escape = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    const dialogs = () => Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.backup-progress-dialog'));
+
+    beforeEach(() => {
+      services$.next([app('ntfy', 'Ntfy')]);
+      fixture.detectChanges();
+    });
+
+    it('closes the restore dialog on Escape, but not while it is restoring', () => {
+      component.openSnapshotRestore(snapshot);
+      fixture.detectChanges();
+      component['restoringSnapshot'] = true;
+      fixture.detectChanges();
+      escape();
+      expect(component['restoreSnapshotTarget']).not.toBeNull();
+
+      component['restoringSnapshot'] = false;
+      fixture.detectChanges();
+      escape();
+      expect(component['restoreSnapshotTarget']).toBeNull();
+    });
+
+    it('closes the run dialog on Escape only once it has finished', () => {
+      component['showRunModal'] = true;
+      component['progress'] = { phase: 'dumping', index: 1, total: 3, label: 'ntfy' } as never;
+      fixture.detectChanges();
+      escape();
+      expect(component['showRunModal']).toBeTrue();
+
+      component['progress'] = { phase: 'done', ok: true, detail: 'ok' } as never;
+      fixture.detectChanges();
+      escape();
+      expect(component['showRunModal']).toBeFalse();
+    });
+
+    it('paints the snapshot restore as the data overwrite it is, like the settings-file restore', () => {
+      component.openSnapshotRestore(snapshot);
+      fixture.detectChanges();
+      const root: HTMLElement = fixture.nativeElement;
+      expect(root.querySelector('.backup-progress-dialog .btn-danger')).not.toBeNull();
+      expect(root.querySelector('.backup-progress-dialog .btn-warning')).toBeNull();
+      expect(root.querySelector('.backup-progress-dialog .alert-danger')).not.toBeNull();
+    });
+
+    it('uses alertdialog only for the restore, and names the progress bar', () => {
+      component['showRunModal'] = true;
+      component['progress'] = { phase: 'dumping', index: 1, total: 3, label: 'ntfy' } as never;
+      fixture.detectChanges();
+      expect(dialogs().map((d) => d.getAttribute('role'))).toEqual(['dialog']);
+      expect((fixture.nativeElement as HTMLElement).querySelector('[role=progressbar]')?.getAttribute('aria-label')).toBeTruthy();
+    });
+  });
+
   describe('restoring one app from a snapshot', () => {
     beforeEach(() => {
       operations.restoreAppFromSnapshot = jasmine.createSpy('restoreAppFromSnapshot');

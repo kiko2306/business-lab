@@ -35,3 +35,11 @@
   border-top: 1px solid var(--bs-border-color);
   background: var(--bs-tertiary-bg);
 }
+
+.retention-input {
+  width: 6rem;
+}
+
+.backup-progress-track {
+  height: 0.5rem;
+}

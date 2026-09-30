@@ -58,14 +58,13 @@
             <label class="form-label small mb-1" for="backupScheduleRetention">{{ 'backups.schedule.keepLastLabel' | t }}</label>
             <div class="d-flex align-items-center gap-2">
               <input
-                class="form-control form-control-sm"
+                class="form-control form-control-sm retention-input"
                 type="number"
                 id="backupScheduleRetention"
                 min="1"
                 max="365"
                 [(ngModel)]="schedule.retentionCount"
                 name="backupScheduleRetention"
-                style="width: 6rem"
               />
               <span class="small text-body-secondary">{{ 'backups.schedule.retentionUnit' | t }}</span>
             </div>
@@ -412,7 +411,8 @@
   </app-panel>
 
   <div class="backup-progress-backdrop" *ngIf="showRunModal">
-    <div class="backup-progress-dialog" role="alertdialog" aria-modal="true" [attr.aria-label]="'backups.runModal.ariaLabel' | t">
+    <div class="backup-progress-dialog" role="dialog" aria-modal="true" [attr.aria-label]="'backups.runModal.ariaLabel' | t"
+         appModalFocus [dismissible]="progress?.phase === 'done' || !!runError" (dismiss)="closeRunModal()">
       <div class="backup-progress-body">
         <h2 class="h5 mb-3">{{ 'backups.runModal.heading' | t }}</h2>
 
@@ -429,10 +429,11 @@
           </p>
         </ng-container>
 
-        <div class="progress" style="height: 0.5rem" *ngIf="progress && progress.phase === 'dumping' && progress.total > 0">
+        <div class="progress backup-progress-track" *ngIf="progress && progress.phase === 'dumping' && progress.total > 0">
           <div
             class="progress-bar"
             role="progressbar"
+            [attr.aria-label]="'backups.runModal.ariaLabel' | t"
             [style.width.%]="(progress.index / progress.total) * 100"
             [attr.aria-valuenow]="progress.index"
             aria-valuemin="0"
@@ -452,7 +453,8 @@
   </div>
 
   <div class="backup-progress-backdrop" *ngIf="restoreSnapshotTarget">
-    <div class="backup-progress-dialog" role="alertdialog" aria-modal="true" [attr.aria-label]="'backups.restoreModal.ariaLabel' | t">
+    <div class="backup-progress-dialog" role="alertdialog" aria-modal="true" [attr.aria-label]="'backups.restoreModal.ariaLabel' | t"
+         appModalFocus [dismissible]="!restoringSnapshot" (dismiss)="closeSnapshotRestore()">
       <div class="backup-progress-body">
         <h2 class="h5 mb-1">{{ 'backups.restoreModal.heading' | t }}</h2>
         <p class="text-body-secondary small mb-3">
@@ -471,7 +473,7 @@
             <option *ngFor="let app of restorableApps" [value]="app.name">{{ app.label }}</option>
           </select>
 
-          <div class="alert alert-warning small mb-0" role="alert">
+          <div class="alert alert-danger small mb-0" role="alert">
             {{ 'backups.restoreModal.warning' | t }}
           </div>
 
@@ -508,7 +510,7 @@
         </button>
         <button
           type="button"
-          class="btn btn-warning"
+          class="btn btn-danger"
           *ngIf="!snapshotRestoreResult"
           [disabled]="!restoreSnapshotApp || restoringSnapshot"
           (click)="confirmSnapshotRestore()"
@@ -520,7 +522,8 @@
   </div>
 
   <div class="backup-progress-backdrop" *ngIf="showDestinationRestartModal">
-    <div class="backup-progress-dialog" role="alertdialog" aria-modal="true" [attr.aria-label]="'backups.restartModal.ariaLabel' | t">
+    <div class="backup-progress-dialog" role="dialog" aria-modal="true" [attr.aria-label]="'backups.restartModal.ariaLabel' | t"
+         appModalFocus [dismissible]="destinationRestartDone" (dismiss)="closeDestinationRestartModal()">
       <div class="backup-progress-body">
         <h2 class="h5 mb-3">{{ 'backups.restartModal.heading' | t }}</h2>
         <p class="mb-2"

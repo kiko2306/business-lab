@@ -5,6 +5,7 @@ import { Subscription, catchError, finalize, of, switchMap, timer } from 'rxjs';
 import { PanelComponent } from '../../components/panel/panel.component';
 import { OperationsService } from '../../core/operations.service';
 import { ConfirmService } from '../../core/confirm.service';
+import { ModalFocusDirective } from '../../components/modal-focus.directive';
 import {
   BackupFile,
   BackupProgress,
@@ -47,7 +48,7 @@ const KOPIA_STATUS_POLL_MS = 1000;
 @Component({
   selector: 'app-backups',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, PanelComponent, TranslatePipe],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, PanelComponent, TranslatePipe, ModalFocusDirective],
   templateUrl: './backups.component.html',
   styleUrl: './backups.component.css',
 })

@@ -34948,3 +34948,22 @@ there. Tests in `service-card.component.spec.ts`: asks and names the hostname, d
 emits nothing, no prompt without a public address or before a start, no `[aria-live]` in a
 row. Rejected: a per-row inline confirm instead of the shared modal, since `ConfirmService`
 already gives focus handling and Escape, and the core case used it. Not rendered.
+
+## 783. Backups dialogs: focus, Escape, one severity (§776 item 6)
+
+The three hand-rolled Backups dialogs (snapshot restore, run progress, engine restart) had
+`aria-modal` and nothing else: focus stayed on the page behind, Tab left the dialog, Escape did
+nothing. A new `ModalFocusDirective` (`components/modal-focus.directive.ts`) does what the
+service card's Settings dialog already did inline — focus in on open, Tab/Shift+Tab wrap,
+focus back to the opener on close — plus Escape, emitted as `dismiss` only while its
+`dismissible` input is true: restore while not restoring, run once `done` or errored, restart
+once done. So Escape never abandons work that is still running. Progress and restart are now
+`role="dialog"` (not alerts); only the restore keeps `alertdialog`. The snapshot restore's
+`btn-warning`/`alert-warning` are `danger`: it overwrites app data, the same act the
+settings-file restore confirms in red, and amber is for a degraded state. The progress bar has
+an accessible name, and the two inline styles the critique found (`width: 6rem`,
+`height: 0.5rem`) are classes. Tests: `modal-focus.directive.spec.ts` (focus in and back, Tab
+wrap both ways, Escape gated) and four in `backups.component.spec.ts` (Escape per dialog,
+severity, roles, progress name). Rejected: moving the service card onto the directive in the
+same commit (working code with its own tests; a later cleanup), and a shared modal component,
+since only the focus behaviour was missing. Not rendered.
