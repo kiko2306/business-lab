@@ -24,7 +24,7 @@ const CATEGORY_ORDER: ServiceCategory[] = [
 
 // Fixed display order for both the running-apps table and the full apps
 // list, so the same category shows up in the same place in both.
-const CATEGORY_DISPLAY_ORDER: readonly string[] = [...CATEGORY_ORDER, 'Other'];
+export const CATEGORY_DISPLAY_ORDER: readonly string[] = [...CATEGORY_ORDER, 'Other'];
 
 function orderCategories(present: Iterable<string>): string[] {
   const seen = new Set(present);

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.153.14] — 2026-09-30
+
+### Fixed
+
+- Apps page: category names, access badges (Local network only / VPN only), Yes/No radios and setting labels are translated and plain-language instead of raw keys
+
 ## [0.153.13] — 2026-09-30
 
 ### Fixed

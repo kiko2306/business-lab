@@ -51,7 +51,7 @@
         rel="noopener noreferrer"
         [title]="'serviceCard.openUrlTitle' | t:{ url: lanAccessUrl() ?? '' }"
       >
-        {{ service.lanOnly ? 'lanOnly' : 'overlayOnly' }}
+        {{ (service.lanOnly ? 'serviceCard.access.lanOnly' : 'serviceCard.access.overlayOnly') | t }}
       </a>
     </div>
     <div class="service-row-sub">
@@ -143,7 +143,7 @@
           <ng-container *ngFor="let field of env.fields">
            <div *ngIf="!field.hidden" class="mb-2">
             <label class="form-label small mb-1" [for]="'env-' + service.name + '-' + field.key">
-              {{ field.key }}
+              {{ envLabel(field.key) }}
               <span *ngIf="field.required" class="text-danger">*</span>
             </label>
 
@@ -158,7 +158,7 @@
                   value="true"
                   [(ngModel)]="envValues[field.key]"
                 />
-                <label class="form-check-label small" [for]="'env-' + service.name + '-' + field.key + '-true'">true</label>
+                <label class="form-check-label small" [for]="'env-' + service.name + '-' + field.key + '-true'">{{ 'serviceCard.boolean.true' | t }}</label>
               </div>
               <div class="form-check">
                 <input
@@ -169,7 +169,7 @@
                   value="false"
                   [(ngModel)]="envValues[field.key]"
                 />
-                <label class="form-check-label small" [for]="'env-' + service.name + '-' + field.key + '-false'">false</label>
+                <label class="form-check-label small" [for]="'env-' + service.name + '-' + field.key + '-false'">{{ 'serviceCard.boolean.false' | t }}</label>
               </div>
             </div>
 
@@ -179,12 +179,12 @@
               <div class="form-check">
                 <input class="form-check-input" type="radio" disabled
                   [checked]="managedFieldValue(field) === 'true'" />
-                <label class="form-check-label small">true</label>
+                <label class="form-check-label small">{{ 'serviceCard.boolean.true' | t }}</label>
               </div>
               <div class="form-check">
                 <input class="form-check-input" type="radio" disabled
                   [checked]="managedFieldValue(field) !== 'true'" />
-                <label class="form-check-label small">false</label>
+                <label class="form-check-label small">{{ 'serviceCard.boolean.false' | t }}</label>
               </div>
             </div>
 

@@ -324,7 +324,7 @@ describe('ServiceCardComponent lanAccessUrl', () => {
     fixture.detectChanges();
 
     const link = fixture.nativeElement.querySelector('a.badge') as HTMLAnchorElement | null;
-    expect(link?.textContent?.trim()).toBe('lanOnly');
+    expect(link?.textContent?.trim()).toBe('Local network only');
     expect(link?.getAttribute('href')).toBe(`http://${window.location.hostname}:10450`);
   });
 
@@ -334,7 +334,7 @@ describe('ServiceCardComponent lanAccessUrl', () => {
     fixture.detectChanges();
 
     const link = fixture.nativeElement.querySelector('a.badge') as HTMLAnchorElement | null;
-    expect(link?.textContent?.trim()).toBe('overlayOnly');
+    expect(link?.textContent?.trim()).toBe('VPN only');
   });
 
   it('does not render the LAN/overlay link when the app is publicly exposed instead', () => {
@@ -343,7 +343,7 @@ describe('ServiceCardComponent lanAccessUrl', () => {
     fixture.detectChanges();
 
     const badges = Array.from(fixture.nativeElement.querySelectorAll('a.badge')) as HTMLAnchorElement[];
-    expect(badges.some((b) => b.textContent?.trim() === 'lanOnly' || b.textContent?.trim() === 'overlayOnly')).toBe(
+    expect(badges.some((b) => b.textContent?.trim() === 'Local network only' || b.textContent?.trim() === 'VPN only')).toBe(
       false
     );
   });

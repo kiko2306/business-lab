@@ -34675,3 +34675,16 @@ and starting rows, and whether an unsaved edit is lost on backdrop click. State 
 over SSE (`/api/services/stream`), so a route mock could not inject an `error` row. These
 need the live box (behind Authelia) or a stack with real apps. Rejected: mocking the SSE
 stream just to see a red row, which proves nothing about the real error text.
+
+## 763. Apps page: raw strings translated (first §761 P1)
+
+Category headings (`apps.category.<name>`), the LAN-only/VPN-only badge
+(`serviceCard.access.*`) and the true/false radios (`serviceCard.boolean.*`) now go
+through `t`, in en and pt-PT. Setting labels use `humanizeEnvKey` (`SIGNUPS_ALLOWED` →
+"Signups allowed") rather than a per-key table: the registry carries no labels, and a
+derived one covers all ~36 apps without a dictionary that rots. Rejected: a per-key
+label dictionary (same rot, hundreds of keys). Test first: `apps-strings.spec.ts` fails
+on any category/access/boolean key missing in either dictionary (categories come from
+the exported `CATEGORY_DISPLAY_ORDER`, so a new category without a translation fails).
+Two existing card specs asserted the raw `lanOnly`/`overlayOnly` text; updated.
+Search still matches the English category name. Beta check added to README.

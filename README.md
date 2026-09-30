@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.153.13** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.153.14** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -209,12 +209,11 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Apps page (impeccable critique, plan.md §761)
 
-- [ ] **Apps page: translate the raw strings (P1, plan.md §761)** — category names
-      (`apps.component.ts:14-23`, `apps.component.html:50,138`), the `lanOnly`/`overlayOnly`
-      badges (`service-card.html:54`) and the `true`/`false` radios (`:161,:172`) go through
-      the translate service ("Local network only", "VPN only", Yes/No), and Settings shows
-      friendly field labels instead of env keys. Test first: a registry-wide i18n test that
-      fails on any untranslated category or access value. Check in pt-PT on `beta`.
+- [ ] **Beta-test the Apps page translations (plan.md §763)** — on `beta`, switch the
+      language to pt-PT: category headings (both panels), the LAN-only/VPN-only badge on a
+      LAN-only app (Samba) and an overlay-only one (nginx-proxy-manager), and a boolean
+      setting's radios (Vaultwarden `SIGNUPS_ALLOWED`) read Portuguese ("Sim"/"Não"), and
+      setting labels read "Signups allowed", not `SIGNUPS_ALLOWED`. Delete once seen.
 
 - [ ] **Apps page: failed and starting/stopping states get a recovery path (P1, plan.md §761)**
       — `service.error` (`service-card.html:65`) becomes a plain cause plus one action

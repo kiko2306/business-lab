@@ -47,7 +47,7 @@
         <ng-container *ngIf="portGroups.length; else noPortsState">
           <div class="service-group mb-3" *ngFor="let group of portGroups; trackBy: trackByCategory">
             <h3 class="h6 text-body-secondary text-uppercase mb-2">
-              {{ group.category }}
+              {{ 'apps.category.' + group.category | t }}
               <span class="badge rounded-pill text-bg-secondary border fw-normal">{{ group.rows.length }}</span>
             </h3>
             <div class="table-responsive table-stack-wrap">
@@ -135,7 +135,7 @@
                 <svg class="chevron" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                   <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
-                <span>{{ group.category }}</span>
+                <span>{{ 'apps.category.' + group.category | t }}</span>
                 <span class="badge rounded-pill text-bg-secondary border fw-normal">{{ group.services.length }}</span>
               </button>
             </h3>

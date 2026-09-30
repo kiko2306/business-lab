@@ -31,6 +31,13 @@ import { ToastService } from '../../core/toast.service';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
 
+// SIGNUPS_ALLOWED -> "Signups allowed": the registry has no per-key labels, and
+// a derived one beats a raw env key for a non-technical owner (plan.md §761).
+export function humanizeEnvKey(key: string): string {
+  const words = key.toLowerCase().replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 type StartupPhase = 'streaming' | 'running' | 'error' | 'timeout';
 
 interface DependencyState {
@@ -57,6 +64,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   private readonly confirm = inject(ConfirmService);
   private readonly zone = inject(NgZone);
   protected readonly translate = inject(TranslateService);
+  protected readonly envLabel = humanizeEnvKey;
 
   @Input({ required: true }) service!: ServiceStatus;
   @Input() allServices: ServiceStatus[] = [];
