@@ -347,3 +347,17 @@ Do the bump with `scripts/bump-version.sh <patch|minor> <Category> "<bullet>"`
 rather than editing the three files by hand — it writes `VERSION`, the README
 line, and the `CHANGELOG.md` entry from one source of truth. Review its diff
 before committing.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues (`kiko2306/business-lab`) via `gh`, for the mattpocock skills only. README TODO stays the tracker for this repo's own working loop. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-label vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+single-context. See `docs/agents/domain.md`.
