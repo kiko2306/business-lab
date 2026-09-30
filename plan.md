@@ -34594,3 +34594,14 @@ reproduce (root in the backend can write those dirs; re-running `dumpOneApp`
 for all four succeeded) and is unexplained — those three `_dump` dirs have an
 mtime of Sep 28 08:55 unlike the rest. Not chased further; if it recurs, capture
 the dir's owner/mode at failure time.
+
+## 756. The outline/hotel/tally `EACCES` (§755): root-owned `data/_dump`
+
+Explained. The backend runs as `appuser` (uid 100, gid 101), not root; my
+`docker exec … node -e` re-run in §755 ran as root, which is why it succeeded
+where the real "Back up now" still failed with the same `EACCES`. The three
+`_dump` dirs are `root:lxd 0755` (created Sep 28 08:55 by a root process, after
+the 09-26/09-28 runs failed at `mkdir` — §702's case), so `appuser` cannot
+create `.part` in them. §702's entrypoint chown covered `data/` but never
+`data/_dump`. The entrypoint now also `chown -R`s `data/_dump` at every start.
+Lesson: a diagnostic run as root proves nothing about a non-root service.

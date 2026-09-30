@@ -40,6 +40,12 @@ if [ -n "${APPS_DIR:-}" ] && [ -d "$APPS_DIR" ]; then
     find "$d" -maxdepth 1 -type f \( -name '.env' -o -name '.env.example' \) \
       -exec chown appuser:appgroup {} + 2>/dev/null || true
     [ -d "${d}data" ] && chown appuser:appgroup "${d}data" 2>/dev/null || true
+    # data/_dump is the backend's own scratch (appDumps.ts) but a root
+    # process (a helper container, a by-hand fix) can leave it root:root
+    # 0755, after which every pg_dump into it fails EACCES as appuser and the
+    # backup reports "N database dumps failed" (plan.md §756). Recursive is
+    # safe here — nothing but our dump files lives inside.
+    [ -d "${d}data/_dump" ] && chown -R appuser:appgroup "${d}data/_dump" 2>/dev/null || true
   done
 fi
 
