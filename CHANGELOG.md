@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.157.4] — 2026-09-30
+
+### Polish
+
+- Fix the theme toggle icon and remove leftover stack/Docker jargon from Utils and Updates
+
 ## [0.157.3] — 2026-09-30
 
 ### Public links

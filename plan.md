@@ -35321,3 +35321,62 @@ plain language, no console/shell references, matching Home/Apps/Backups/Settings
 from §787–§789. Not a full README backlog item for the two Reported findings above;
 recorded here so they're not lost, left for the user to prioritize the same way §789's
 list was.
+
+## 791. §790's two reported findings fixed
+
+**Theme toggle icon.** `shell.component.html` swapped the bare `☀`/`☾` Unicode
+symbols for inline SVG — a minimal sun (circle + rays) and crescent moon, both
+`stroke="currentColor"`, matching `panel.component`'s own chevron convention
+exactly (same attribute shape, same "no font dependency" reasoning as §789's
+Home-tile emoji fix). Verified live at both states: the moon (light mode)
+already rendered fine everywhere, confirming the bug was specifically `☀`'s
+codepoint; the sun now renders as the actual SVG instead of the fallback
+glyph.
+
+**Utils/Updates jargon.** Rewrote in both languages, following §780's own
+before/after as the template:
+- `utils.subtitle`: "Stack health checks and…" → "Health checks and…" (the
+  panel titled "Health checks" sits one line below it — "Stack" added
+  nothing "health checks" alone doesn't already say).
+- `utils.health.dockerStorage`: "Docker storage" → "Apps storage" (what it
+  actually measures: disk used by every managed app's containers/images
+  together, as opposed to the other disk row, `systemRoot`).
+- `selfUpdate.subtitle`: "…this is also the only way managed apps' images
+  update, so the whole stack moves together." → "…including every app it
+  manages, all together." Same fact, no "stack".
+- `selfUpdate.panel.subtitle`: "Pull the latest code from {{branch}}, rebuild
+  the dashboard, pull and recreate every managed app on its pinned images,
+  then restart" → "Downloads the latest version, rebuilds the dashboard, and
+  updates every managed app to its latest version" — dropped `{{branch}}`
+  entirely rather than explain what a branch is; the template's interpolation
+  argument came out with it (dead code, not left behind).
+
+**Scope held, not expanded:** the Updates panel's commit-hash detail block
+("Current commit", "Latest on {{branch}}", "N commits behind", raw hashes) is
+the *same* jargon problem, worse — but it wasn't what §790 quoted or the
+README item asked for, and turning three git-status rows into something a
+non-technical reader wants instead is a real information-architecture
+decision (what does "is my box current" mean to someone who's never heard of
+a commit?), not a wording swap. Left alone here; flagged as its own README
+item rather than folded in as a drive-by.
+
+Test-first, following the existing per-page `*-strings.spec.ts` convention
+(`apps-strings.spec.ts`, `backups-strings.spec.ts`): new
+`utils-strings.spec.ts` bans stack/Docker across every `utils.*` key;
+new `self-update-strings.spec.ts` bans stack/pull/pinned/recreate/branch/
+commit across the three title/subtitle keys specifically (not the whole
+`selfUpdate.*` namespace — the commit-detail block's keys are *supposed* to
+say "commit" until that separate rewrite happens, so a namespace-wide guard
+would fail on purpose right now).
+
+Verified live (same harness): the moon/sun icons at both theme states, and
+both pages' rewritten copy, via a fresh screenshot each. 175 frontend tests,
+build clean. Route coverage check (asked directly): all 16 routes in
+`app.routes.ts` have now been screenshotted at least once, across §789/§790/
+this section — nothing left unvisited at the route level. What's *not* yet
+exercised: most pages' own panels only in their default collapsed state (no
+real apps/users/backups/drafts exist on the disposable test stack, so an
+expanded "Accounts" list, a populated "Log entries" table, a real running
+service row, etc. were never actually rendered) — noted, not treated as a
+gap to close without being asked; the test stack would need seeded data to
+show any of it.

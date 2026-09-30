@@ -10,7 +10,7 @@
     anchor="self-update"
     key="self-update"
     [title]="'selfUpdate.panel.title' | t"
-    [subtitle]="'selfUpdate.panel.subtitle' | t:{ branch: status?.check?.branch ?? 'main' }"
+    [subtitle]="'selfUpdate.panel.subtitle' | t"
   >
     <div class="card mb-3" *ngIf="status as s">
       <div class="card-body p-4">

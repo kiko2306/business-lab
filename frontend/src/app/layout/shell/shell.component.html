@@ -38,7 +38,20 @@
           <option value="pt-PT">PT</option>
         </select>
         <button type="button" class="btn btn-outline-secondary btn-sm app-header__theme" (click)="toggleTheme()"
-                [attr.aria-label]="'shell.themeLabel' | t" [title]="'shell.themeLabel' | t">{{ theme() === 'dark' ? '☀' : '☾' }}</button>
+                [attr.aria-label]="'shell.themeLabel' | t" [title]="'shell.themeLabel' | t">
+          <!-- Inline SVG, not a Unicode symbol — a bare ☀/☾ doesn't render in every font
+               (found live during an audit, plan.md §791); matches panel.component's own
+               chevron convention (currentColor stroke, no font dependency). -->
+          <svg *ngIf="theme() === 'dark'" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5" />
+            <path d="M8 0.5v2M8 13.5v2M15.5 8h-2M2.5 8h-2M13.2 2.8l-1.4 1.4M4.2 11.8l-1.4 1.4M13.2 13.2l-1.4-1.4M4.2 4.2L2.8 2.8"
+                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+          <svg *ngIf="theme() !== 'dark'" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M13.5 9.3A5.5 5.5 0 1 1 6.7 2.5a4.3 4.3 0 0 0 6.8 6.8z"
+                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
         <button type="button" class="btn btn-outline-danger btn-sm app-header__logout" (click)="logout()">{{ 'shell.logout' | t }}</button>
       </div>
     </div>

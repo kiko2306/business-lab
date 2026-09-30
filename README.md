@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.157.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.157.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -234,26 +234,20 @@ item is deleted.
       widths from 360px up, and pt-PT string lengths in the Apps row, Backups forms and
       Settings panels. New findings become new items here.
 
-### Audit findings, the other 12 pages (plan.md §790)
+### Audit findings, the other 12 pages (plan.md §790, §791)
 
 `/impeccable audit` extended past the original four (login, setup, recovery,
 set-password, access-denied, unsubscribe, content, utils, audit-logs, users, updates,
-account). A raw Joi validation leak on set-password/unsubscribe was fixed live in that
-same pass; these two are reported, not yet fixed.
+account). A raw Joi validation leak on set-password/unsubscribe, the theme toggle's
+icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§790,
+§791). One deferred, deliberately not folded into that fix:
 
-- [ ] **Shell header's theme toggle uses two bare Unicode symbols that don't both
-      render (plan.md §790)** — `shell.component.html`: `{{ theme() === 'dark' ? '☀' :
-      '☾' }}`. `☀` (dark mode) renders as a generic fallback glyph in a Chromium build
-      missing that codepoint's font coverage — the same fragility class as §789's Home
-      tile icons, on the shared header, so present on all 18 routes. Replace with plain
-      text ("Light"/"Dark") or an inline SVG (matching `.panel__toggle`'s existing
-      chevron, `stroke="currentColor"`, no font dependency).
-- [ ] **Utils and Updates still have the git/Docker jargon §780 removed from Settings
-      (plan.md §790)** — Utils: "Stack health checks", "Docker storage". Updates: "the
-      whole stack moves together", "Pull the latest code from main, rebuild the
-      dashboard, pull and recreate every managed app on its pinned images, then
-      restart". Rewrite in plain language, both en and pt-PT, following §780's own
-      before/after as the template.
+- [ ] **Updates page: the commit-hash detail block is still raw git status
+      (plan.md §791)** — "Current commit", "Latest on {{branch}}", "N commits behind",
+      monospace hashes. Same jargon problem as the title/subtitle §791 already fixed,
+      but rewriting it well means deciding what "is my box current" should say to a
+      non-technical reader, not just swapping words — a real design pass, not a
+      same-session drive-by. `self-update.component.html`'s `<dl>` block.
 
 ### Apps page (impeccable critique, plan.md §761)
 
