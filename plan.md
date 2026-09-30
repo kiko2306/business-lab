@@ -34832,3 +34832,25 @@ dead running-table CSS in `apps.component.css` removed (§772 deleted that table
 renders `.service-group table`); the "four-up" comment corrected to three tiles. Left as
 is: `→` in the port badge, which is data notation, not an icon. Specs updated to match the
 glyph removal. No live-stack surface changed, so no README beta item.
+
+## 776. Dashboard critique (Home, Apps, Backups, Settings): findings and the order to fix them
+
+Source-only dual-agent critique (design review + detector/greps per page; pages sit behind
+login, so nothing was rendered and contrast/layout are unmeasured). Scores: Home 18/36
+(n/a #9), Apps 25/40 (was 23), Backups 23/40, Settings 24/40. Detector clean on all four;
+real mechanical hits: inline styles at `backups.component.html:68,430` and
+`network-settings.component.html:66`. Snapshots in `.impeccable/critique/` (not committed).
+
+Cross-page themes: jargon shown to a non-technical owner (tunnel token, Kopia, rclone,
+`4000 → 80/tcp`, "error/unknown/inactive"); values asked of the user that the system can
+derive (Settings' Cloudflare tunnel/account/zone IDs); dialog and live-region gaps (Backups
+dialogs have no focus trap or Escape, Apps has `aria-live` on all 36 row badges); landing
+surfaces with no status or route (Home shows no box state, the Settings checklist is text).
+
+Decided with the user: fix **plain language first**, **one page at a time** (own test,
+commit and version bump each), and make **Home status-first** (summary strip, drop the
+stub Updates tile, merge the duplicate `/settings` tile). Order: Apps copy, Backups copy,
+Settings copy, Home; then Stop confirm, Backups dialogs, Settings derive-don't-ask.
+Left for a later batch: Users, Updates, Account, Audit logs, Utils, Social (not critiqued).
+Rejected for now: rendering the pages via the e2e stack to measure contrast; a review of
+the copy alone can land first and the render check belongs to `audit`.
