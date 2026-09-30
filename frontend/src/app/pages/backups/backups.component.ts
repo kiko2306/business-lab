@@ -74,6 +74,26 @@ export class BackupsComponent implements OnInit, OnDestroy {
     password: [''],
     options: [''],
   });
+
+  // §786: only these four sit under the "more kinds" disclosure; the other
+  // four (disk/smb/s3/sftp) stay in the main select.
+  private static readonly MORE_KINDS: BackupTargetKind[] = ['nfs', 'webdav', 'ftp', 'ftps'];
+  protected isMoreKind(kind: BackupTargetKind): boolean {
+    return BackupsComponent.MORE_KINDS.includes(kind);
+  }
+
+  // The one "extra flags" field every kind but disk has, consolidated under a
+  // single Advanced disclosure instead of one per kind (§786). null for a
+  // kind with no such field.
+  protected readonly optionsFieldByKind: Partial<Record<BackupTargetKind, { labelKey: string; hintKey: string; placeholder: string }>> = {
+    smb: { labelKey: 'backups.target.extraMountOptionsLabel', hintKey: 'backups.target.mountOptionsHint', placeholder: 'vers=2.1' },
+    nfs: { labelKey: 'backups.target.extraMountOptionsLabel', hintKey: 'backups.target.mountOptionsHint', placeholder: 'vers=2.1' },
+    s3: { labelKey: 'backups.target.extraConnectionFlagsLabel', hintKey: 'backups.target.s3FlagsHint', placeholder: '--region=us-east-1 --disable-tls' },
+    webdav: { labelKey: 'backups.target.extraConnectionFlagsLabel', hintKey: 'backups.target.webdavFlagsHint', placeholder: '' },
+    ftp: { labelKey: 'backups.target.extraRcloneFlagsLabel', hintKey: 'backups.target.rcloneHint', placeholder: '--ftp-disable-epsv' },
+    ftps: { labelKey: 'backups.target.extraRcloneFlagsLabel', hintKey: 'backups.target.rcloneHint', placeholder: '--ftp-disable-epsv' },
+    sftp: { labelKey: 'backups.target.extraRcloneFlagsLabel', hintKey: 'backups.target.rcloneHint', placeholder: '--sftp-known-hosts-file=/path/known_hosts' },
+  };
   protected backupTarget: BackupTargetSettings | null = null;
   protected backupTargetLoading = true;
   protected savingBackupTarget = false;

@@ -95,6 +95,10 @@ describe('BackupsComponent', () => {
   }
 
   beforeEach(async () => {
+    // SectionCollapseService persists panel state to real localStorage, which
+    // survives across tests in this file — start each one collapsed.
+    localStorage.clear();
+
     operations = jasmine.createSpyObj('OperationsService', [
       'listBackups',
       'listRemoteBackups',
@@ -412,4 +416,59 @@ describe('BackupsComponent', () => {
 
     component.ngOnDestroy();
   }));
+
+  // plan.md §786: only Disk, SMB, S3 and SFTP up front; the other four kinds
+  // and every kind's extra-flags field move under an Advanced disclosure.
+  describe('destination kinds and the Advanced disclosure', () => {
+    const expandPanel = () => {
+      const host = fixture.nativeElement as HTMLElement;
+      host.querySelector<HTMLElement>('.panel__toggle')?.click();
+      fixture.detectChanges();
+    };
+
+    beforeEach(() => expandPanel());
+
+    it('keeps only Disk, SMB, S3 and SFTP in the main destination select', () => {
+      const options = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLOptionElement>('#backupKind option')
+      ).map((o) => o.value);
+      expect(options).toEqual(['disk', 'smb', 's3', 'sftp']);
+    });
+
+    it('lists the other four kinds under a collapsed disclosure', () => {
+      const host = fixture.nativeElement as HTMLElement;
+      const details = host.querySelector<HTMLDetailsElement>('details.backup-kind-more');
+      expect(details).not.toBeNull();
+      expect(details?.open).toBeFalse(); // default kind is 'disk', not one of the four
+      const options = Array.from(details!.querySelectorAll<HTMLOptionElement>('option')).map((o) => o.value);
+      expect(options).toEqual(['nfs', 'webdav', 'ftp', 'ftps']);
+    });
+
+    it('picking a kind from the disclosure drives the same form control', () => {
+      const host = fixture.nativeElement as HTMLElement;
+      const moreSelect = host.querySelector<HTMLSelectElement>('details.backup-kind-more select');
+      moreSelect!.value = 'ftp';
+      moreSelect!.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+      expect(component['backupTargetForm'].controls.kind.value).toBe('ftp');
+    });
+
+    it('has no extra-flags field at all for Disk', () => {
+      expect((fixture.nativeElement as HTMLElement).querySelector('.backup-options-advanced')).toBeNull();
+    });
+
+    it('puts the extra-flags field for every other kind under one Advanced disclosure', () => {
+      component['backupTargetForm'].patchValue({ kind: 's3' });
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      const details = host.querySelectorAll('details.backup-options-advanced');
+      expect(details.length).toBe(1);
+      expect(details[0].querySelector('#backupOptions')).not.toBeNull();
+
+      component['backupTargetForm'].patchValue({ kind: 'sftp' });
+      fixture.detectChanges();
+      // Still exactly one — not a second copy left behind from the s3 branch.
+      expect(host.querySelectorAll('details.backup-options-advanced').length).toBe(1);
+    });
+  });
 });

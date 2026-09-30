@@ -162,14 +162,25 @@
             <select id="backupKind" class="form-select" formControlName="kind">
               <option value="disk">{{ 'backups.target.kind.disk' | t }}</option>
               <option value="smb">{{ 'backups.target.kind.smb' | t }}</option>
-              <option value="nfs">{{ 'backups.target.kind.nfs' | t }}</option>
               <option value="s3">{{ 'backups.target.kind.s3' | t }}</option>
-              <option value="webdav">{{ 'backups.target.kind.webdav' | t }}</option>
-              <option value="ftp">{{ 'backups.target.kind.ftp' | t }}</option>
-              <option value="ftps">{{ 'backups.target.kind.ftps' | t }}</option>
               <option value="sftp">{{ 'backups.target.kind.sftp' | t }}</option>
             </select>
           </div>
+
+          <!-- Four less-common kinds, out from under foot until asked for. Bound to the
+               same `kind` control as the select above (plan.md §786). -->
+          <details class="backup-kind-more col-12" [open]="isMoreKind(backupTargetForm.controls.kind.value) || null">
+            <summary>{{ 'backups.target.moreKindsSummary' | t }}</summary>
+            <div class="col-md-4 mt-2">
+              <label class="form-label" for="backupKindMore">{{ 'backups.target.moreKindsLabel' | t }}</label>
+              <select id="backupKindMore" class="form-select" formControlName="kind">
+                <option value="nfs">{{ 'backups.target.kind.nfs' | t }}</option>
+                <option value="webdav">{{ 'backups.target.kind.webdav' | t }}</option>
+                <option value="ftp">{{ 'backups.target.kind.ftp' | t }}</option>
+                <option value="ftps">{{ 'backups.target.kind.ftps' | t }}</option>
+              </select>
+            </div>
+          </details>
 
           <!-- Local disk -->
           <div class="col-md-8" *ngIf="backupTargetForm.controls.kind.value === 'disk'">
@@ -206,16 +217,6 @@
                      [placeholder]="backupTarget?.passwordConfigured ? ('backups.target.passwordConfigured' | t) : ('backups.target.passwordNotSet' | t)"
                      autocomplete="new-password" />
             </div>
-            <div class="col-12">
-              <label class="form-label fw-semibold" for="backupOptions">
-                {{ 'backups.target.extraMountOptionsLabel' | t }} <span class="fw-normal text-body-secondary">{{ 'common.optional' | t }}</span>
-              </label>
-              <input id="backupOptions" type="text" class="form-control" formControlName="options"
-                     placeholder="vers=2.1" autocomplete="off" />
-              <div class="form-text">
-                {{ 'backups.target.mountOptionsHint' | t }}
-              </div>
-            </div>
           </ng-container>
 
           <!-- S3-compatible bucket -->
@@ -245,16 +246,6 @@
                      [placeholder]="backupTarget?.passwordConfigured ? ('backups.target.passwordConfigured' | t) : ('backups.target.passwordNotSet' | t)"
                      autocomplete="new-password" />
             </div>
-            <div class="col-12">
-              <label class="form-label fw-semibold" for="backupOptions">
-                {{ 'backups.target.extraConnectionFlagsLabel' | t }} <span class="fw-normal text-body-secondary">{{ 'common.optional' | t }}</span>
-              </label>
-              <input id="backupOptions" type="text" class="form-control" formControlName="options"
-                     placeholder="--region=us-east-1 --disable-tls" autocomplete="off" />
-              <div class="form-text">
-                {{ 'backups.target.s3FlagsHint' | t }}
-              </div>
-            </div>
           </ng-container>
 
           <!-- WebDAV -->
@@ -276,13 +267,6 @@
               <input id="backupPassword" type="password" class="form-control" formControlName="password"
                      [placeholder]="backupTarget?.passwordConfigured ? ('backups.target.passwordConfigured' | t) : ('backups.target.passwordNotSet' | t)"
                      autocomplete="new-password" />
-            </div>
-            <div class="col-12">
-              <label class="form-label fw-semibold" for="backupOptions">
-                {{ 'backups.target.extraConnectionFlagsLabel' | t }} <span class="fw-normal text-body-secondary">{{ 'common.optional' | t }}</span>
-              </label>
-              <input id="backupOptions" type="text" class="form-control" formControlName="options" autocomplete="off" />
-              <div class="form-text">{{ 'backups.target.webdavFlagsHint' | t }}</div>
             </div>
           </ng-container>
 
@@ -317,18 +301,22 @@
                 {{ 'backups.target.sftpPasswordHint' | t }}
               </div>
             </div>
-            <div class="col-12">
+          </ng-container>
+
+          <!-- The one "extra flags" field every kind but Disk has, consolidated here
+               instead of repeated per kind (plan.md §786). -->
+          <details class="backup-options-advanced col-12" *ngIf="optionsFieldByKind[backupTargetForm.controls.kind.value] as opts"
+                    [open]="backupTargetForm.controls.options.value ? '' : null">
+            <summary>{{ 'backups.target.advancedSummary' | t }}</summary>
+            <div class="mt-2">
               <label class="form-label fw-semibold" for="backupOptions">
-                {{ 'backups.target.extraRcloneFlagsLabel' | t }} <span class="fw-normal text-body-secondary">{{ 'common.optional' | t }}</span>
+                {{ opts.labelKey | t }} <span class="fw-normal text-body-secondary">{{ 'common.optional' | t }}</span>
               </label>
               <input id="backupOptions" type="text" class="form-control" formControlName="options"
-                     [placeholder]="backupTargetForm.controls.kind.value === 'sftp' ? '--sftp-known-hosts-file=/path/known_hosts' : '--ftp-disable-epsv'"
-                     autocomplete="off" />
-              <div class="form-text">
-                {{ 'backups.target.rcloneHint' | t }}
-              </div>
+                     [placeholder]="opts.placeholder" autocomplete="off" />
+              <div class="form-text">{{ opts.hintKey | t }}</div>
             </div>
-          </ng-container>
+          </details>
 
           <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
             <button type="submit" class="btn btn-primary" [disabled]="savingBackupTarget">

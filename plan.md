@@ -35038,3 +35038,45 @@ renumbered every reference to §785 (this section) so the citations resolve.
 
 Backend 1293 tests + typecheck, frontend 153 tests + build all pass. Version
 bump: see CHANGELOG. README item deleted.
+
+## 786. Backups: four destination kinds up front, every kind's flags field under one Advanced disclosure
+
+Closes the README item (part of the §776 dashboard-critique batch, alongside §777's
+render/adapt passes). The destination-kind select listed all eight kinds (Disk, SMB,
+NFS, S3, WebDAV, FTP, FTPS, SFTP) at once; now only Disk, SMB, S3 and SFTP — the
+common cases — sit in the main select. The other four move under a collapsed
+`<details class="backup-kind-more">`, bound to the *same* `kind` form control via a
+second `formControlName="kind"` on its own `<select>` — Angular's reactive forms
+support more than one control-value-accessor per control (the same mechanism radio
+groups use), so both selects read and drive one shared value with no extra wiring.
+The disclosure auto-opens (`[open]`) when the loaded target's kind is already one of
+the four, so an existing NFS/WebDAV/FTP/FTPS setup doesn't look unset.
+
+Each of the five kinds with an "extra flags" field (every kind but Disk) had its own
+copy of that field, repeated per `ng-container`. Consolidated into one
+`<details class="backup-options-advanced">` after all the kind blocks, driven by a
+new `optionsFieldByKind` lookup in the component (label/hint/placeholder per kind,
+`undefined` for Disk) — one shared field, one shared disclosure, instead of five
+near-identical copies. It auto-opens when the field already holds a value, for the
+same "don't hide an existing setting" reason.
+
+**Test-first, per the working-loop rule.** `backups.component.spec.ts` got a new
+`describe` block before any template change: option count on the main select,
+presence/contents of the kind-more disclosure, that picking a "more" kind updates the
+shared control, that Disk has no flags field at all, and that switching between kinds
+leaves exactly one flags `<details>` in the DOM (not a leftover copy per kind touched).
+All five failed for the right reason against the old template; then the template and
+component changes landed and all five went green.
+
+One real flakiness bug caught along the way: `SectionCollapseService` persists to
+*real* `localStorage`, which survives across tests in the same spec file — a test that
+opened the panel left it open (or, worse, toggled it back closed) for whichever test
+ran next, depending on Karma's run order. `backups.component.spec.ts` never cleared it
+(unlike `account.component.spec.ts`'s existing `localStorage.clear()` convention);
+added it to this file's outer `beforeEach`, and three repeated full runs came back
+158/158 green where a couple of the new tests had intermittently failed before.
+
+Frontend-only; no backend change. New i18n keys (`backups.target.moreKindsSummary`,
+`.moreKindsLabel`, `.advancedSummary`) pass the existing §779 jargon guard. 158
+frontend tests + build pass. Rendering in en/pt-PT is covered by §777's audit/adapt
+pass, not repeated here. Version bump: see CHANGELOG.

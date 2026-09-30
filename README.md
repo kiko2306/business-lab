@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.156.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.156.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,9 +212,6 @@ it is done — not ticked off and left behind. Section references point at
 Done one page at a time, test first, each its own commit and version bump. A finished
 item is deleted.
 
-- [ ] **Backups: keep four destination kinds up front (plan.md §779)** — Disk, SMB, S3 and
-      SFTP visible, the rest and every "extra flags" field under an Advanced disclosure.
-      Layout change; check it renders in en and pt-PT (§777).
 - [ ] **Settings checklist: translate it and drop the console instructions (plan.md §780)** —
       the rows' label and detail come from `deploymentStatus.ts` in English only, and the
       tunnel row says "run start.sh with the token set", the admin row "open /setup". Key
