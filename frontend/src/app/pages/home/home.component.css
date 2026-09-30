@@ -1,14 +1,13 @@
 /* A bento grid (§141.2): three columns on desktop, with the high-traffic
-   tiles (Apps, Backups) and one closing tile spanning two columns. Nine
-   tiles = 3 doubles + 6 singles = 12 cells = four even rows, no ragged
-   straggler. A fixed row height lines every card body up regardless of how
-   long its description runs. Steps down to 2-up (doubles go full width) then
-   1-up on a phone. */
+   tiles (Apps, Backups) and one closing tile spanning two columns. Eight
+   tiles = 4 doubles + 4 singles = 12 cells = four even rows, no ragged
+   straggler. Rows size to content (compact, icon-led tiles, plan.md §781)
+   rather than a fixed height — nothing here runs long enough to need one.
+   Steps down to 2-up (doubles go full width) then 1-up on a phone. */
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-auto-rows: 12rem;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .menu-tile--wide {
@@ -45,27 +44,35 @@
 .menu-tile .card-body {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 1.6rem;
-  overflow: hidden;
+  gap: 0.3rem;
+  padding: 1.1rem 1.25rem;
+}
+
+.menu-tile__icon {
+  font-size: 1.6rem;
+  line-height: 1;
+  margin-bottom: 0.2rem;
 }
 
 .menu-tile .card-body h2 {
-  font-size: 1.3rem;
-  /* Two titles wrap to two lines ("Exposure & networking"); cap there so a
-     wrap can't push the description out of a fixed-height card. */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  font-size: 1.1rem;
+  margin-bottom: 0;
 }
 
 .menu-tile__desc {
-  font-size: 0.95rem;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  font-size: 0.9rem;
+}
+
+.menu-tile__badge {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--bs-warning-bg-subtle, #fff3cd);
+  color: var(--bs-warning-text-emphasis, #664d03);
 }
 
 /* The box's state sits where the subtitle was: calm by default, red only when an app needs the owner. */

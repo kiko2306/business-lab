@@ -1,10 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 import { HomeComponent } from './home.component';
 import { AuthService } from '../../core/auth.service';
 import { Capability } from '../../core/capabilities';
-import { ServiceSummary } from '../../core/models';
+import { BackupLastAppDataDump, SelfUpdateStatus, ServiceSummary } from '../../core/models';
+import { OperationsService } from '../../core/operations.service';
 import { ServiceStateService } from '../../core/service-state.service';
 import { en } from '../../i18n/en';
 import { ptPT } from '../../i18n/pt-pt';
@@ -16,15 +17,31 @@ describe('HomeComponent', () => {
   let el: HTMLElement;
   let summary$: BehaviorSubject<ServiceSummary>;
   let state: jasmine.SpyObj<ServiceStateService>;
+  let operations: jasmine.SpyObj<OperationsService>;
 
-  const setUp = (capabilities: Capability[] | 'all') => {
+  const neutralSelfUpdate: SelfUpdateStatus = { appVersion: '1.0.0', check: null, lastCheckError: null, latestRun: null };
+
+  const setUp = (
+    capabilities: Capability[] | 'all',
+    opts?: { commitsBehind?: number; lastSuccessfulAppData?: BackupLastAppDataDump | null }
+  ) => {
     summary$ = new BehaviorSubject<ServiceSummary>({ total: 0, running: 0, stopped: 0, error: 0, starting: 0 });
     state = jasmine.createSpyObj('ServiceStateService', ['startPolling', 'stopPolling'], { summary$ });
+    operations = jasmine.createSpyObj('OperationsService', ['getSelfUpdateStatus', 'getLastSuccessfulBackup']);
+    operations.getSelfUpdateStatus.and.returnValue(
+      of(
+        opts?.commitsBehind !== undefined
+          ? { ...neutralSelfUpdate, check: { currentCommit: 'a', remoteCommit: 'b', commitsBehind: opts.commitsBehind, checkedAt: '', branch: 'beta' } }
+          : neutralSelfUpdate
+      )
+    );
+    operations.getLastSuccessfulBackup.and.returnValue(of({ lastSuccessfulAppData: opts?.lastSuccessfulAppData ?? null }));
     TestBed.configureTestingModule({
       imports: [HomeComponent],
       providers: [
         provideRouter([]),
         { provide: ServiceStateService, useValue: state },
+        { provide: OperationsService, useValue: operations },
         {
           provide: AuthService,
           useValue: { hasCapability: (c: Capability) => capabilities === 'all' || capabilities.includes(c) },
@@ -75,6 +92,36 @@ describe('HomeComponent', () => {
     expect(state.startPolling).toHaveBeenCalledTimes(1);
     fixture.destroy();
     expect(state.stopPolling).toHaveBeenCalledTimes(1);
+  });
+
+  it('badges the Updates tile when an update is pending', () => {
+    setUp('all', { commitsBehind: 3 });
+    const badge = el.querySelector('a[href="/updates"] .menu-tile__badge');
+    expect(badge).not.toBeNull();
+    expect(badge?.textContent).toContain('Update available');
+  });
+
+  it('does not badge Updates when already current', () => {
+    setUp('all', { commitsBehind: 0 });
+    expect(el.querySelector('a[href="/updates"] .menu-tile__badge')).toBeNull();
+  });
+
+  it('badges the Backups tile with how long ago the last successful backup ran', () => {
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    setUp('all', { lastSuccessfulAppData: { at: threeDaysAgo, result: 'success', dumped: 5, failed: 0, trigger: 'schedule', failures: [] } });
+    const badge = el.querySelector('a[href="/backups"] .menu-tile__badge');
+    expect(badge?.textContent).toContain('3');
+  });
+
+  it('does not badge Backups when there is no successful backup yet', () => {
+    setUp('all', { lastSuccessfulAppData: null });
+    expect(el.querySelector('a[href="/backups"] .menu-tile__badge')).toBeNull();
+  });
+
+  it('does not fetch update or backup state for a role without those capabilities', () => {
+    setUp(['account' as Capability]);
+    expect(operations.getSelfUpdateStatus).not.toHaveBeenCalled();
+    expect(operations.getLastSuccessfulBackup).not.toHaveBeenCalled();
   });
 
   it('has plain copy in both languages and no leftover stub strings', () => {

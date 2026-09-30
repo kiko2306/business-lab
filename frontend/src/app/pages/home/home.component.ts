@@ -3,6 +3,7 @@ import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { Capability } from '../../core/capabilities';
+import { OperationsService } from '../../core/operations.service';
 import { ServiceStateService } from '../../core/service-state.service';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 
@@ -12,6 +13,8 @@ interface MenuTile {
   descriptionKey: string;
   /** Router path the tile links to. */
   link: string;
+  /** Decorative — the compact tile layout (plan.md §781) always shows the title too. */
+  icon: string;
   /** Hidden unless the signed-in user's role grants this (plan.md §149). */
   capability?: Capability;
   /** Like `capability`, but any one of these is enough (the page's own route guard is any-of). */
@@ -22,6 +25,8 @@ interface MenuTile {
    * evenly (4 doubles + 4 singles = 12 = four clean rows of three).
    */
   wide?: boolean;
+  /** Which of the two cheap status reads (plan.md §781) badges this tile, if any. */
+  badgeFor?: 'updates' | 'backups';
 }
 
 /**
@@ -37,26 +42,54 @@ interface MenuTile {
 })
 export class HomeComponent implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
+  private readonly operations = inject(OperationsService);
   protected readonly serviceState = inject(ServiceStateService);
 
   /** Only a role that can control apps sees the box's state, and only then is the poll worth running. */
   protected readonly showStatus = this.auth.hasCapability('apps:control');
 
+  /** True once a self-update check has found the box behind its tracked branch. */
+  protected updateAvailable = false;
+  /** Age in whole days of the last *successful* app-data backup; null until one has ever run. */
+  protected lastBackupDaysAgo: number | null = null;
+
   // Ordered so each row of three is one wide tile and one single.
   private readonly tiles: MenuTile[] = [
-    { titleKey: 'home.tiles.apps.title', descriptionKey: 'home.tiles.apps.description', link: '/apps', capability: 'apps:control', wide: true },
-    { titleKey: 'home.tiles.updates.title', descriptionKey: 'home.tiles.updates.description', link: '/updates', capability: 'system:update' },
-    { titleKey: 'home.tiles.backups.title', descriptionKey: 'home.tiles.backups.description', link: '/backups', capability: 'backups:manage', wide: true },
-    { titleKey: 'home.tiles.users.title', descriptionKey: 'home.tiles.users.description', link: '/users', capability: 'users:manage' },
+    { titleKey: 'home.tiles.apps.title', descriptionKey: 'home.tiles.apps.description', link: '/apps', icon: '🧩', capability: 'apps:control', wide: true },
+    { titleKey: 'home.tiles.updates.title', descriptionKey: 'home.tiles.updates.description', link: '/updates', icon: '🔄', capability: 'system:update', badgeFor: 'updates' },
+    { titleKey: 'home.tiles.backups.title', descriptionKey: 'home.tiles.backups.description', link: '/backups', icon: '💾', capability: 'backups:manage', wide: true, badgeFor: 'backups' },
+    { titleKey: 'home.tiles.users.title', descriptionKey: 'home.tiles.users.description', link: '/users', icon: '👥', capability: 'users:manage' },
     // Networking used to be its own tile onto the same /settings page; one tile now, gated like the route.
-    { titleKey: 'home.tiles.settings.title', descriptionKey: 'home.tiles.settings.description', link: '/settings', anyCapability: ['settings:manage', 'exposure:settings'], wide: true },
-    { titleKey: 'home.tiles.utils.title', descriptionKey: 'home.tiles.utils.description', link: '/utils', capability: 'apps:control' },
-    { titleKey: 'home.tiles.account.title', descriptionKey: 'home.tiles.account.description', link: '/account', wide: true },
-    { titleKey: 'home.tiles.auditLogs.title', descriptionKey: 'home.tiles.auditLogs.description', link: '/audit-logs', capability: 'audit:view' },
+    { titleKey: 'home.tiles.settings.title', descriptionKey: 'home.tiles.settings.description', link: '/settings', icon: '⚙️', anyCapability: ['settings:manage', 'exposure:settings'], wide: true },
+    { titleKey: 'home.tiles.utils.title', descriptionKey: 'home.tiles.utils.description', link: '/utils', icon: '🧰', capability: 'apps:control' },
+    { titleKey: 'home.tiles.account.title', descriptionKey: 'home.tiles.account.description', link: '/account', icon: '👤', wide: true },
+    { titleKey: 'home.tiles.auditLogs.title', descriptionKey: 'home.tiles.auditLogs.description', link: '/audit-logs', icon: '📜', capability: 'audit:view' },
   ];
 
   ngOnInit(): void {
     if (this.showStatus) this.serviceState.startPolling();
+
+    // One-off reads, not polled — these change rarely, unlike app state
+    // (plan.md §781). Each is cheap enough to run on every visit: the update
+    // check is a cached value refreshed every 6h, not a live fetch, and the
+    // backup one is a single indexed query with no Kopia round trip.
+    if (this.auth.hasCapability('system:update')) {
+      this.operations.getSelfUpdateStatus().subscribe({
+        next: (status) => (this.updateAvailable = (status.check?.commitsBehind ?? 0) > 0),
+        // Non-fatal: the tile just shows no badge.
+        error: () => {},
+      });
+    }
+    if (this.auth.hasCapability('backups:manage')) {
+      this.operations.getLastSuccessfulBackup().subscribe({
+        next: ({ lastSuccessfulAppData }) => {
+          this.lastBackupDaysAgo = lastSuccessfulAppData
+            ? Math.floor((Date.now() - new Date(lastSuccessfulAppData.at).getTime()) / (24 * 60 * 60 * 1000))
+            : null;
+        },
+        error: () => {},
+      });
+    }
   }
 
   ngOnDestroy(): void {

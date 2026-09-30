@@ -98,6 +98,9 @@ export const en: Record<string, string> = {
   'home.tiles.auditLogs.description': 'A record of user actions and system operations, exportable as CSV.',
   'home.tiles.account.title': 'Account security',
   'home.tiles.account.description': 'Two-factor authentication for your own sign-in.',
+  'home.badge.updateAvailable': 'Update available',
+  'home.badge.backupToday': 'Backed up today',
+  'home.badge.backupDaysAgo': 'Backed up {{days}}d ago',
 
   'common.loading': 'Loading…',
   'common.close': 'Close',

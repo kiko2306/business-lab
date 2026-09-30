@@ -72,6 +72,23 @@ router.get('/status', async (_req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/backups/last-successful — just the timestamp of the last
+ * successful app-data dump, one indexed query and no Kopia round trip
+ * (plan.md §781). `/status` above already covers this and more, but its
+ * Kopia calls are too much to run on every visit to Home; this is what Home's
+ * status strip reads instead.
+ */
+router.get('/last-successful', async (_req: Request, res: Response) => {
+  try {
+    const lastSuccessfulAppData = await getLastAppDataDump({ onlySuccess: true });
+    return res.json({ lastSuccessfulAppData });
+  } catch (error) {
+    logger.error('Unable to load the last successful backup', { error: (error as Error).message });
+    return res.status(500).json({ error: 'Unable to load the last successful backup.' });
+  }
+});
+
+/**
  * GET /api/backups/remote — the snapshots Kopia actually holds at the
  * configured destination, newest first (mirrors GET / for the local
  * archives). `listSnapshots` never throws and returns `[]` when there is no

@@ -17,6 +17,7 @@ import {
   BackupProgress,
   BackupScheduleConfig,
   BackupScheduleSettings,
+  BackupLastAppDataDump,
   BackupStatusResponse,
   RemoteBackupListResponse,
   SnapshotRestoreResponse,
@@ -91,6 +92,16 @@ export class OperationsService {
 
   getBackupStatus(): Observable<BackupStatusResponse> {
     return this.http.get<BackupStatusResponse>(`${API_BASE_URL}/backups/status`);
+  }
+
+  /** Just the last successful app-data backup's timestamp — no Kopia round trip,
+   * cheap enough for Home's status strip to read on every visit (plan.md §781). */
+  getLastSuccessfulBackup(): Observable<{ lastSuccessfulAppData: BackupLastAppDataDump | null }> {
+    // Read by Home on every visit; a failure here shouldn't toast (same
+    // reasoning as getSelfUpdateStatus below) — the caller just shows no badge.
+    return this.http.get<{ lastSuccessfulAppData: BackupLastAppDataDump | null }>(`${API_BASE_URL}/backups/last-successful`, {
+      context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+    });
   }
 
   getSelfUpdateStatus(): Observable<SelfUpdateStatus> {

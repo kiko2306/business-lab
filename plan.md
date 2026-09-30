@@ -35112,3 +35112,46 @@ assert on `.params` instead of a rendered English sentence.
 
 Backend 1293 tests + typecheck, frontend 164 tests + build pass. Version bump: see
 CHANGELOG.
+
+## 788. Home: backup age and update-available badges, and tiles sized to content
+
+Closes the README item (§776 item 4's leftover) — the two pieces §781 named as needing
+APIs Home didn't call yet, plus the fixed-height tile layout that §776's own P2 left in
+place.
+
+**Backup age.** `/backups/status` (used by the Backups page) calls Kopia's REST API
+(repo status, sources, snapshots — up to three round trips) on every request; fine for
+a page opened deliberately, too much to run on every Home visit. Added
+`getLastAppDataDump({ onlySuccess: true })` (parameterized, default behaviour
+untouched) and a new `GET /api/backups/last-successful` route that runs only that one
+indexed `audit_logs` query — no Kopia call at all. Home reads it once on init (not
+polled — a backup's age doesn't need a live loop the way app state does) and badges
+the Backups tile with the day count, or nothing if none has ever succeeded.
+
+**Update available.** `GET /api/self-update/status` was already cheap — `cachedCheck`
+is refreshed by a 6h sweeper, not fetched live, exactly what "Home can read them
+cheaply" was asking for. Home reads `check.commitsBehind > 0` once on init and badges
+the Updates tile. Both reads skip the global HTTP error toast
+(`SKIP_GLOBAL_ERROR_HANDLING`, matching the existing convention on
+`getSelfUpdateStatus`) and fail silently into "no badge" — a background read on a
+landing page shouldn't toast an error on every sign-in.
+
+**Layout.** `grid-auto-rows: 12rem` (and the title/description line-clamps it existed
+to protect) dropped — tiles now size to content. Each tile got a decorative emoji icon
+(`aria-hidden`, title text still carries the label) and tighter padding, matching the
+"compact tiles with icons" ask. `.menu-tile__badge` — a class the existing spec already
+asserted was absent by default, evidently reserved for this — now renders as a small
+pill in the tile's corner for the two badged tiles.
+
+Test-first: `home.component.spec.ts` got new cases (badge appears/doesn't for both
+signals, no fetch for a role without the capability) before `HomeComponent` read
+anything past `ServiceStateService`; they failed compiling against the old component
+(no `OperationsService` injected, no `badgeFor`) and then against its behaviour, then
+went green. Backend's `toLastAppDataDump` mapping was already covered and is unchanged
+by the new `onlySuccess` option — no assertions needed there (the query itself isn't
+unit-tested, per convention).
+
+Backend 1293 tests + typecheck, frontend 169 tests + build pass (three repeated runs,
+no flake). Not run against `e2e/tests/nav.spec.ts`'s full browser suite — this doesn't
+touch auth, nav or Users, so it's outside that gate; the route/heading it asserts on is
+unchanged either way. Version bump: see CHANGELOG.

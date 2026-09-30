@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.157.0] — 2026-09-30
+
+### Home
+
+- Badge the Updates and Backups tiles with a pending update and last-backup age; compact icon-led tiles
+
 ## [0.156.5] — 2026-09-30
 
 ### Settings

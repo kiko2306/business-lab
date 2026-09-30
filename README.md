@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.156.5** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.157.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,10 +212,15 @@ it is done — not ticked off and left behind. Section references point at
 Done one page at a time, test first, each its own commit and version bump. A finished
 item is deleted.
 
-- [ ] **Home: backup age and "update available" in the status strip (plan.md §781)** — the
-      strip shows app state only; add the last successful backup and a pending update once
-      Home can read them cheaply. Also `layout`: compact tiles with icons instead of fixed
-      12rem cards.
+- [ ] **Beta-test Home's new badges (plan.md §788)** — on `beta`, with a
+      successful app-data backup on record, confirm the Backups tile shows
+      its age ("Backed up Nd ago" / "Backed up today"), and that the Updates
+      tile shows "Update available" only once `beta` is genuinely behind
+      `origin/beta` (it won't be, right after a pull — check right before the
+      next commit lands, or watch it clear after updating). Confirm neither
+      badge triggers an error toast if you can make one of the two reads fail
+      (e.g. stop the backend's DB briefly) — the tile should just show no
+      badge, not an error.
 - [ ] **Beta-test the derived Cloudflare account/zone IDs (plan.md §785)** — on
       `beta`, open Settings → Networking with the account/zone fields blank
       under **Advanced**, save, and confirm the exposure config ends up with

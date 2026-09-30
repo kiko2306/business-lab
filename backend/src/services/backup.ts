@@ -317,12 +317,13 @@ export function toLastAppDataDump(
   };
 }
 
-export async function getLastAppDataDump(): Promise<LastAppDataDump | null> {
+export async function getLastAppDataDump(options?: { onlySuccess?: boolean }): Promise<LastAppDataDump | null> {
   // Both resources are app-database dumps: the scheduler writes 'app-data',
   // the manual "dump apps" route writes 'app-databases'. Newest of either.
   const result = await query<{ result: string; created_at: Date; metadata: unknown }>(
     `SELECT result, created_at, metadata FROM audit_logs
      WHERE action = 'backup_create' AND resource IN ('app-data', 'app-databases')
+       ${options?.onlySuccess ? "AND result = 'success'" : ''}
      ORDER BY created_at DESC
      LIMIT 1`
   );

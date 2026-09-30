@@ -98,6 +98,9 @@ export const ptPT: Record<string, string> = {
   'home.tiles.auditLogs.description': 'Um registo das ações dos utilizadores e operações do sistema, exportável em CSV.',
   'home.tiles.account.title': 'Segurança da conta',
   'home.tiles.account.description': 'Autenticação de dois fatores para a sua própria sessão.',
+  'home.badge.updateAvailable': 'Atualização disponível',
+  'home.badge.backupToday': 'Copiado hoje',
+  'home.badge.backupDaysAgo': 'Copiado há {{days}}d',
 
   'common.loading': 'A carregar…',
   'common.close': 'Fechar',

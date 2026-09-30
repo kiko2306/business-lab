@@ -16,7 +16,12 @@
       [class.menu-tile--wide]="tile.wide && useBento"
       [routerLink]="tile.link"
     >
+      <span *ngIf="tile.badgeFor === 'updates' && updateAvailable" class="menu-tile__badge">{{ 'home.badge.updateAvailable' | t }}</span>
+      <span *ngIf="tile.badgeFor === 'backups' && lastBackupDaysAgo !== null" class="menu-tile__badge">
+        {{ (lastBackupDaysAgo === 0 ? 'home.badge.backupToday' : 'home.badge.backupDaysAgo') | t:{ days: lastBackupDaysAgo } }}
+      </span>
       <div class="card-body">
+        <span class="menu-tile__icon" aria-hidden="true">{{ tile.icon }}</span>
         <h2 class="h5 mb-1">{{ tile.titleKey | t }}</h2>
         <p class="menu-tile__desc text-body-secondary small mb-0">{{ tile.descriptionKey | t }}</p>
       </div>
