@@ -119,6 +119,15 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   private pendingStartupLines: string[] = [];
   private startupFlushTimer?: ReturnType<typeof setTimeout>;
 
+  // Dialogs are focused when they render (the setters fire once the element
+  // exists) and hand focus back to whatever opened them (plan.md §761).
+  private opener: HTMLElement | null = null;
+  @ViewChild('settingsDialog') protected set settingsDialogEl(el: ElementRef<HTMLElement> | undefined) {
+    el?.nativeElement.focus();
+  }
+  @ViewChild('startupDialog') protected set startupDialogEl(el: ElementRef<HTMLElement> | undefined) {
+    el?.nativeElement.focus();
+  }
   @ViewChild('startupLogBody') private startupLogBody?: ElementRef<HTMLElement>;
 
   /**
@@ -190,7 +199,37 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     }
   }
 
+  /** Keeps Tab/Shift+Tab inside the dialog: aria-modal alone does not trap focus. */
+  protected trapTab(event: KeyboardEvent): void {
+    if (event.key !== 'Tab') {
+      return;
+    }
+    const dialog = event.currentTarget as HTMLElement;
+    const focusable = dialog.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])'
+    );
+    if (!focusable.length) {
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || active === dialog)) {
+      last.focus();
+      event.preventDefault();
+    } else if (!event.shiftKey && active === last) {
+      first.focus();
+      event.preventDefault();
+    }
+  }
+
+  private restoreFocus(): void {
+    this.opener?.focus();
+    this.opener = null;
+  }
+
   openSettings(): void {
+    this.opener = document.activeElement as HTMLElement | null;
     this.settingsModalOpen = true;
     if (!this.env) {
       this.loadEnv();
@@ -203,10 +242,12 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   closeSettings(): void {
     this.settingsModalOpen = false;
+    this.restoreFocus();
   }
 
   private async openStartupLogs(): Promise<void> {
     this.teardownStartupLogs();
+    this.opener = document.activeElement as HTMLElement | null;
     this.startupLogsOpen = true;
     this.startupLogLines = [];
     this.startupPhase = 'streaming';
@@ -329,6 +370,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   closeStartupLogs(): void {
     this.teardownStartupLogs();
     this.startupLogsOpen = false;
+    this.restoreFocus();
   }
 
   private teardownStartupLogs(): void {

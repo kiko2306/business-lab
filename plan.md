@@ -34700,3 +34700,15 @@ down; `requestAction` became async for that. Rejected: a new `stopping` state โ€
 backend has none, and `loadingAction === 'stop'` already shows the spinner. Rejected:
 new CSS (the card's stylesheet sits near its 8 kB budget); Bootstrap utilities only.
 Tests: four new specs in `service-card.component.spec.ts`, red before the change.
+
+## 765. Apps page: dialog focus and unsaved edits (ยง761 P2)
+
+Settings no longer closes on a backdrop click (it silently dropped unsaved edits);
+Escape and the X still close. Both dialogs (Settings, startup log) take focus when they
+render, wrap Tab/Shift+Tab (`trapTab`), and return focus to the opener on close; the
+state badge is `aria-live="polite"`. Rejected: native `<dialog>.showModal()` (free trap
+and focus return, but rewrites both dialogs and their CSS against a tight 8 kB budget);
+a dirty-check prompt on backdrop click (more code than removing the trigger). Claim not
+borne out: a disabled Start's reason is already visible text in the row sub-line
+(`startBlockedTitle()`), not only a `title`, so nothing changed there. Tests: three specs
+in `service-card.component.spec.ts`, red before.

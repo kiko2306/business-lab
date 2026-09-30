@@ -472,3 +472,65 @@ describe('ServiceCardComponent recovery states', () => {
     expect(emitted).toEqual(['stop']);
   });
 });
+
+// plan.md §761: the Settings dialog must not drop unsaved edits on a stray
+// backdrop click, must keep Tab inside, and must hand focus back on close.
+describe('ServiceCardComponent settings dialog focus', () => {
+  let fixture: ComponentFixture<ServiceCardComponent>;
+  let component: ServiceCardComponent;
+  let el: HTMLElement;
+
+  beforeEach(async () => {
+    const operations = jasmine.createSpyObj('OperationsService', ['getServiceEnv', 'listAppBackups']);
+    operations.listAppBackups.and.returnValue(of({ items: [] }));
+    operations.getServiceEnv.and.returnValue(of({ fields: [] } as unknown as ServiceEnvStatus));
+    await TestBed.configureTestingModule({
+      imports: [ServiceCardComponent],
+      providers: [
+        { provide: OperationsService, useValue: operations },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+        { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ServiceCardComponent);
+    component = fixture.componentInstance;
+    component.service = service('paperless', 'running');
+    component.allServices = [component.service];
+    el = fixture.nativeElement;
+    document.body.appendChild(el); // focus only works on attached nodes
+    fixture.detectChanges();
+  });
+
+  afterEach(() => el.remove());
+
+  const opener = () => el.querySelector('.service-row-actions button:last-child') as HTMLButtonElement;
+
+  it('keeps the dialog open, edits intact, on a backdrop click', () => {
+    opener().click();
+    fixture.detectChanges();
+    (el.querySelector('.settings-backdrop') as HTMLElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('.settings-dialog')).not.toBeNull();
+  });
+
+  it('moves focus into the dialog, then back to the opener on close', () => {
+    opener().focus();
+    opener().click();
+    fixture.detectChanges();
+    expect(el.querySelector('.settings-dialog')!.contains(document.activeElement)).toBeTrue();
+    component.closeSettings();
+    fixture.detectChanges();
+    expect(document.activeElement).toBe(opener());
+  });
+
+  it('wraps Tab from the last control to the first', () => {
+    opener().click();
+    fixture.detectChanges();
+    const dialog = el.querySelector('.settings-dialog') as HTMLElement;
+    const focusable = dialog.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]');
+    focusable[focusable.length - 1].focus();
+    dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(focusable[0]);
+  });
+});

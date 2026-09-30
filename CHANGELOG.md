@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.153.16] — 2026-09-30
+
+### Fixed
+
+- Apps page: a stray click outside the Settings dialog no longer discards unsaved edits; dialogs keep keyboard focus inside and return it on close
+
 ## [0.153.15] — 2026-09-30
 
 ### Changed

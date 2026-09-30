@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.153.15** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.153.16** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -231,11 +231,11 @@ it is done — not ticked off and left behind. Section references point at
       and the page opens with one sentence ("All 36 apps fine" / "3 need you").
       Question raised, not decided: is the Running table a duplicate of the list?
 
-- [ ] **Apps page: modal focus and unsaved edits (P2, plan.md §761)** — Settings and log
-      dialogs trap focus and return it to the opener; a backdrop click no longer drops
-      unsaved edits (`service-card.html:116,388`, `service-card.ts:163-181`); a disabled
-      Start's reason is reachable by keyboard (not only a `title` on a disabled button);
-      state changes go to an `aria-live` region.
+- [ ] **Beta-test the Apps page dialogs (plan.md §765)** — on `beta`: open an app's
+      Settings, type into a field, click the dark backdrop — the dialog stays and the edit
+      survives; Tab/Shift+Tab never leaves it; Escape closes it and focus lands back on the
+      Settings button. Same Tab/focus check on the startup-log dialog after pressing Start.
+      Delete once seen.
 
 - [ ] **Apps page: small fixes (P3, plan.md §761)** — emoji icons to SVG or initials
       (`service-card.ts:687-735`); `dd/MM/yyyy, HH:mm` hard-coded at `apps.component.html:34`
