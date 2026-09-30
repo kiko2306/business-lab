@@ -83,3 +83,7 @@ apps/kitchen-switcher/html/config.json
 # configuration.yml is generated: start.sh seeds it from the .example, and the
 # dashboard rewrites its access_control block on every exposure change (plan.md §151).
 apps/authelia/config/configuration.yml
+
+# Impeccable skill's own cache/state and timestamped scratch critique notes —
+# local tool output, not source.
+.impeccable/
