@@ -34712,3 +34712,14 @@ a dirty-check prompt on backdrop click (more code than removing the trigger). Cl
 borne out: a disabled Start's reason is already visible text in the row sub-line
 (`startBlockedTitle()`), not only a `title`, so nothing changed there. Tests: three specs
 in `service-card.component.spec.ts`, red before.
+
+## 766. Apps page: thinner row heading (§761 P2)
+
+Heading keeps name, state badge, the health badge only for a running app that fails its
+check (the "healthy"/"inactive" badges restated state), and the one primary link
+(public URL, or the LAN-only/VPN-only badge). The ⓥ version, Android/iOS badges, app-URL
+and secondary URLs moved to a new `settings-about` block at the top of the Settings
+dialog, as labelled text rather than icon-only badges. Rejected: a separate detail view
+(Settings already is one). Not done: "one Open link" beyond this — the public URL is
+already the single link. Tests: three heading specs, red before; the older ⓥ spec now
+looks in the dialog.

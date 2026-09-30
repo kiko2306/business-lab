@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.153.16** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.153.17** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -222,9 +222,11 @@ it is done — not ticked off and left behind. Section references point at
       on nginx-proxy-manager asks "Stop anyway?", Cancel leaves it running. Check in pt-PT
       too. Delete once seen.
 
-- [ ] **Apps page: thin out the heading line (P2, plan.md §761)** — version, Android/iOS
-      links and secondary URLs move into a detail view; the row keeps state and one "Open"
-      link; health shows only when it differs from state (`service-card.html:7-55`).
+- [ ] **Beta-test the thinner Apps row heading (plan.md §766)** — on `beta`, a running
+      exposed app's row shows only its name, state and one link (no ⓥ, phone badges,
+      secondary URLs, or "healthy"); a failing health check still shows "check failed";
+      Settings opens with the version, phone-app and secondary/app URLs at the top. Check
+      on an app that has them (Nextcloud or Vaultwarden). Delete once seen.
 
 - [ ] **Apps page: scale tools for 36 apps (P2, plan.md §761)** — summary tiles filter
       (Issues, Stopped), a "Start with what it needs" action, groups with issues auto-expand,

@@ -266,15 +266,16 @@ describe('ServiceCardComponent installedVersion', () => {
     expect(component['installedVersion']()).toBe('latest');
   });
 
-  it('renders a single ⓥ badge with the version in its title, and no pinned badges or Unpin button', () => {
+  it('renders a single ⓥ badge with the version in the Settings dialog, and no pinned badges or Unpin button', () => {
     component.service = service('guacamole', 'running', { pinnedImages: [], versionPinned: ['1.6.0'] });
     component.allServices = [component.service];
+    component['settingsModalOpen'] = true;
     fixture.detectChanges();
 
     const root: HTMLElement = fixture.nativeElement;
-    const versionBadge = Array.from(root.querySelectorAll('span')).find((el) => el.textContent?.trim() === 'ⓥ');
+    const versionBadge = Array.from(root.querySelectorAll('.settings-about span')).find((el) => el.textContent?.includes('ⓥ'));
     expect(versionBadge).withContext('ⓥ badge should render').toBeTruthy();
-    expect(versionBadge?.getAttribute('title')).toBe('Installed: 1.6.0');
+    expect(versionBadge?.textContent?.trim()).toBe('ⓥ Installed: 1.6.0');
 
     expect(root.textContent).not.toContain('pinned to a fixed image');
     expect(root.textContent).not.toContain('version pinned');
@@ -532,5 +533,71 @@ describe('ServiceCardComponent settings dialog focus', () => {
     focusable[focusable.length - 1].focus();
     dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
     expect(document.activeElement).toBe(focusable[0]);
+  });
+});
+
+// plan.md §761: the row heading keeps state, health-only-when-wrong and one
+// link; version, phone apps and secondary URLs live in the Settings dialog.
+describe('ServiceCardComponent heading line', () => {
+  let fixture: ComponentFixture<ServiceCardComponent>;
+  let component: ServiceCardComponent;
+  let el: HTMLElement;
+
+  beforeEach(async () => {
+    const operations = jasmine.createSpyObj('OperationsService', ['getServiceEnv', 'listAppBackups']);
+    operations.listAppBackups.and.returnValue(of({ items: [] }));
+    operations.getServiceEnv.and.returnValue(of({ fields: [] } as unknown as ServiceEnvStatus));
+    await TestBed.configureTestingModule({
+      imports: [ServiceCardComponent],
+      providers: [
+        { provide: OperationsService, useValue: operations },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+        { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ServiceCardComponent);
+    component = fixture.componentInstance;
+    el = fixture.nativeElement;
+  });
+
+  const render = (extra: Partial<ServiceStatus>) => {
+    component.service = service('paperless', 'running', {
+      exposedHostname: 'paperless.example.com',
+      clientApiPath: '/api',
+      mobileApps: { android: true, ios: true },
+      additionalExposureUrls: [{ label: 'Sync', hostname: 'sync.example.com' }],
+      ...extra,
+    });
+    component.allServices = [component.service];
+    fixture.detectChanges();
+  };
+  const heading = () => el.querySelector('.service-row-heading') as HTMLElement;
+
+  it('shows state and one link, and no health badge while healthy', () => {
+    render({});
+    expect(heading().querySelectorAll('a').length).toBe(1);
+    expect(heading().textContent).toContain('paperless.example.com');
+    expect(heading().textContent).not.toContain('sync.example.com');
+    expect(heading().querySelector('svg')).toBeNull();
+    expect(heading().textContent).not.toContain('ⓥ');
+    expect(heading().querySelectorAll('.badge').length).toBe(2); // state + link
+  });
+
+  it('shows a health badge only when a running app fails its check', () => {
+    render({ healthy: false });
+    expect(heading().textContent).toContain('check failed');
+  });
+
+  it('moves version, phone apps and secondary URLs into the Settings dialog', () => {
+    render({});
+    component.openSettings();
+    fixture.detectChanges();
+    const about = el.querySelector('.settings-dialog .settings-about') as HTMLElement;
+    expect(about.textContent).toContain('sync.example.com');
+    expect(about.textContent).toContain('/api');
+    expect(about.textContent).toContain('Android');
+    expect(about.textContent).toContain('iPhone');
+    expect(about.textContent).toContain('ⓥ');
   });
 });
