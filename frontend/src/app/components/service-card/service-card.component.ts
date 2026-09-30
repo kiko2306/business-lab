@@ -38,6 +38,8 @@ export function humanizeEnvKey(key: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+const CORE_SERVICES = new Set(['authelia', 'nginx-proxy-manager']);
+
 type StartupPhase = 'streaming' | 'running' | 'error' | 'timeout';
 
 interface DependencyState {
@@ -149,7 +151,18 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     return `http://${host}:${this.service.webPort}${this.service.webPath ?? ''}`;
   }
 
-  requestAction(action: ServiceAction): void {
+  async requestAction(action: ServiceAction): Promise<void> {
+    // Stopping the SSO or the proxy silently takes every gated/exposed app down.
+    if (action === 'stop' && CORE_SERVICES.has(this.service.name)) {
+      const confirmed = await this.confirm.ask({
+        title: this.translate.t('serviceCard.confirmStopCore.title', { label: this.service.label }),
+        message: this.translate.t('serviceCard.confirmStopCore.message', { label: this.service.label }),
+        confirmText: this.translate.t('serviceCard.confirmStopCore.confirmText'),
+      });
+      if (!confirmed) {
+        return;
+      }
+    }
     if (action === 'start') {
       void this.openStartupLogs();
     }

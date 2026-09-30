@@ -34688,3 +34688,15 @@ on any category/access/boolean key missing in either dictionary (categories come
 the exported `CATEGORY_DISPLAY_ORDER`, so a new category without a translation fails).
 Two existing card specs asserted the raw `lanOnly`/`overlayOnly` text; updated.
 Search still matches the English category name. Beta check added to README.
+
+## 764. Apps page: recovery path for failed and starting rows (second §761 P1)
+
+An `error` row shows "Couldn't start X" plus one **Try again** (re-runs start) and the
+raw `service.error` behind a native `<details>` "Show details" — no JS, keyboard-usable.
+A `starting` row's Start button shows a spinner and "Starting…" (the visible reason it is
+disabled). Stop on `authelia`/`nginx-proxy-manager` goes through `ConfirmService` first
+(`CORE_SERVICES` in the card), since stopping them silently takes other apps' access
+down; `requestAction` became async for that. Rejected: a new `stopping` state — the
+backend has none, and `loadingAction === 'stop'` already shows the spinner. Rejected:
+new CSS (the card's stylesheet sits near its 8 kB budget); Bootstrap utilities only.
+Tests: four new specs in `service-card.component.spec.ts`, red before the change.

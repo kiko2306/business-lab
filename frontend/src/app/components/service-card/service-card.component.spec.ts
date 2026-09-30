@@ -405,3 +405,70 @@ describe('ServiceCardComponent polish', () => {
     expect(fixture.nativeElement.querySelectorAll('.service-row-heading [style]').length).toBe(0);
   });
 });
+
+// plan.md §761: a failed or in-flight row must say what happened and offer one
+// action; stopping the proxy or SSO must warn that other apps lose access.
+describe('ServiceCardComponent recovery states', () => {
+  let fixture: ComponentFixture<ServiceCardComponent>;
+  let component: ServiceCardComponent;
+  let confirm: jasmine.SpyObj<ConfirmService>;
+  let emitted: string[];
+
+  beforeEach(async () => {
+    confirm = jasmine.createSpyObj('ConfirmService', ['ask']);
+    await TestBed.configureTestingModule({
+      imports: [ServiceCardComponent],
+      providers: [
+        { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+        { provide: ConfirmService, useValue: confirm },
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ServiceCardComponent);
+    component = fixture.componentInstance;
+    emitted = [];
+    component.actionRequested.subscribe((a) => emitted.push(a));
+  });
+
+  const render = (svc: ServiceStatus) => {
+    component.service = svc;
+    component.allServices = [svc];
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  };
+
+  it('shows a plain cause, Try again and the raw error behind Show details', () => {
+    const el = render(service('jellyfin', 'error', { error: 'port is already allocated' }));
+    expect(el.querySelector('.row-recovery')?.textContent).toContain('start jellyfin');
+    expect(el.querySelector('.row-recovery details')?.textContent).toContain('port is already allocated');
+    (el.querySelector('.row-recovery button') as HTMLButtonElement).click();
+    expect(emitted).toEqual(['start']);
+  });
+
+  it('gives a starting row a busy Start button that says why it is disabled', () => {
+    const el = render(service('jellyfin', 'starting'));
+    const start = el.querySelector('.service-row-actions button') as HTMLButtonElement;
+    expect(start.disabled).toBeTrue();
+    expect(start.textContent).toContain('Starting');
+  });
+
+  it('asks before stopping the proxy or SSO, and stops nothing on cancel', async () => {
+    confirm.ask.and.resolveTo(false);
+    component.service = service('authelia', 'running');
+    await component.requestAction('stop');
+    expect(confirm.ask).toHaveBeenCalled();
+    expect(emitted).toEqual([]);
+
+    confirm.ask.and.resolveTo(true);
+    await component.requestAction('stop');
+    expect(emitted).toEqual(['stop']);
+  });
+
+  it('stops an ordinary app without asking', async () => {
+    component.service = service('jellyfin', 'running');
+    await component.requestAction('stop');
+    expect(confirm.ask).not.toHaveBeenCalled();
+    expect(emitted).toEqual(['stop']);
+  });
+});

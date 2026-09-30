@@ -62,7 +62,15 @@
       <span *ngIf="dependenciesSatisfied() && degradedBy().length" class="text-warning-emphasis">
         · {{ degradedTitle() }}
       </span>
-      <span *ngIf="service.error" class="text-danger">· {{ service.error }}</span>
+    </div>
+    <!-- Plain cause + one action; the raw error stays one click away. -->
+    <div *ngIf="service.state === 'error'" class="row-recovery small text-danger d-flex flex-wrap align-items-center gap-2">
+      <span>{{ 'serviceCard.recovery.cause' | t:{ label: service.label } }}</span>
+      <button type="button" class="btn btn-outline-danger btn-sm py-0" [disabled]="loadingAction !== null" (click)="requestAction('start')">{{ 'serviceCard.recovery.tryAgain' | t }}</button>
+      <details *ngIf="service.error">
+        <summary>{{ 'serviceCard.recovery.showDetails' | t }}</summary>
+        {{ service.error }}
+      </details>
     </div>
 
     <!-- Always listed, not only when something is missing: knowing an app needs
@@ -90,7 +98,8 @@
       (click)="requestAction('start')"
     >
       <span *ngIf="loadingAction === 'start'" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-      <span *ngIf="loadingAction !== 'start'">{{ 'serviceCard.startButton' | t }}</span>
+      <span *ngIf="loadingAction !== 'start' && service.state === 'starting'"><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>{{ 'serviceCard.startingButton' | t }}</span>
+      <span *ngIf="loadingAction !== 'start' && service.state !== 'starting'">{{ 'serviceCard.startButton' | t }}</span>
     </button>
     <button
       type="button"

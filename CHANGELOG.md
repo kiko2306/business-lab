@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.153.15] — 2026-09-30
+
+### Changed
+
+- Apps page: a failed start shows a plain cause with Try again and Show details, a starting app shows a busy Start button, and stopping Authelia or the proxy asks first
+
 ## [0.153.14] — 2026-09-30
 
 ### Fixed

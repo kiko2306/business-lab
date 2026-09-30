@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.153.14** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.153.15** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -215,12 +215,12 @@ it is done — not ticked off and left behind. Section references point at
       setting's radios (Vaultwarden `SIGNUPS_ALLOWED`) read Portuguese ("Sim"/"Não"), and
       setting labels read "Signups allowed", not `SIGNUPS_ALLOWED`. Delete once seen.
 
-- [ ] **Apps page: failed and starting/stopping states get a recovery path (P1, plan.md §761)**
-      — `service.error` (`service-card.html:65`) becomes a plain cause plus one action
-      ("Try again" / "Show details"); `starting`/`stopping` get a row-level state
-      (animated dot, buttons disabled with a reason); Stop on Authelia/NPM warns that it
-      takes other apps' access down. Check on `beta`: force a failed start and read it as a
-      non-technical owner would.
+- [ ] **Beta-test the Apps page recovery states (plan.md §764)** — on `beta`: (1) force a
+      failed start (e.g. occupy an app's port) and read the row as a non-technical owner:
+      "Couldn't start X" + Try again works, Show details reveals the raw error; (2) a
+      starting app's Start button shows a spinner and "Starting…"; (3) Stop on Authelia and
+      on nginx-proxy-manager asks "Stop anyway?", Cancel leaves it running. Check in pt-PT
+      too. Delete once seen.
 
 - [ ] **Apps page: thin out the heading line (P2, plan.md §761)** — version, Android/iOS
       links and secondary URLs move into a detail view; the row keeps state and one "Open"
