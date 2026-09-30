@@ -1,4 +1,4 @@
-import { filterServices } from './apps.component';
+import { filterServices, hasIssue } from './apps.component';
 import { ServiceStatus } from '../../core/models';
 
 function svc(partial: Partial<ServiceStatus>): ServiceStatus {
@@ -35,5 +35,29 @@ describe('filterServices', () => {
   it('requires every space-separated term to match (AND)', () => {
     expect(filterServices(services, 'media photo').map((s) => s.name)).toEqual(['immich']);
     expect(filterServices(services, 'media nope')).toEqual([]);
+  });
+});
+
+// plan.md §761: the summary tiles filter the list, and a category holding a
+// failed app never hides it inside a collapsed group.
+describe('filterServices by state', () => {
+  const services = [
+    svc({ name: 'a', label: 'A', state: 'error' }),
+    svc({ name: 'b', label: 'B', state: 'stopped' }),
+    svc({ name: 'c', label: 'C', state: 'running' }),
+  ];
+
+  it('narrows to one state, and combines with the text query', () => {
+    expect(filterServices(services, '', 'error').map((s) => s.name)).toEqual(['a']);
+    expect(filterServices(services, '', 'stopped').map((s) => s.name)).toEqual(['b']);
+    expect(filterServices(services, 'c', 'stopped')).toEqual([]);
+    expect(filterServices(services, '', null)).toEqual(services);
+  });
+});
+
+describe('hasIssue', () => {
+  it('is true for a group with any failed app', () => {
+    expect(hasIssue([svc({ state: 'running' }), svc({ state: 'error' })])).toBeTrue();
+    expect(hasIssue([svc({ state: 'stopped' })])).toBeFalse();
   });
 });

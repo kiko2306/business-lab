@@ -44,6 +44,8 @@ export const en: Record<string, string> = {
 
   'apps.title': 'Apps',
   'apps.subtitle': 'Monitor, start, and stop the services running across your stack.',
+  'apps.headline.allFine': 'All {{total}} apps are fine.',
+  'apps.headline.needYou': '{{count}} of {{total}} apps need you.',
   'apps.refresh': 'Refresh status',
   'apps.summary.total': 'Total',
   'apps.summary.running': 'Running',

@@ -164,3 +164,13 @@
     overflow-wrap: anywhere;
   }
 }
+
+/* Issues/Stopped tiles are buttons that filter the list. */
+button.summary-card {
+  color: inherit;
+  cursor: pointer;
+}
+
+.summary-card.active {
+  border-color: var(--bs-primary);
+}

@@ -34723,3 +34723,14 @@ dialog, as labelled text rather than icon-only badges. Rejected: a separate deta
 (Settings already is one). Not done: "one Open link" beyond this — the public URL is
 already the single link. Tests: three heading specs, red before; the older ⓥ spec now
 looks in the dialog.
+
+## 767. Apps page: scale tools (§761 P2, partly)
+
+Done: a headline replacing the static subtitle once the summary loads ("All N apps are
+fine." / "N of M apps need you."; `aria-live`), Issues/Stopped tiles as toggle buttons
+feeding `filterServices(..., state)`, and `isAppGroupCollapsed` forcing open any
+category with a failed app (`hasIssue`) or while a state filter is on. Left open as its
+own README item: "Start with what it needs" (needs a dependency-ordered start, a real
+backend/UX design) and the Running-table-as-duplicate question, which the critique
+raised without deciding. Known rough edge: a state filter with zero matches shows the
+"no matches for ''" text. Tests: `filterServices` state cases and `hasIssue`, red first.

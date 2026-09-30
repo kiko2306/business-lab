@@ -44,6 +44,8 @@ export const ptPT: Record<string, string> = {
 
   'apps.title': 'Aplicações',
   'apps.subtitle': 'Monitorize, inicie e pare os serviços a correr no seu sistema.',
+  'apps.headline.allFine': 'As {{total}} apps estão bem.',
+  'apps.headline.needYou': '{{count}} de {{total}} apps precisam de si.',
   'apps.refresh': 'Atualizar estado',
   'apps.summary.total': 'Total',
   'apps.summary.running': 'Em execução',

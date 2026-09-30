@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.153.17** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.153.18** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -228,10 +228,14 @@ it is done — not ticked off and left behind. Section references point at
       Settings opens with the version, phone-app and secondary/app URLs at the top. Check
       on an app that has them (Nextcloud or Vaultwarden). Delete once seen.
 
-- [ ] **Apps page: scale tools for 36 apps (P2, plan.md §761)** — summary tiles filter
-      (Issues, Stopped), a "Start with what it needs" action, groups with issues auto-expand,
-      and the page opens with one sentence ("All 36 apps fine" / "3 need you").
-      Question raised, not decided: is the Running table a duplicate of the list?
+- [ ] **Apps page: "Start with what it needs" (P2, plan.md §761, §767)** — the one
+      part of the scale-tools item not done: a start action that first starts an app's
+      `dependsOn` chain. Undecided: is the Running table a duplicate of the list?
+
+- [ ] **Beta-test the Apps page scale tools (plan.md §767)** — on `beta`: the heading line
+      reads "All N apps are fine." or "N of M apps need you."; clicking the Issues or
+      Stopped tile filters the list to those apps (click again clears); a category with a
+      failed app is open on load. Check in pt-PT. Delete once seen.
 
 - [ ] **Beta-test the Apps page dialogs (plan.md §765)** — on `beta`: open an app's
       Settings, type into a field, click the dark backdrop — the dialog stays and the edit

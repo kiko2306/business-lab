@@ -98,18 +98,27 @@ function groupRunningPortsByCategory(services: ServiceStatus[], hostLanIp: strin
 // Free-text filter for the "All apps" list. Matches a space-separated query
 // against name/label/description/category so "media jelly" narrows the same
 // way typing either word alone would. Empty query returns everything.
-export function filterServices(services: ServiceStatus[], query: string): ServiceStatus[] {
+export function filterServices(
+  services: ServiceStatus[],
+  query: string,
+  state: ServiceStatus['state'] | null = null,
+): ServiceStatus[] {
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (!terms.length) {
+  if (!terms.length && !state) {
     return services;
   }
   return services.filter((service) => {
+    if (state && service.state !== state) {
+      return false;
+    }
     const haystack = [service.name, service.label, service.description, service.category ?? '']
       .join(' ')
       .toLowerCase();
     return terms.every((term) => haystack.includes(term));
   });
 }
+
+export const hasIssue = (services: ServiceStatus[]): boolean => services.some((s) => s.state === 'error');
 
 function groupServicesByCategory(services: ServiceStatus[]): ServiceGroup[] {
   const byCategory = new Map<string, ServiceStatus[]>();
@@ -152,6 +161,9 @@ export class AppsComponent implements OnInit, OnDestroy {
   // is force-expanded (isAppGroupCollapsed), so a match is never hidden inside
   // a collapsed section.
   protected appFilter = '';
+  // Set by the Issues/Stopped summary tiles; click the active tile again to clear.
+  protected stateFilter: ServiceStatus['state'] | null = null;
+  protected readonly hasIssue = hasIssue;
 
   ngOnInit(): void {
     this.serviceState.startPolling();
@@ -189,8 +201,13 @@ export class AppsComponent implements OnInit, OnDestroy {
   // Each "All apps" category group starts collapsed like everything else; an
   // active search forces them open so a match is never hidden in a collapsed
   // group.
-  isAppGroupCollapsed(key: string): boolean {
-    return this.appFilter.trim() ? false : this.collapse.isCollapsed(key);
+  isAppGroupCollapsed(key: string, services: ServiceStatus[] = []): boolean {
+    // A failed app is what the owner most needs to see: never hide it.
+    return this.appFilter.trim() || this.stateFilter || hasIssue(services) ? false : this.collapse.isCollapsed(key);
+  }
+
+  toggleStateFilter(state: 'error' | 'stopped'): void {
+    this.stateFilter = this.stateFilter === state ? null : state;
   }
 
   toggleAppGroup(key: string): void {
@@ -199,5 +216,6 @@ export class AppsComponent implements OnInit, OnDestroy {
 
   clearAppFilter(): void {
     this.appFilter = '';
+    this.stateFilter = null;
   }
 }
