@@ -24,9 +24,9 @@
         {{ (c.done ? 'settings.deployment.setBadge' : 'settings.deployment.todoBadge') | t }}
       </span>
       <span class="flex-grow-1">
-        <span class="fw-medium">{{ c.label }}</span>
+        <span class="fw-medium">{{ deploymentLabelKey(c.id) | t }}</span>
         <br />
-        <span class="text-body-secondary small">{{ c.detail }}</span>
+        <span class="text-body-secondary small">{{ deploymentDetailKey(c) | t:c.params }}</span>
         <span *ngIf="!c.done" class="text-body-secondary small"> · {{ 'settings.deployment.fixInPrefix' | t }} <ng-container *ngIf="fixTarget(c.fixIn) as target; else plainFix">
             <a *ngIf="target.route" class="link-primary" [routerLink]="target.route">{{ target.labelKey | t }}</a>
             <button *ngIf="!target.route" type="button" class="btn btn-link btn-sm p-0 align-baseline" (click)="goToPanel(target)">{{ target.labelKey | t }}</button>

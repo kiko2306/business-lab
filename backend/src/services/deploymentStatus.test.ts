@@ -36,15 +36,19 @@ beforeEach(() => {
   mockedUsers.mockReturnValue([]);
 });
 
+// plan.md §787: label/detail prose moved to the frontend (en + pt-PT), keyed by
+// check id — the backend now sends only raw, non-secret values for it to
+// interpolate. No more "run start.sh"/"open /setup" baked into an English string.
 describe('getDeploymentStatus', () => {
-  it('reports every check outstanding on a fresh box', async () => {
+  it('reports every check outstanding on a fresh box, with no params to show', async () => {
     const status = await getDeploymentStatus();
     expect(status.checks).toHaveLength(7);
     expect(status.outstanding).toBe(7);
     expect(status.checks.every((c) => !c.done)).toBe(true);
+    expect(status.checks.every((c) => Object.keys(c.params).length === 0)).toBe(true);
   });
 
-  it('marks a check done and surfaces its value when set', async () => {
+  it('marks a check done and sends its raw value as a param', async () => {
     settingsRows({
       exposure_base_domain: 'acme.example',
       cloudflare_tunnel_token: 'tok',
@@ -53,9 +57,9 @@ describe('getDeploymentStatus', () => {
       exposure_cloudflare_zone_id: 'zone',
     });
     const status = await getDeploymentStatus();
-    expect(byId(status, 'domain')).toMatchObject({ done: true, detail: 'acme.example' });
+    expect(byId(status, 'domain')).toMatchObject({ done: true, params: { domain: 'acme.example' } });
     expect(byId(status, 'tunnel').done).toBe(true);
-    expect(byId(status, 'tunnel').detail).toContain('abcd1234');
+    expect(byId(status, 'tunnel').params.tunnelIdPrefix).toBe('abcd1234');
     expect(status.outstanding).toBe(4); // npm, mail, backup, admin still blank
   });
 
@@ -71,14 +75,13 @@ describe('getDeploymentStatus', () => {
     mockedUsers.mockReturnValue(['mig', 'anna', 'sam']);
 
     const status = await getDeploymentStatus();
-    expect(byId(status, 'mail')).toMatchObject({ done: true, detail: 'hi@acme.example via smtp.acme' });
-    expect(byId(status, 'backup').detail).toBe('sftp — nas.acme');
-    expect(byId(status, 'admin').detail).toContain('3 users total');
+    expect(byId(status, 'mail')).toMatchObject({ done: true, params: { fromAddress: 'hi@acme.example', smtpHost: 'smtp.acme' } });
+    expect(byId(status, 'backup').params).toEqual({ kind: 'sftp', server: 'nas.acme' });
+    expect(byId(status, 'admin').params).toEqual({ username: 'mig', email: 'mig@acme.example', userCount: 3 });
   });
 
-  it('singularises a one-user box', async () => {
-    mockedAdmin.mockReturnValue({ username: 'mig', email: 'mig@acme.example', displayName: '', groups: [] });
-    mockedUsers.mockReturnValue(['mig']);
-    expect((await getDeploymentStatus()).checks.find((c) => c.id === 'admin')!.detail).toContain('1 user total');
+  it('omits the server param for a backup kind with none', async () => {
+    mockedBackup.mockResolvedValue({ kind: 'disk', server: null } as never);
+    expect((await getDeploymentStatus()).checks.find((c) => c.id === 'backup')!.params).toEqual({ kind: 'disk' });
   });
 });

@@ -21,6 +21,7 @@ import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
 import { SectionCollapseService } from '../../core/section-collapse.service';
 import { FixTarget, fixTarget } from './fix-target';
+import { deploymentDetailKey, deploymentLabelKey } from './deployment-check-text';
 import { PanelComponent } from '../../components/panel/panel.component';
 import { NetworkSettingsComponent } from './network-settings.component';
 import { TranslatePipe } from '../../i18n/translate.pipe';
@@ -43,6 +44,8 @@ export class SettingsComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
   private readonly collapse = inject(SectionCollapseService);
   protected readonly fixTarget = fixTarget;
+  protected readonly deploymentLabelKey = deploymentLabelKey;
+  protected readonly deploymentDetailKey = deploymentDetailKey;
   private readonly settingsService = inject(SettingsService);
   private readonly toastService = inject(ToastService);
   protected readonly translate = inject(TranslateService);

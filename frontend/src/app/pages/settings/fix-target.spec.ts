@@ -27,9 +27,11 @@ describe('fixTarget', () => {
 });
 
 describe('Settings page strings', () => {
-  // Reseller and developer wording shown to the client who owns the box.
-  const enJargon = /docker|plan\.md|§|stack|reseller|contracted|self-controlled|bridge/i;
-  const ptJargon = /docker|plan\.md|§|revendedor|contratada|autogerida|bridge/i;
+  // Reseller and developer wording shown to the client who owns the box, plus
+  // (plan.md §787) telling them to run a shell command or open a guest-only
+  // route the checklist itself already links them to.
+  const enJargon = /docker|plan\.md|§|stack|reseller|contracted|self-controlled|bridge|start\.sh|\/setup/i;
+  const ptJargon = /docker|plan\.md|§|revendedor|contratada|autogerida|bridge|start\.sh|\/setup/i;
 
   it('keeps developer and reseller wording out of settings.* and networkSettings.*', () => {
     for (const key of Object.keys(en).filter((k) => /^(settings|networkSettings)\./.test(k))) {

@@ -19,13 +19,17 @@ const CLOUDFLARE_TOKEN_KEY = 'cloudflare_tunnel_token';
 
 export interface DeploymentCheck {
   id: string;
-  label: string;
   /** true = configured, false = still needs an operator step. */
   done: boolean;
-  /** One line: the current value/state, safe to show (no secrets). */
-  detail: string;
   /** Where in Settings to set it. */
   fixIn: string;
+  /**
+   * Raw, non-secret values for the frontend to interpolate into its own
+   * translated label/detail (keyed by `id`, in `settings.deployment.check.*`)
+   * — never prose, so the checklist has no English-only or console-flavoured
+   * text baked into it (plan.md §787).
+   */
+  params: Record<string, string | number>;
 }
 
 export interface DeploymentStatus {
@@ -50,62 +54,49 @@ export async function getDeploymentStatus(): Promise<DeploymentStatus> {
   const checks: DeploymentCheck[] = [
     {
       id: 'domain',
-      label: 'Base domain',
       done: has(EXPOSURE_SETTINGS_KEYS.baseDomain),
-      detail: has(EXPOSURE_SETTINGS_KEYS.baseDomain)
-        ? s[EXPOSURE_SETTINGS_KEYS.baseDomain]
-        : 'Not set',
+      params: has(EXPOSURE_SETTINGS_KEYS.baseDomain) ? { domain: s[EXPOSURE_SETTINGS_KEYS.baseDomain] } : {},
       fixIn: 'Networking',
     },
     {
       id: 'cloudflare-token',
-      label: 'Cloudflare API token',
       done: has(CLOUDFLARE_TOKEN_KEY),
-      detail: has(CLOUDFLARE_TOKEN_KEY) ? 'Stored (use Test to verify)' : 'Not set',
+      params: {},
       fixIn: 'Networking',
     },
     {
       id: 'tunnel',
-      label: 'Cloudflare Tunnel',
       done:
         has(EXPOSURE_SETTINGS_KEYS.cloudflareTunnelId) &&
         has(EXPOSURE_SETTINGS_KEYS.cloudflareAccountId) &&
         has(EXPOSURE_SETTINGS_KEYS.cloudflareZoneId),
-      detail: has(EXPOSURE_SETTINGS_KEYS.cloudflareTunnelId)
-        ? `Tunnel ${s[EXPOSURE_SETTINGS_KEYS.cloudflareTunnelId].slice(0, 8)}…`
-        : 'Not provisioned — run start.sh with the token set',
+      params: has(EXPOSURE_SETTINGS_KEYS.cloudflareTunnelId)
+        ? { tunnelIdPrefix: s[EXPOSURE_SETTINGS_KEYS.cloudflareTunnelId].slice(0, 8) }
+        : {},
       fixIn: 'Networking',
     },
     {
       id: 'npm',
-      label: 'Proxy admin credentials',
       done: has(EXPOSURE_SETTINGS_KEYS.npmEmail) && has(EXPOSURE_SETTINGS_KEYS.npmPassword),
-      detail: has(EXPOSURE_SETTINGS_KEYS.npmEmail)
-        ? s[EXPOSURE_SETTINGS_KEYS.npmEmail]
-        : 'Not set',
+      params: has(EXPOSURE_SETTINGS_KEYS.npmEmail) ? { email: s[EXPOSURE_SETTINGS_KEYS.npmEmail] } : {},
       fixIn: 'Networking',
     },
     {
       id: 'mail',
-      label: 'Email (shared mailbox)',
       done: mail !== null,
-      detail: mail ? `${mail.fromAddress} via ${mail.smtpHost}` : 'Not configured',
+      params: mail ? { fromAddress: mail.fromAddress, smtpHost: mail.smtpHost } : {},
       fixIn: 'Email',
     },
     {
       id: 'backup',
-      label: 'Backup destination',
       done: backup !== null,
-      detail: backup ? `${backup.kind}${backup.server ? ` — ${backup.server}` : ''}` : 'Not configured',
+      params: backup ? { kind: backup.kind, ...(backup.server ? { server: backup.server } : {}) } : {},
       fixIn: 'Backup destination',
     },
     {
       id: 'admin',
-      label: 'Administrator account',
       done: Boolean(admin?.email),
-      detail: admin?.email
-        ? `${admin.username} <${admin.email}> · ${userCount} user${userCount === 1 ? '' : 's'} total`
-        : 'Not created — open /setup',
+      params: admin?.email ? { username: admin.username, email: admin.email, userCount } : {},
       fixIn: 'Users page',
     },
   ];

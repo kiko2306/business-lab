@@ -276,10 +276,10 @@ export interface GeneralSettings {
 /** GET /api/settings/deployment — the per-client provisioning checklist (§357). */
 export interface DeploymentCheck {
   id: string;
-  label: string;
   done: boolean;
-  detail: string;
   fixIn: string;
+  /** Raw values to interpolate into the frontend's own translated label/detail. */
+  params: Record<string, string | number>;
 }
 
 export interface DeploymentStatus {

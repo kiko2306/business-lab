@@ -35080,3 +35080,35 @@ Frontend-only; no backend change. New i18n keys (`backups.target.moreKindsSummar
 `.moreKindsLabel`, `.advancedSummary`) pass the existing §779 jargon guard. 158
 frontend tests + build pass. Rendering in en/pt-PT is covered by §777's audit/adapt
 pass, not repeated here. Version bump: see CHANGELOG.
+
+## 787. Settings checklist speaks the UI's language instead of the backend's
+
+Closes the README item (§776 item 3's leftover). `deploymentStatus.ts` used to build
+each checklist row's `label`/`detail` as a full English sentence — untranslated, and
+two of the seven ("tunnel" and "admin") told the operator to run `./start.sh` or open
+`/setup`, breaking the no-console principle and (for `/setup`) pointing at a
+guest-only route the operator, already logged in, can't even reach.
+
+`DeploymentCheck` dropped `label`/`detail` entirely; the backend now sends only `id`,
+`done`, `fixIn` and a `params` bag of raw, non-secret values (a domain string, a
+tunnel-id prefix, an email, mail's `fromAddress`/`smtpHost`, backup's `kind`/`server`,
+admin's `username`/`email`/`userCount`). `deployment-check-text.ts` (new, with its own
+spec) picks the translated key per check id and state —
+`settings.deployment.check.<id>.label` / `.detail<Done|Todo>[Variant]` — with two
+checks needing a variant: backup's detail with vs without a `server`, admin's singular
+vs plural user count. The template interpolates via the existing `| t:params` pipe
+pattern already used elsewhere on this page. The two console-flavoured lines became
+"Not provisioned yet" and "Not created yet" — the row's own "Fix in: Networking" /
+"Fix in: Users page" link (§780) is already the actionable UI path; the detail text
+doesn't need to duplicate it with a shell command or a route the reader can't open.
+
+Test-first: `deployment-check-text.spec.ts` written before the implementation,
+asserting a translated key exists for every id/state/variant in both languages and
+that no `detailTodo` key matches `start\.sh|/setup` in either language — the exact
+regression the old copy was. `fix-target.spec.ts`'s existing settings-wide jargon
+guard extended with the same pattern so any future `settings.*` string reintroducing
+either phrase fails a test, not a code review. `deploymentStatus.test.ts` rewritten to
+assert on `.params` instead of a rendered English sentence.
+
+Backend 1293 tests + typecheck, frontend 164 tests + build pass. Version bump: see
+CHANGELOG.
