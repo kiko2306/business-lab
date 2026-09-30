@@ -34747,3 +34747,11 @@ the Total tile and its key are gone (the headline states the total); an empty st
 filter says "No apps in this state." (the §767 rough edge). Tests: `serviceInitials`,
 tile/tooltip render and the dropped key, red first. The date format has no unit test
 (template-only); the README beta item carries it.
+
+## 769. Decisions on the two open §761 questions
+
+Asked and answered: (1) the Running apps table is a duplicate of the list and goes,
+replaced by a Running tile filter, with URL and ports kept on the rows/Settings; (2)
+"Start with what it needs" starts the `dependsOn` chain only, never `requires`. Both are
+README items. The six Apps page changes (§763–§768) were merged dev → beta; their README
+beta items still need running on the box before `main`.

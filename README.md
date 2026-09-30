@@ -228,9 +228,15 @@ it is done — not ticked off and left behind. Section references point at
       Settings opens with the version, phone-app and secondary/app URLs at the top. Check
       on an app that has them (Nextcloud or Vaultwarden). Delete once seen.
 
-- [ ] **Apps page: "Start with what it needs" (P2, plan.md §761, §767)** — the one
-      part of the scale-tools item not done: a start action that first starts an app's
-      `dependsOn` chain. Undecided: is the Running table a duplicate of the list?
+- [ ] **Apps page: "Start with what it needs" (P2, plan.md §769)** — decided: when Start
+      is blocked by `dependsOn`, offer one button that starts the missing `dependsOn` apps
+      in dependency order, then the app. `requires` stays optional and is never started.
+      Test first: a pure ordering function over the registry (cycles, already-running).
+
+- [ ] **Apps page: remove the Running apps table (P2, plan.md §769)** — decided: fold it
+      into the list. Add a Running tile filter like Issues/Stopped; keep each app's public
+      URL and host ports reachable from its row/Settings (the table's whole value). Test
+      first: the port/URL rows still derive for every running app.
 
 - [ ] **Beta-test the Apps page scale tools (plan.md §767)** — on `beta`: the heading line
       reads "All N apps are fine." or "N of M apps need you."; clicking the Issues or
