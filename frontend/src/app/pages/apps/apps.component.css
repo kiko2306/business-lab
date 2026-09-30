@@ -83,7 +83,7 @@
 /* Lift the whole pill on focus-within instead of ringing just the input. */
 .app-search:focus-within {
   border-radius: 999px;
-  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+  box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb, 13, 110, 253), 0.25);
 }
 
 /* ---- All-apps category headings ------------------------------------------- */

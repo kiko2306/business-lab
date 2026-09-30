@@ -34605,3 +34605,19 @@ the 09-26/09-28 runs failed at `mkdir` — §702's case), so `appuser` cannot
 create `.part` in them. §702's entrypoint chown covered `data/` but never
 `data/_dump`. The entrypoint now also `chown -R`s `data/_dump` at every start.
 Lesson: a diagnostic run as root proves nothing about a non-root service.
+
+## 757. Polish pass on the Apps page and service card (impeccable `polish`)
+
+Code-review-only pass (no running dashboard to screenshot; no `PRODUCT.md`/`DESIGN.md`
+exists, so the incumbent conventions were the system). Four local defects fixed, each
+with a failing spec first: the state badge printed the raw `service.state` string
+(`running`, `stopped`) so pt-PT users saw English — now `serviceCard.state.*` in both
+dictionaries; the settings dialog had `role="dialog"` but no accessible name, and the
+startup-log popup had no dialog semantics at all — both now `aria-labelledby` their
+heading (startup popup also `role="dialog" aria-modal`); the Android/iOS badges carried
+inline `style` — now a `.badge-icon` class; the search pill's focus ring hard-coded
+Bootstrap's default blue — now `--bs-primary-rgb`, so it follows a themed primary.
+Left alone on purpose: the `ⓥ` version badge (a spec pins it), the summary tiles' hover
+lift on non-interactive tiles (a design choice per the CSS comment), the raw
+`lanOnly`/`overlayOnly` badge text (identifiers, separate i18n decision). Impeccable's
+detector reported nothing on the two directories.

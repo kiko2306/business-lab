@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.153.10** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.153.11** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -217,6 +217,11 @@ it is done — not ticked off and left behind. Section references point at
       is `appuser`-owned (uid 100) and the same run reports no `EACCES` failures.
 
 ### Exposure and platform
+
+- [ ] **Beta-test the Apps page polish (plan.md §757)** — after `beta` is updated, open
+      Apps in pt-PT: each app's state badge reads Portuguese (`em execução`, `parado`);
+      the Settings dialog and the startup-log popup announce their title to a screen
+      reader (or `aria-labelledby` in devtools); the search box's focus ring still shows.
 
 - [ ] **Beta-test that a bumped image-check date moves exactly one app (plan.md §750, §751)**
       — the code-only half is **confirmed** (§751: run 113, 1m47s, zero

@@ -348,3 +348,60 @@ describe('ServiceCardComponent lanAccessUrl', () => {
     );
   });
 });
+
+describe('ServiceCardComponent polish', () => {
+  let fixture: ComponentFixture<ServiceCardComponent>;
+  let component: ServiceCardComponent;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [ServiceCardComponent],
+      providers: [
+        { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+        { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(ServiceCardComponent);
+    component = fixture.componentInstance;
+    component.service = service('guacamole', 'running', { mobileApps: { android: true, ios: true } });
+    component.allServices = [component.service];
+  });
+
+  it('renders the state badge through the translate service, not the raw state string', () => {
+    const translate = component['translate'];
+    spyOn(translate, 't').and.callFake((key: string) => `«${key}»`);
+    fixture.detectChanges();
+
+    const badge = fixture.nativeElement.querySelector('.service-row-heading .badge');
+    expect(badge.textContent.trim()).toBe('«serviceCard.state.running»');
+  });
+
+  it('names the settings dialog by its title', () => {
+    component['settingsModalOpen'] = true;
+    fixture.detectChanges();
+
+    const dialog: HTMLElement = fixture.nativeElement.querySelector('.settings-dialog');
+    const labelId = dialog.getAttribute('aria-labelledby');
+    expect(labelId).withContext('aria-labelledby').toBeTruthy();
+    expect(fixture.nativeElement.querySelector('#' + labelId)?.textContent).toContain('guacamole');
+  });
+
+  it('marks the startup-log popup as a modal dialog named by its heading', () => {
+    component['startupLogsOpen'] = true;
+    fixture.detectChanges();
+
+    const dialog: HTMLElement = fixture.nativeElement.querySelector('.startup-logs-dialog');
+    expect(dialog.getAttribute('role')).toBe('dialog');
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    const labelId = dialog.getAttribute('aria-labelledby');
+    expect(fixture.nativeElement.querySelector('#' + labelId)?.textContent).toContain('guacamole');
+  });
+
+  it('keeps layout styling for the mobile-app badges in CSS, not inline style attributes', () => {
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('.service-row-heading [style]').length).toBe(0);
+  });
+});

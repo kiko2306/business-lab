@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.153.11] — 2026-09-30
+
+### Fixed
+
+- Apps page: state badge is translated, the settings and startup-log dialogs are named for screen readers, and the search focus ring follows the theme's primary colour
+
 ## [0.153.10] — 2026-09-29
 
 ### Fixed
