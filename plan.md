@@ -34644,3 +34644,14 @@ The §757 Apps-page polish item stays open: it needs eyes in pt-PT.
 
 Checked by the user on `beta` (0.153.13) in pt-PT: state badges read Portuguese, the
 dialogs announce their titles, and the search focus ring still shows. Closes the §757 item.
+
+## 761. Impeccable critique of the Apps page: findings logged, nothing changed
+
+Dual-agent critique (design review from source + `impeccable detect`) of
+`frontend/src/app/pages/apps/apps.component.html` and the service card: **23/40**,
+0 P0, 2 P1, 3 P2, 1 P3; detector clean. Judged from source only: the live page is
+behind login, so contrast, wrapping and focus are inferred, not observed. The P1s are
+untranslated/raw strings (breaks PRODUCT.md's plain-language rule) and no recovery path
+on failed or starting/stopping states. The user chose to log, not fix: each finding is a
+README TODO under "Apps page". Snapshot in `.impeccable/critique/` (untracked). Not
+verified by me: the reviewer's line numbers and claims; check each when picking one up.

@@ -207,6 +207,42 @@ two — the guarantees are.
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
 
+### Apps page (impeccable critique, plan.md §761)
+
+- [ ] **Apps page: translate the raw strings (P1, plan.md §761)** — category names
+      (`apps.component.ts:14-23`, `apps.component.html:50,138`), the `lanOnly`/`overlayOnly`
+      badges (`service-card.html:54`) and the `true`/`false` radios (`:161,:172`) go through
+      the translate service ("Local network only", "VPN only", Yes/No), and Settings shows
+      friendly field labels instead of env keys. Test first: a registry-wide i18n test that
+      fails on any untranslated category or access value. Check in pt-PT on `beta`.
+
+- [ ] **Apps page: failed and starting/stopping states get a recovery path (P1, plan.md §761)**
+      — `service.error` (`service-card.html:65`) becomes a plain cause plus one action
+      ("Try again" / "Show details"); `starting`/`stopping` get a row-level state
+      (animated dot, buttons disabled with a reason); Stop on Authelia/NPM warns that it
+      takes other apps' access down. Check on `beta`: force a failed start and read it as a
+      non-technical owner would.
+
+- [ ] **Apps page: thin out the heading line (P2, plan.md §761)** — version, Android/iOS
+      links and secondary URLs move into a detail view; the row keeps state and one "Open"
+      link; health shows only when it differs from state (`service-card.html:7-55`).
+
+- [ ] **Apps page: scale tools for 36 apps (P2, plan.md §761)** — summary tiles filter
+      (Issues, Stopped), a "Start with what it needs" action, groups with issues auto-expand,
+      and the page opens with one sentence ("All 36 apps fine" / "3 need you").
+      Question raised, not decided: is the Running table a duplicate of the list?
+
+- [ ] **Apps page: modal focus and unsaved edits (P2, plan.md §761)** — Settings and log
+      dialogs trap focus and return it to the opener; a backdrop click no longer drops
+      unsaved edits (`service-card.html:116,388`, `service-card.ts:163-181`); a disabled
+      Start's reason is reachable by keyboard (not only a `title` on a disabled button);
+      state changes go to an `aria-live` region.
+
+- [ ] **Apps page: small fixes (P3, plan.md §761)** — emoji icons to SVG or initials
+      (`service-card.ts:687-735`); `dd/MM/yyyy, HH:mm` hard-coded at `apps.component.html:34`
+      so en gets a pt-style date; `.service-name` truncation has no tooltip; drop the
+      redundant "Total" tile.
+
 ### Exposure and platform
 
 - [ ] **Beta-test that a bumped image-check date moves exactly one app (plan.md §750, §751)**
