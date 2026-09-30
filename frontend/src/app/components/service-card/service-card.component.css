@@ -27,7 +27,7 @@
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 0.6rem;
-  background: rgba(13, 110, 253, 0.12);
+  background: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.12);
   font-size: 1.1rem;
 }
 

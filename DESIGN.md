@@ -117,7 +117,7 @@ A cool, desaturated slate ground with Bootstrap's stock semantic hues on top.
 
 ### Named Rules
 **The Meaning-Only Colour Rule.** Green, red and amber mean state and nothing else. A decorative use of them makes a healthy box look broken.
-**The Both-Themes Rule.** Every colour lives as a token with light and dark values kept in step (`styles.css`); component CSS reads theme colours from Bootstrap's `--bs-*` variables or `--app-*` tokens rather than repeating a hex. Known exceptions today: the service-row icon tile's primary tint, the dialog backdrop, and the startup-log popup's fixed dark palette.
+**The Both-Themes Rule.** Every colour lives as a token with light and dark values kept in step (`styles.css`); component CSS reads theme colours from Bootstrap's `--bs-*` variables or `--app-*` tokens rather than repeating a hex. Known exceptions today: the dialog backdrop, and the startup-log popup's fixed dark palette.
 
 ## Typography
 

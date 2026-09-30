@@ -252,7 +252,7 @@
       },
       {
         "name": "The Both-Themes Rule",
-        "body": "Every colour lives as a token with light and dark values kept in step; component CSS reads theme colours from Bootstrap's --bs-* variables or --app-* tokens rather than repeating a hex. Known exceptions today: the service-row icon tile's primary tint, the dialog backdrop, and the startup-log popup's fixed dark palette.",
+        "body": "Every colour lives as a token with light and dark values kept in step; component CSS reads theme colours from Bootstrap's --bs-* variables or --app-* tokens rather than repeating a hex. Known exceptions today: the dialog backdrop, and the startup-log popup's fixed dark palette.",
         "section": "colors"
       },
       {

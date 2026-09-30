@@ -34621,3 +34621,11 @@ Left alone on purpose: the `ⓥ` version badge (a spec pins it), the summary til
 lift on non-interactive tiles (a design choice per the CSS comment), the raw
 `lanOnly`/`overlayOnly` badge text (identifiers, separate i18n decision). Impeccable's
 detector reported nothing on the two directories.
+
+## 758. Service-row icon tint follows the theme primary
+
+Follow-up to §757 / DESIGN.md: the last hard-coded Bootstrap blue in the Apps page CSS,
+the service-row icon tile's 12% tint, now reads `--bs-primary-rgb` like the search
+focus halo, so a re-themed primary recolours it too. CSS-only, no unit-test surface
+(computed colour of a themed variable); the diff is the proof, and DESIGN.md's list of
+known exceptions drops it.
