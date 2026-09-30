@@ -34655,3 +34655,23 @@ untranslated/raw strings (breaks PRODUCT.md's plain-language rule) and no recove
 on failed or starting/stopping states. The user chose to log, not fix: each finding is a
 README TODO under "Apps page". Snapshot in `.impeccable/critique/` (untracked). Not
 verified by me: the reviewer's line numbers and claims; check each when picking one up.
+
+## 762. §761's critique claims, checked on a running page
+
+Ran the throwaway test stack (`docker-compose.test.yml`, 44 registry apps, no Docker
+socket, so every app is stopped/unknown) and drove `/apps` with Playwright in en and pt.
+**Confirmed:** categories stay English in pt-PT (`NETWORKING & SECURITY` under a
+Portuguese UI); the ⓥ badge has only `title="Installed: latest"`, no `aria-label`;
+a disabled Start's reason is only a `title` on the disabled button (`Start Authelia
+first`), unreachable by keyboard; zero `aria-live` regions; Tab escapes the Settings
+dialog to the background (no focus trap) and focus falls to `<body>` on close; backdrop
+click closes it; the date is hard-coded `dd/MM/yyyy, HH:mm` (`apps.component.html:36`, not
+`:34`); the first view shows no apps (both panels and all 8 category groups collapsed).
+**Corrected:** heading badges peak at 5 here, not "about 10" (the ~10 needs live URLs and
+mobile links, which this stack lacks).
+**Not verifiable there:** `lanOnly`/`overlayOnly` badge text, Settings env-key labels and
+`true`/`false` radios (no app exposed a field: the stack has no `apps/` env), the failed
+and starting rows, and whether an unsaved edit is lost on backdrop click. State arrives
+over SSE (`/api/services/stream`), so a route mock could not inject an `error` row. These
+need the live box (behind Authelia) or a stack with real apps. Rejected: mocking the SSE
+stream just to see a red row, which proves nothing about the real error text.
