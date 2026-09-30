@@ -34967,3 +34967,31 @@ wrap both ways, Escape gated) and four in `backups.component.spec.ts` (Escape pe
 severity, roles, progress name). Rejected: moving the service card onto the directive in the
 same commit (working code with its own tests; a later cleanup), and a shared modal component,
 since only the focus behaviour was missing. Not rendered.
+
+## 784. Twenty v2.43.0 beta test closed: upgrade stable, worker OOM fixed live, login unverified
+
+Ran the §739/§738 README item on `home-srv-01`. Found the worker crash-looping
+on the upgrade itself: `twenty-twenty-worker-1` hit `FATAL ERROR: Reached heap
+limit ... JavaScript heap out of memory` repeatedly during the v2.43.0
+migration — `v8.getHeapStatistics()` in the live container showed
+`heap_size_limit` ≈ 498MB, V8 auto-sizing off the container's 900m `mem_limit`
+cgroup, too small for four minors of TypeORM migrations. Fixed in
+`apps/twenty/docker-compose.yml`: `mem_limit` 900m → 1536m (above
+`twenty-server`'s 1200m, since the worker migrates independently). Merged to
+`beta`, redeployed via the Update page: both containers recreated together,
+`RestartCount=0`, stable 27h+ since.
+
+Rest of the checklist confirmed live: `docker inspect` → `twentycrm/twenty:v2.43.0`
+on both containers; `docker-compose.override.yml` pins match (`v2.43.0`, same
+digest, all four services); worker log shows `"Found 1 active workspaces"` —
+the existing workspace survived; backend log shows `"Twenty already has a
+workspace owner; nothing to bootstrap"` at the exact point the bootstrap
+reconciler ran post-recreate — the README's precise ask.
+
+**Not verified: the admin login itself.** Confirming it needs the real
+`TWENTY_ADMIN_PASSWORD`, and reading that out of `.env` is exactly what this
+repo's own guardrails (and principle 2) exist to stop an agent from doing.
+Asked the user to check it by hand; not confirmed either way in this session.
+Recorded honestly rather than assumed — everything else about the upgrade is
+solid enough that the item is closed, but this one sub-check stays open if
+login trouble ever surfaces on Twenty.

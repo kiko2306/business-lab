@@ -272,22 +272,6 @@ item is deleted.
       Authelia admin; and a non-admin Authelia user is auto-created in
       Navidrome as a non-admin.
 
-- [ ] **Beta-test Twenty v2.39.5 → v2.43.0 (plan.md §739, §738)** — the auth
-      chain the dashboard's admin bootstrap drives was re-read against
-      `twenty/v2.43.0`'s source and every operation still matches, but source
-      reading is exactly what §421 proved insufficient on its own. On `beta`,
-      before the update, check `apps/twenty/docker-compose.override.yml`: if
-      the app has ever been through a self-update it pins a digest that
-      silently wins over the new tag (§440) — clear it with the dashboard's
-      per-app **Unpin**, not a hand-edit. Then update and give it time — four
-      minors of TypeORM migrations run on boot and the healthcheck allows
-      180 s. Confirm: `docker inspect` shows `twentycrm/twenty:v2.43.0`, the
-      card goes healthy, the existing workspace and its records are still
-      there (the migrations are one-way — no downgrade), a login with the
-      dashboard-generated admin password still works, and the backend log
-      shows the bootstrap saying "Twenty already has a workspace owner"
-      rather than trying to sign up again.
-
 - [ ] **Beta-test Nextcloud's 34→35 major upgrade (plan.md §711)** — the
       upgrade itself is **confirmed** (2026-09-28, over SSH at 0.151.5): the
       image pulled, the container is healthy, and `/status.php` reports
