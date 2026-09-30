@@ -34787,3 +34787,26 @@ link showed for LAN-only/VPN-only apps only. An ordinary running app with no
 `lanAccessUrl()`, same href logic as the LAN-only badge. Stopped apps get none (no live
 port). Tests: running-unexposed link and stopped-none, one red first; `serviceCard.access.lan`
 added to the registry-wide i18n spec.
+
+## 773. Beta test of §763–§772 (Apps page batch): one part failed, `main` not merged
+
+Ran on `home-srv-01` (beta `b64dcb3`, v0.155.1) with Playwright as a throwaway `claude`
+account (login is the username `claude`, not the email), en and pt-PT, 44 apps.
+**Passed:** category headings, LAN/VPN badges, Yes/No radios and humanized setting labels
+(pt-PT: Sim/Não); headline and Running/Stopped/Issues tile filters with "No apps in this
+state."; no Running panel, no Total tile; initials, name tooltip, locale-aware refresh
+date (`9/30/26, 9:20 AM` vs `30/09/2026 09:20`); heading without ⓥ/phone/secondary
+badges and "check failed" only on a failing health check; Settings about block (version,
+ports, phone apps); Settings keeps an edit through a backdrop click, Tab never escapes
+(Settings and startup-log dialogs), Escape returns focus to the opener; Stop on Authelia
+and nginx-proxy-manager asks "Stop anyway?" and Cancel leaves it running; a failed start
+(IT Tools, port 10490 held by a listener) shows "Couldn't start X. Try again" (pt-PT
+"Não foi possível iniciar…"), and Try again once the port is free returns it to running;
+"Start it with what it needs": with Authelia's port held it ends in `error` and the
+dependent app (Web Terminal) is never started; with the port free Authelia starts, then
+the app, four seconds apart (container `StartedAt`).
+**Failed:** "Show details" never renders for a real failed start — `status.ts` maps
+`created`/`restarting` containers to `error` with no message, so `service.error` is empty
+and the raw text only lives in the startup dialog/toast. **Not observed:** the "Starting…"
+button (no visible `starting` state), the "N need you" headline, the LAN fallback link.
+Left running after the test: IT Tools, Authelia, Web Terminal, Paperless (all restarted).

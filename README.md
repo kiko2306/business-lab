@@ -209,53 +209,24 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Apps page (impeccable critique, plan.md §761)
 
-- [ ] **Beta-test the Apps page translations (plan.md §763)** — on `beta`, switch the
-      language to pt-PT: category headings (both panels), the LAN-only/VPN-only badge on a
-      LAN-only app (Samba) and an overlay-only one (nginx-proxy-manager), and a boolean
-      setting's radios (Vaultwarden `SIGNUPS_ALLOWED`) read Portuguese ("Sim"/"Não"), and
-      setting labels read "Signups allowed", not `SIGNUPS_ALLOWED`. Delete once seen.
+- [ ] **Apps page: "Show details" never appears for a real failed start (plan.md §773)** —
+      beta test FAILED this part. A failed start leaves a container in `created`/`restarting`,
+      which `status.ts` maps to `state: 'error'` with no `error` string, so the row shows
+      "Couldn't start X. Try again" but no Show details; the raw failure text only reaches
+      the startup-log dialog and a toast. Fix: keep the last start failure message
+      (`startupEvents`) per app and render it under Show details. Test first. Also still
+      unseen on beta: the "Starting…" Start button (the box goes stopped → running with no
+      visible `starting` state).
 
-- [ ] **Beta-test the Apps page recovery states (plan.md §764)** — on `beta`: (1) force a
-      failed start (e.g. occupy an app's port) and read the row as a non-technical owner:
-      "Couldn't start X" + Try again works, Show details reveals the raw error; (2) a
-      starting app's Start button shows a spinner and "Starting…"; (3) Stop on Authelia and
-      on nginx-proxy-manager asks "Stop anyway?", Cancel leaves it running. Check in pt-PT
-      too. Delete once seen.
+- [ ] **Beta-test the "Local network" row link (plan.md §772, §773)** — the Running panel is
+      gone, the Running tile filters, public links and Settings ports passed. Still unseen:
+      the fallback link, which needs a running app with no public hostname (every app on the
+      box is exposed or LAN/VPN-only). Delete once seen.
 
-- [ ] **Beta-test the thinner Apps row heading (plan.md §766)** — on `beta`, a running
-      exposed app's row shows only its name, state and one link (no ⓥ, phone badges,
-      secondary URLs, or "healthy"); a failing health check still shows "check failed";
-      Settings opens with the version, phone-app and secondary/app URLs at the top. Check
-      on an app that has them (Nextcloud or Vaultwarden). Delete once seen.
-
-- [ ] **Beta-test "Start it with what it needs" (plan.md §770)** — on `beta`, stop
-      Authelia, then on an app that `dependsOn` it (e.g. Paperless) press the link next to
-      "Start Authelia first": Authelia starts, then the app; both end running. Also force
-      the dependency to fail and confirm the app is not attempted. Delete once seen.
-
-- [ ] **Beta-test the Running table's removal (plan.md §771)** — on `beta`: the page has
-      no Running apps panel; clicking the Running tile lists only running apps (click again
-      clears); an exposed app's public link is in its row, and Settings shows its published
-      ports (e.g. Paperless `10xxx → 8000/tcp`); a running app with no public hostname
-      (stop the tunnel, or use an app exposure skips) shows a "Local network" link that
-      opens on the host's LAN IP. Delete once seen.
-
-- [ ] **Beta-test the Apps page scale tools (plan.md §767)** — on `beta`: the heading line
-      reads "All N apps are fine." or "N of M apps need you."; clicking the Issues or
-      Stopped tile filters the list to those apps (click again clears); a category with a
-      failed app is open on load. Check in pt-PT. Delete once seen.
-
-- [ ] **Beta-test the Apps page dialogs (plan.md §765)** — on `beta`: open an app's
-      Settings, type into a field, click the dark backdrop — the dialog stays and the edit
-      survives; Tab/Shift+Tab never leaves it; Escape closes it and focus lands back on the
-      Settings button. Same Tab/focus check on the startup-log dialog after pressing Start.
-      Delete once seen.
-
-- [ ] **Beta-test the Apps page small fixes (plan.md §768)** — on `beta`: app tiles show
-      initials (Home Assistant → HA) in the list and Settings; hovering a long app name
-      shows the full name; "Last refresh" reads `30/09/2026, 08:46` in pt-PT and a US-style
-      date in en; there is no Total tile; the Issues tile with no failed apps says "No
-      apps in this state." Delete once seen.
+- [ ] **Beta-test the Apps page scale tools, remainder (plan.md §767, §773)** — headline
+      "All N apps are fine." and the tile filters passed in en and pt-PT. Still unseen: the
+      "N of M apps need you." wording and a category with a failed app being open on load —
+      needs an app left in `error` while the page loads. Delete once seen.
 
 ### Exposure and platform
 
