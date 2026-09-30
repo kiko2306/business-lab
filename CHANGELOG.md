@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.153.13] — 2026-09-30
+
+### Fixed
+
+- Service card CSS back under its size budget: badge alignment uses Bootstrap utility classes
+
 ## [0.153.12] — 2026-09-30
 
 ### Fixed

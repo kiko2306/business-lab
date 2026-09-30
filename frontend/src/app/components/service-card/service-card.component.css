@@ -61,11 +61,6 @@
   font-weight: 500;
 }
 
-.service-row-heading .badge-icon {
-  display: inline-flex;
-  align-items: center;
-}
-
 .service-row-sub {
   display: flex;
   gap: 0.35rem;
