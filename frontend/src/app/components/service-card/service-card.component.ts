@@ -38,6 +38,16 @@ export function humanizeEnvKey(key: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+// Initials, not the registry's emoji: emoji render differently per OS and read
+// as noise beside 36 rows (plan.md §761). "Home Assistant" -> HA, "Jellyfin" -> Je.
+export function serviceInitials(label: string): string {
+  const words = label.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) {
+    return '?';
+  }
+  return words.length > 1 ? (words[0][0] + words[1][0]).toUpperCase() : words[0].slice(0, 2).replace(/^./, (c) => c.toUpperCase());
+}
+
 const CORE_SERVICES = new Set(['authelia', 'nginx-proxy-manager']);
 
 type StartupPhase = 'streaming' | 'running' | 'error' | 'timeout';
@@ -67,6 +77,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   private readonly zone = inject(NgZone);
   protected readonly translate = inject(TranslateService);
   protected readonly envLabel = humanizeEnvKey;
+  protected readonly initials = serviceInitials;
 
   @Input({ required: true }) service!: ServiceStatus;
   @Input() allServices: ServiceStatus[] = [];
@@ -745,53 +756,6 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       );
     }
     return parts.join(' · ');
-  }
-
-  serviceIcon(icon: string): string {
-    const icons: Record<string, string> = {
-      nginx: '🌐',
-      vpn: '🔐',
-      home: '🏠',
-      cloud: '☁️',
-      code: '💻',
-      book: '📚',
-      folder: '🗂️',
-      dashboard: '🧭',
-      workflow: '🔁',
-      document: '📄',
-      shield: '🛡️',
-      speed: '⚡',
-      lock: '🔒',
-      pulse: '📈',
-      key: '🔑',
-      backup: '💾',
-      photo: '📷',
-      media: '🎬',
-      music: '🎵',
-      tasks: '✅',
-      update: '🔄',
-      bell: '🔔',
-      pdf: '📕',
-      chat: '💬',
-      table: '🗃️',
-      siren: '🚨',
-      pantry: '🥫',
-      fridge: '🧊',
-      cart: '🛒',
-      remote: '🖥️',
-      box: '📦',
-      disk: '💽',
-      tools: '🧰',
-      chart: '📊',
-      rss: '📰',
-      megaphone: '📣',
-      database: '🗄️',
-      signature: '✍️',
-      clock: '⏱️',
-      contacts: '👥',
-    };
-
-    return icons[icon] ?? '🖥️';
   }
 
   stateBadge(state: ServiceStatus['state']): string {

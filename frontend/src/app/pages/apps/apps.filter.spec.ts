@@ -1,3 +1,4 @@
+import { en } from '../../i18n/en';
 import { filterServices, hasIssue } from './apps.component';
 import { ServiceStatus } from '../../core/models';
 
@@ -59,5 +60,12 @@ describe('hasIssue', () => {
   it('is true for a group with any failed app', () => {
     expect(hasIssue([svc({ state: 'running' }), svc({ state: 'error' })])).toBeTrue();
     expect(hasIssue([svc({ state: 'stopped' })])).toBeFalse();
+  });
+});
+
+describe('summary strip', () => {
+  it('has no Total tile: the headline already says how many apps there are', () => {
+    // template-level guard lives in apps-strings.spec (dictionary), so just pin the key set
+    expect(Object.keys(en)).not.toContain('apps.summary.total');
   });
 });

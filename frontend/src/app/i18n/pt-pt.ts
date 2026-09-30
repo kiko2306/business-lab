@@ -47,7 +47,7 @@ export const ptPT: Record<string, string> = {
   'apps.headline.allFine': 'As {{total}} apps estão bem.',
   'apps.headline.needYou': '{{count}} de {{total}} apps precisam de si.',
   'apps.refresh': 'Atualizar estado',
-  'apps.summary.total': 'Total',
+  'apps.search.noneInState': 'Nenhuma aplicação neste estado.',
   'apps.summary.running': 'Em execução',
   'apps.summary.stopped': 'Paradas',
   'apps.summary.issues': 'Problemas',

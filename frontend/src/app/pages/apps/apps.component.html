@@ -17,10 +17,6 @@
 
   <section class="summary-grid mb-3" *ngIf="serviceState.summary$ | async as summary">
     <div class="summary-card">
-      <span class="summary-label">{{ 'apps.summary.total' | t }}</span>
-      <strong>{{ summary.total }}</strong>
-    </div>
-    <div class="summary-card">
       <span class="summary-label text-success">{{ 'apps.summary.running' | t }}</span>
       <strong>{{ summary.running }}</strong>
     </div>
@@ -36,7 +32,7 @@
 
   <section class="mb-4 small text-body-secondary d-flex align-items-center gap-2" *ngIf="serviceState.lastUpdated$ | async as lastUpdated">
     <span class="badge text-bg-secondary border">{{ ('apps.status.' + (serviceState.connectionStatus$ | async)) | t }}</span>
-    {{ 'apps.lastRefresh' | t:{ time: (lastUpdated | date:'dd/MM/yyyy, HH:mm':undefined:translate.locale()) ?? '' } }}
+    {{ 'apps.lastRefresh' | t:{ time: (lastUpdated | date:'short':undefined:translate.locale()) ?? '' } }}
   </section>
 
   <app-panel
@@ -124,7 +120,7 @@
 
         <ng-container *ngIf="filterServices(services, appFilter, stateFilter) as matches">
           <p *ngIf="!matches.length" class="text-body-secondary">
-            {{ 'apps.search.noMatches' | t:{ query: appFilter } }}
+            {{ (appFilter.trim() ? 'apps.search.noMatches' : 'apps.search.noneInState') | t:{ query: appFilter } }}
           </p>
           <div class="service-group mb-4" *ngFor="let group of groupServicesByCategory(matches); trackBy: trackByCategory">
             <h3 class="h6 text-body-secondary text-uppercase mb-2">

@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { of } from 'rxjs';
-import { ServiceCardComponent } from './service-card.component';
+import { ServiceCardComponent, serviceInitials } from './service-card.component';
 import { ConfirmService } from '../../core/confirm.service';
 import { OperationsService } from '../../core/operations.service';
 import { ServiceStateService } from '../../core/service-state.service';
@@ -599,5 +599,34 @@ describe('ServiceCardComponent heading line', () => {
     expect(about.textContent).toContain('Android');
     expect(about.textContent).toContain('iPhone');
     expect(about.textContent).toContain('ⓥ');
+  });
+});
+
+// plan.md §761 P3: OS-dependent emoji replaced by initials, so every app's tile
+// renders the same on every device.
+describe('serviceInitials', () => {
+  it('takes the first letters of the first two words, else the first two letters', () => {
+    expect(serviceInitials('Home Assistant')).toBe('HA');
+    expect(serviceInitials('Jellyfin')).toBe('Je');
+    expect(serviceInitials('  nginx proxy manager ')).toBe('NP');
+    expect(serviceInitials('')).toBe('?');
+  });
+
+  it('renders as the row tile, with the full name as a tooltip', () => {
+    TestBed.configureTestingModule({
+      imports: [ServiceCardComponent],
+      providers: [
+        { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+      ],
+    });
+    const fixture = TestBed.createComponent(ServiceCardComponent);
+    fixture.componentInstance.service = service('jellyfin', 'running', { label: 'Jellyfin', icon: 'media' });
+    fixture.componentInstance.allServices = [fixture.componentInstance.service];
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('.service-icon')?.textContent?.trim()).toBe('Je');
+    expect(el.querySelector('.service-name')?.getAttribute('title')).toBe('Jellyfin');
   });
 });

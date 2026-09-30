@@ -1,9 +1,9 @@
 <article class="service-row" [class.row-error]="service.state === 'error'">
-  <span class="service-icon">{{ serviceIcon(service.icon) }}</span>
+  <span class="service-icon" aria-hidden="true">{{ initials(service.label) }}</span>
 
   <div class="service-row-main">
     <div class="service-row-heading">
-      <span class="service-name">{{ service.label }}</span>
+      <span class="service-name" [title]="service.label">{{ service.label }}</span>
       <span class="badge text-bg-{{ stateBadge(service.state) }}" aria-live="polite">{{ 'serviceCard.state.' + service.state | t }}</span>
       <span *ngIf="service.state === 'running' && !service.healthy" class="badge bg-body-tertiary border" [ngClass]="healthClass()">{{ healthLabel() }}</span>
       <a
@@ -99,7 +99,7 @@
 <div *ngIf="settingsModalOpen" class="settings-backdrop">
   <div #settingsDialog tabindex="-1" style="outline:0" (keydown)="trapTab($event)" class="settings-dialog" role="dialog" aria-modal="true" [attr.aria-labelledby]="'settings-title-' + service.name">
     <div class="settings-head">
-      <span class="service-icon service-icon-sm">{{ serviceIcon(service.icon) }}</span>
+      <span class="service-icon service-icon-sm" aria-hidden="true">{{ initials(service.label) }}</span>
       <span class="fw-semibold" [id]="'settings-title-' + service.name">{{ 'serviceCard.settingsModalTitle' | t:{ label: service.label } }}</span>
       <button type="button" class="btn-close ms-auto" [attr.aria-label]="'common.close' | t" (click)="closeSettings()"></button>
     </div>

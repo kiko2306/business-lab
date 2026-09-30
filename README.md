@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.153.18** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.153.19** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -243,10 +243,11 @@ it is done — not ticked off and left behind. Section references point at
       Settings button. Same Tab/focus check on the startup-log dialog after pressing Start.
       Delete once seen.
 
-- [ ] **Apps page: small fixes (P3, plan.md §761)** — emoji icons to SVG or initials
-      (`service-card.ts:687-735`); `dd/MM/yyyy, HH:mm` hard-coded at `apps.component.html:34`
-      so en gets a pt-style date; `.service-name` truncation has no tooltip; drop the
-      redundant "Total" tile.
+- [ ] **Beta-test the Apps page small fixes (plan.md §768)** — on `beta`: app tiles show
+      initials (Home Assistant → HA) in the list and Settings; hovering a long app name
+      shows the full name; "Last refresh" reads `30/09/2026, 08:46` in pt-PT and a US-style
+      date in en; there is no Total tile; the Issues tile with no failed apps says "No
+      apps in this state." Delete once seen.
 
 ### Exposure and platform
 

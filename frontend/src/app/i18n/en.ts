@@ -47,7 +47,7 @@ export const en: Record<string, string> = {
   'apps.headline.allFine': 'All {{total}} apps are fine.',
   'apps.headline.needYou': '{{count}} of {{total}} apps need you.',
   'apps.refresh': 'Refresh status',
-  'apps.summary.total': 'Total',
+  'apps.search.noneInState': 'No apps in this state.',
   'apps.summary.running': 'Running',
   'apps.summary.stopped': 'Stopped',
   'apps.summary.issues': 'Issues',

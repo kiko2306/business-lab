@@ -34734,3 +34734,16 @@ own README item: "Start with what it needs" (needs a dependency-ordered start, a
 backend/UX design) and the Running-table-as-duplicate question, which the critique
 raised without deciding. Known rough edge: a state filter with zero matches shows the
 "no matches for ''" text. Tests: `filterServices` state cases and `hasIssue`, red first.
+
+## 768. Apps page: small fixes (§761 P3)
+
+Tiles show initials (`serviceInitials`) instead of the registry's emoji, which drew
+differently per OS; the 40-line emoji map is deleted (the registry's `icon` field stays,
+now unused by the card; the Home Page uses its own icons). Rejected: SVG icons for ~40
+keys (a sprite to maintain for no information gain). `.service-name` gets a `title`;
+"Last refresh" uses Angular's locale-aware `short` format instead of a hard-coded
+`dd/MM/yyyy` (only this line: other pages still hard-code it, not raised in the critique);
+the Total tile and its key are gone (the headline states the total); an empty state
+filter says "No apps in this state." (the §767 rough edge). Tests: `serviceInitials`,
+tile/tooltip render and the dropped key, red first. The date format has no unit test
+(template-only); the README beta item carries it.
