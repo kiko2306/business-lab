@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.157.2] — 2026-09-30
+
+### Backups
+
+- Fix a missing space after the destination/dump status labels (found during a polish pass)
+
 ## [0.157.1] — 2026-09-30
 
 ### Audit fixes

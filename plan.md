@@ -35209,3 +35209,42 @@ it — to stop warning on weight that lazy-loading can't remove.
 All four fixed in one batch per the audit's own closing recommendation. Frontend 173
 tests (backend untouched, no backend changes this section) + build clean, no bundle
 warning. Version bump: see CHANGELOG.
+
+### 789.1 `/impeccable polish` on the same four pages
+
+Re-inspected the fresh screenshots from §789's own verification pass with a polish
+rather than an audit lens (alignment, spacing, terminology, one-off vs. shared
+patterns), plus read the code for interaction states the screenshots can't show
+(focus-visible, hover). Two things considered and set aside, one real defect found and
+fixed:
+
+- **Considered: the new `<details>` disclosures' native triangle marker looks
+  inconsistent with `.panel__toggle`'s custom chevron.** Checked whether this was a
+  one-off implementation to fix — it isn't: `service-card.component.html`'s pre-existing
+  "Show details" `<details>` (its own error-recovery disclosure) also uses the bare
+  native marker, unstyled, with nothing in that component's CSS touching it. The new
+  disclosures match an existing, if minimal, convention rather than breaking one.
+  Left alone — styling a custom chevron onto `<details>` now would be a *new* standard
+  nobody asked for, the opposite of consistency.
+- **Considered: the initials avatar's font-size/box proportions vs. `service-icon`'s.**
+  Close enough (2.5rem/0.95rem vs. service-card's 2.25rem/1.1rem, same visual weight at
+  a glance) that adjusting it would be motion for its own sake. Left alone.
+- **Fixed: `backups.status.destinationLabel`/`dumpLabel` ("Destination:", "Last
+  app-database dump:") ran directly into the following text with no gap** —
+  "Destination:The backup engine is unreachable". Pre-existing, predates this session.
+  Cause: Angular's default `preserveWhitespaces: false` collapses the template-source
+  whitespace between the label `<span>` and the adjacent `<ng-container>`/
+  `<ng-template>`, so newline/indentation in the source doesn't survive to the DOM —
+  the fix has to be a real margin, not more template whitespace. Added Bootstrap's own
+  `me-1` utility to both label spans (already the codebase's idiom for this exact kind
+  of spacing; no new CSS). Grepped for the same "label span immediately followed by a
+  container, no separator" shape elsewhere in `pages/` — no other match, so this was
+  contained to these two lines, not a systemic pattern worth a broader sweep.
+
+Verified live (same `docker-compose.test.yml` + Playwright harness as §789): confirmed
+`Advanced: more destination kinds` closed with the correct chevron direction when Disk
+(a main-select kind) is active — the auto-open logic from §786 holds both ways, not
+just the "already advanced" case §789 happened to screenshot. Confirmed the label
+spacing fix with a fresh screenshot. 173 tests unaffected (HTML/class-only change).
+No `critique-storage` snapshot existed for these files to close (exit 2 — the settings
+page's last recorded critique predates this session's edits to it).

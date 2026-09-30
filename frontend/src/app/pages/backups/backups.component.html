@@ -113,7 +113,7 @@
              dump went. -->
         <div class="border-top mt-3 pt-3 small d-flex flex-column gap-1" *ngIf="backupStatus as st">
           <div>
-            <span class="text-body-secondary">{{ 'backups.status.destinationLabel' | t }}</span>
+            <span class="text-body-secondary me-1">{{ 'backups.status.destinationLabel' | t }}</span>
             <ng-container *ngIf="st.job.configured; else noJob">
               <code>{{ st.job.repositoryDescription || st.job.storageType || ('backups.status.unknown' | t) }}</code>
               <span class="text-body-secondary" *ngIf="st.job.snapshotCount !== null">
@@ -129,7 +129,7 @@
             {{ (st.job.lastSnapshotErrorCount === 1 ? 'backups.status.snapshotError.one' : 'backups.status.snapshotError.other') | t:{ time: (st.job.lastSnapshotAt | date:'dd/MM/yyyy, HH:mm':undefined:translate.locale()) ?? '', count: st.job.lastSnapshotErrorCount } }}
           </div>
           <div>
-            <span class="text-body-secondary">{{ 'backups.status.dumpLabel' | t }}</span>
+            <span class="text-body-secondary me-1">{{ 'backups.status.dumpLabel' | t }}</span>
             <ng-container *ngIf="st.lastAppData as dump; else noDump">
               <span [class.text-danger]="dump.result !== 'success'">
                 {{ dump.at | date:'dd/MM/yyyy, HH:mm':undefined:translate.locale() }}<ng-container *ngIf="dump.dumped !== null"> &mdash; {{ dump.dumped }} {{ 'backups.status.dumped' | t }}</ng-container><ng-container *ngIf="dump.failed"> , {{ dump.failed }} {{ 'backups.status.failed' | t }}</ng-container>
