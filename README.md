@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.154.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.155.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -233,10 +233,10 @@ it is done — not ticked off and left behind. Section references point at
       "Start Authelia first": Authelia starts, then the app; both end running. Also force
       the dependency to fail and confirm the app is not attempted. Delete once seen.
 
-- [ ] **Apps page: remove the Running apps table (P2, plan.md §769)** — decided: fold it
-      into the list. Add a Running tile filter like Issues/Stopped; keep each app's public
-      URL and host ports reachable from its row/Settings (the table's whole value). Test
-      first: the port/URL rows still derive for every running app.
+- [ ] **Beta-test the Running table's removal (plan.md §771)** — on `beta`: the page has
+      no Running apps panel; clicking the Running tile lists only running apps (click again
+      clears); an exposed app's public link is in its row, and Settings shows its published
+      ports (e.g. Paperless `10xxx → 8000/tcp`). Delete once seen.
 
 - [ ] **Beta-test the Apps page scale tools (plan.md §767)** — on `beta`: the heading line
       reads "All N apps are fine." or "N of M apps need you."; clicking the Issues or

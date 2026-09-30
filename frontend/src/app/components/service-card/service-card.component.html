@@ -109,6 +109,7 @@
       <!-- About: what used to crowd the row heading (plan.md §761) -->
       <section class="settings-section settings-about small d-flex flex-wrap gap-2 align-items-center">
         <span class="badge bg-body-tertiary border">ⓥ {{ 'serviceCard.installedLabel' | t:{ version: installedVersion() } }}</span>
+        <span class="badge text-bg-secondary border" *ngFor="let port of service.ports" [title]="'serviceCard.portTitle' | t">{{ port.hostPort }} → {{ port.containerPort }}/{{ port.protocol }}</span>
         <span *ngIf="service.mobileApps?.android" class="badge bg-body-tertiary border">{{ 'serviceCard.androidAppTitle' | t }}</span>
         <span *ngIf="service.mobileApps?.ios" class="badge bg-body-tertiary border">{{ 'serviceCard.iosAppTitle' | t }}</span>
         <a

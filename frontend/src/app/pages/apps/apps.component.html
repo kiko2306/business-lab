@@ -16,10 +16,10 @@
   </section>
 
   <section class="summary-grid mb-3" *ngIf="serviceState.summary$ | async as summary">
-    <div class="summary-card">
+    <button type="button" class="summary-card text-start" [class.active]="stateFilter === 'running'" [attr.aria-pressed]="stateFilter === 'running'" (click)="toggleStateFilter('running')">
       <span class="summary-label text-success">{{ 'apps.summary.running' | t }}</span>
       <strong>{{ summary.running }}</strong>
-    </div>
+    </button>
     <button type="button" class="summary-card text-start" [class.active]="stateFilter === 'stopped'" [attr.aria-pressed]="stateFilter === 'stopped'" (click)="toggleStateFilter('stopped')">
       <span class="summary-label text-secondary">{{ 'apps.summary.stopped' | t }}</span>
       <strong>{{ summary.stopped }}</strong>
@@ -34,56 +34,6 @@
     <span class="badge text-bg-secondary border">{{ ('apps.status.' + (serviceState.connectionStatus$ | async)) | t }}</span>
     {{ 'apps.lastRefresh' | t:{ time: (lastUpdated | date:'short':undefined:translate.locale()) ?? '' } }}
   </section>
-
-  <app-panel
-    anchor="running"
-    key="running"
-    [title]="'apps.runningPanel.title' | t"
-    [subtitle]="'apps.runningPanel.subtitle' | t"
-  >
-    <ng-container *ngIf="serviceState.services$ | async as services; else loadingState">
-      <ng-container *ngIf="groupRunningPortsByCategory(services, serviceState.hostLanIp$ | async) as portGroups">
-        <ng-container *ngIf="portGroups.length; else noPortsState">
-          <div class="service-group mb-3" *ngFor="let group of portGroups; trackBy: trackByCategory">
-            <h3 class="h6 text-body-secondary text-uppercase mb-2">
-              {{ 'apps.category.' + group.category | t }}
-              <span class="badge rounded-pill text-bg-secondary border fw-normal">{{ group.rows.length }}</span>
-            </h3>
-            <div class="table-responsive table-stack-wrap">
-              <table class="table table-sm table-striped table-stack align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th scope="col">{{ 'apps.table.app' | t }}</th>
-                    <th scope="col">{{ 'apps.table.url' | t }}</th>
-                    <th scope="col">{{ 'apps.table.ports' | t }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngFor="let row of group.rows; trackBy: trackByPortRow">
-                    <td [attr.data-label]="'apps.table.app' | t">{{ row.label }}</td>
-                    <td [attr.data-label]="'apps.table.url' | t">
-                      <a *ngIf="row.url; else noUrl" [href]="row.url" target="_blank" rel="noopener noreferrer">{{ row.url }}</a>
-                      <ng-template #noUrl><span class="text-body-secondary">&mdash;</span></ng-template>
-                    </td>
-                    <td [attr.data-label]="'apps.table.ports' | t">
-                      <div class="d-flex flex-wrap gap-1">
-                        <span class="badge text-bg-secondary border" *ngFor="let port of row.ports">
-                          {{ port.hostPort }} &rarr; {{ port.containerPort }}/{{ port.protocol }}
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </ng-container>
-        <ng-template #noPortsState>
-          <p class="text-body-secondary mb-0">{{ 'apps.noPorts' | t }}</p>
-        </ng-template>
-      </ng-container>
-    </ng-container>
-  </app-panel>
 
   <app-panel
     anchor="apps"

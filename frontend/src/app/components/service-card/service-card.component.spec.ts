@@ -604,6 +604,13 @@ describe('ServiceCardComponent heading line', () => {
     expect(heading().textContent).toContain('check failed');
   });
 
+  it('lists the published host ports in Settings (the old Running table\'s other column)', () => {
+    render({ ports: [{ hostPort: '10120', containerPort: '8080', protocol: 'tcp' }] });
+    component.openSettings();
+    fixture.detectChanges();
+    expect(el.querySelector('.settings-about')?.textContent).toContain('10120 → 8080/tcp');
+  });
+
   it('moves version, phone apps and secondary URLs into the Settings dialog', () => {
     render({});
     component.openSettings();

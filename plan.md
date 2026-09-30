@@ -34768,3 +34768,13 @@ refuses a blocked start with 409, the UI only needed sequencing, and the client 
 same registry. Known limit: dependencies' startup-log dialogs are not opened (toasts and
 row spinners show progress); only the target's opens. Tests: `startChain` cases, two
 sequencing specs (order, abort on failure), the card link; all red first.
+
+## 771. Running apps table removed (§769 decision 1)
+
+The Running panel, `groupRunningPortsByCategory`/`buildRunningAppUrl` and their `apps.table.*`,
+`apps.runningPanel.*`, `apps.noPorts` strings are deleted. Its two columns already live on
+the rows: the public/LAN link is the row's one link (§766), and the published host ports
+moved into the Settings "about" block (`serviceCard.portTitle`). The Running summary tile is
+now a state filter like Issues/Stopped (`toggleStateFilter('running')`). The LAN URL for a
+non-exposed app was never lost: `lanAccessUrl()` in the card is the same pair. Tests: a
+ports-in-Settings spec, red first; the filter reuses the tested `filterServices(state)`.

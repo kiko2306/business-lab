@@ -23,8 +23,7 @@ const CATEGORY_ORDER: ServiceCategory[] = [
   'Wintouch Interop',
 ];
 
-// Fixed display order for both the running-apps table and the full apps
-// list, so the same category shows up in the same place in both.
+// Fixed display order for the apps list's category groups.
 export const CATEGORY_DISPLAY_ORDER: readonly string[] = [...CATEGORY_ORDER, 'Other'];
 
 function orderCategories(present: Iterable<string>): string[] {
@@ -35,65 +34,6 @@ function orderCategories(present: Iterable<string>): string[] {
 interface ServiceGroup {
   category: string;
   services: ServiceStatus[];
-}
-
-interface ServicePortRow {
-  serviceName: string;
-  label: string;
-  url: string | null;
-  ports: ServiceStatus['ports'];
-}
-
-interface ServicePortGroup {
-  category: string;
-  rows: ServicePortRow[];
-}
-
-// One row per running app for the "running apps" table — all of an app's
-// published ports are listed together instead of one row each. The URL is the
-// app's public hostname when it's exposed (no port — Cloudflare/NPM strip that
-// away), otherwise a LAN link to its web-UI port on whatever host is serving
-// this dashboard; either gets the registry's `webPath` appended when the UI
-// isn't at the bare root (e.g. Pi-hole's `/admin`, NPM's admin panel on :81).
-// Rows are grouped by the same category as the full apps list so the two views
-// line up.
-function buildRunningAppUrl(service: ServiceStatus, hostLanIp: string | null): string | null {
-  const suffix = service.webPath ?? '';
-  if (service.exposedHostname) {
-    return `https://${service.exposedHostname}${suffix}`;
-  }
-  if (service.webPort) {
-    // Not window.location.hostname: when this dashboard is reached over its
-    // own public subdomain, that hostname doesn't forward an app's raw port
-    // (Cloudflare/NPM only carry 80/443) — the actual Docker host's LAN IP
-    // does, for a browser on the LAN or the overlay VPN either way.
-    return `http://${hostLanIp ?? window.location.hostname}:${service.webPort}${suffix}`;
-  }
-  return null;
-}
-
-function groupRunningPortsByCategory(services: ServiceStatus[], hostLanIp: string | null): ServicePortGroup[] {
-  const byCategory = new Map<string, ServicePortRow[]>();
-  for (const service of services) {
-    if (service.state !== 'running' || !service.ports?.length) {
-      continue;
-    }
-    const category = service.category ?? 'Other';
-    const url = buildRunningAppUrl(service, hostLanIp);
-    const row: ServicePortRow = { serviceName: service.name, label: service.label, url, ports: service.ports };
-    const bucket = byCategory.get(category);
-    if (bucket) {
-      bucket.push(row);
-    } else {
-      byCategory.set(category, [row]);
-    }
-  }
-
-  for (const rows of byCategory.values()) {
-    rows.sort((a, b) => a.label.localeCompare(b.label));
-  }
-
-  return orderCategories(byCategory.keys()).map((category) => ({ category, rows: byCategory.get(category)! }));
 }
 
 // Free-text filter for the "All apps" list. Matches a space-separated query
@@ -155,7 +95,6 @@ export class AppsComponent implements OnInit, OnDestroy {
   protected readonly translate = inject(TranslateService);
 
   protected readonly groupServicesByCategory = groupServicesByCategory;
-  protected readonly groupRunningPortsByCategory = groupRunningPortsByCategory;
   protected readonly filterServices = filterServices;
 
   // Bound to the "All apps" search box. While it is non-empty every category
@@ -212,7 +151,7 @@ export class AppsComponent implements OnInit, OnDestroy {
     return this.appFilter.trim() || this.stateFilter || hasIssue(services) ? false : this.collapse.isCollapsed(key);
   }
 
-  toggleStateFilter(state: 'error' | 'stopped'): void {
+  toggleStateFilter(state: 'running' | 'error' | 'stopped'): void {
     this.stateFilter = this.stateFilter === state ? null : state;
   }
 

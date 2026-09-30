@@ -161,8 +161,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
    * A `lanOnly`/`overlayOnly` app never gets an `exposedHostname` (kept off
    * the public tunnel regardless of exposability), but a browser already on
    * the LAN or the overlay VPN reaches it the same way: this dashboard's own
-   * hostname, at the app's published web port (apps.component.ts's
-   * buildRunningAppUrl uses the same pair for the same reason).
+   * hostname, at the app's published web port.
    */
   protected lanAccessUrl(): string | null {
     if (!this.service.webPort) {
