@@ -1,4 +1,4 @@
-import { deploymentDetailKey, deploymentLabelKey } from './deployment-check-text';
+import { deploymentDetailKey, deploymentLabelKey, deploymentSubtitleKey } from './deployment-check-text';
 import { DeploymentCheck } from '../../core/models';
 import { en } from '../../i18n/en';
 import { ptPT } from '../../i18n/pt-pt';
@@ -57,6 +57,30 @@ describe('deployment checklist text', () => {
       const key = deploymentDetailKey(check({ id, done: false, params: {} }));
       expect(en[key]).withContext(`en ${key}`).not.toMatch(/start\.sh|\/setup/i);
       expect(ptPT[key]).withContext(`pt-PT ${key}`).not.toMatch(/start\.sh|\/setup/i);
+    }
+  });
+});
+
+// plan.md §789: found live during an audit — pt-PT's outstanding-count subtitle
+// read literally "item(ns)", mirroring English's "(s)" trick, which isn't valid
+// Portuguese. Split into real singular/plural keys instead.
+describe('deploymentSubtitleKey', () => {
+  it('has a translated key for done, one outstanding, and many outstanding, in both languages', () => {
+    for (const key of [deploymentSubtitleKey(0), deploymentSubtitleKey(1), deploymentSubtitleKey(3)]) {
+      expect(en[key]).withContext(`en ${key}`).toBeTruthy();
+      expect(ptPT[key]).withContext(`pt-PT ${key}`).toBeTruthy();
+    }
+  });
+
+  it('picks a different key for one outstanding than for many', () => {
+    expect(deploymentSubtitleKey(1)).not.toBe(deploymentSubtitleKey(3));
+  });
+
+  it('never leaves a literal "(s)"-style suffix in either language', () => {
+    for (const count of [0, 1, 3]) {
+      const key = deploymentSubtitleKey(count);
+      expect(en[key]).withContext(`en ${key}`).not.toMatch(/\(s\)|\(ns\)/i);
+      expect(ptPT[key]).withContext(`pt-PT ${key}`).not.toMatch(/\(s\)|\(ns\)/i);
     }
   });
 });

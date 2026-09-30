@@ -123,6 +123,13 @@
 }
 
 @media (max-width: 575.98px) {
+  /* auto-fit's 9rem floor only fits 2 of the 3 tiles at phone width, leaving
+     the third alone with empty space beside it (found live during an audit,
+     plan.md §789) — three equal columns always, tightened padding below. */
+  .summary-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
   .summary-card {
     padding: 0.85rem;
     border-radius: 0.8rem;

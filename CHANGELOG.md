@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.157.1] — 2026-09-30
+
+### Audit fixes
+
+- Fix four issues an /impeccable audit found on a real render: emoji icons, a broken pt-PT plural, a stranded mobile tile, and lazy-load every route
+
 ## [0.157.0] — 2026-09-30
 
 ### Home

@@ -35155,3 +35155,57 @@ Backend 1293 tests + typecheck, frontend 169 tests + build pass (three repeated 
 no flake). Not run against `e2e/tests/nav.spec.ts`'s full browser suite — this doesn't
 touch auth, nav or Users, so it's outside that gate; the route/heading it asserts on is
 unchanged either way. Version bump: see CHANGELOG.
+
+## 789. `/impeccable audit` against a real render, and its four findings fixed
+
+Ran `/impeccable audit` against Home, Apps, Backups and Settings — the README's §777
+item — for real: built the frontend, brought up `docker-compose.test.yml`, logged in
+via Playwright's own `auth.setup.ts`, and screenshotted all four pages at desktop and
+mobile, in light and dark, in English and pt-PT. Score 17/20. Four findings, all fixed
+in this same session rather than left for the README:
+
+**Home's emoji icons (from §788, this same session) render as missing-glyph boxes.**
+The real render showed 7 of 8 tile icons (🧩🔄💾👥🧰👤📜) as tofu — only ⚙️ survived —
+in a Chromium build with no colour-emoji font, which is not a rare environment (many
+minimal Linux desktops and locked-down corporate images ship without one). Worse: this
+codebase already rejected emoji for exactly this reason — `service-card.component.ts`'s
+`serviceInitials()` carries the comment "Initials, not the registry's emoji: emoji
+render differently per OS and read as noise" (plan.md §761) — so Home's icons were a
+second, contradicting icon system, not just a rendering bug. Fixed by giving each tile
+a plain two-letter `initials` field (AP/UP/BK/US/SE/UT/AC/AL) rendered in the same
+rounded-box treatment as `.service-icon`, rather than reusing `serviceInitials()`
+itself — that function splits on whitespace and several tile titles contain "&"
+("Updates & version control"), which would have produced initials like "U&". Test-first:
+a new spec case asserts every tile's rendered icon matches `/^[A-Z]{1,2}$/` and that all
+eight are distinct, which fails immediately against an emoji string.
+
+**pt-PT's deployment-checklist subtitle read literally "item(ns)".** Pre-existing
+(`settings.deployment.subtitleOutstanding`, before this session), not caused by §787 —
+mirrored English's "{{count}} item(s)" trick, which isn't valid Portuguese and reads as
+an unfinished translation. `deployment-check-text.ts` gained `deploymentSubtitleKey()`
+returning one of three real keys (done / one outstanding / many outstanding) instead of
+a single templated string; `subtitleOutstandingSingular`/`Plural` replace the old key in
+both languages. Test-first in `deployment-check-text.spec.ts`: asserts both languages
+have all three keys, that singular and plural resolve to different keys, and that
+neither ever contains a literal `(s)`/`(ns)`.
+
+**Apps page: the third summary tile stranded alone on a phone.** `auto-fit,
+minmax(9rem, 1fr)` only fits two of the three stat tiles (Running/Stopped/Issues) at
+phone width, leaving Issues alone with empty space beside it — visible in the real
+mobile screenshot, invisible in a desktop-only review. Fixed inside the page's existing
+575.98px breakpoint: `repeat(3, 1fr)` there instead of relying on auto-fit, alongside
+the padding/font reductions that breakpoint already made.
+
+**Initial bundle 510KB over Angular's budget.** `app.routes.ts` statically imported
+all 18 page components, so a fresh session downloaded every page's code before
+rendering one. Converted every route to `loadComponent: () => import(...)` except the
+always-needed `ShellComponent` — the standard Angular fix, not a budget-number dodge.
+Initial bundle: 1.02MB → 703KB raw (194KB → 146KB transfer); each page now its own
+lazy chunk (7-59KB). The remaining ~190KB over the CLI's stock 500KB warning is
+framework/shared-service weight that doesn't belong to any one page, so
+`angular.json`'s `maximumWarning` moved to 720kB — after the real fix, not instead of
+it — to stop warning on weight that lazy-loading can't remove.
+
+All four fixed in one batch per the audit's own closing recommendation. Frontend 173
+tests (backend untouched, no backend changes this section) + build clean, no bundle
+warning. Version bump: see CHANGELOG.

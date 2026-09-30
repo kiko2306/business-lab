@@ -11,7 +11,7 @@
   key="settings:deployment"
   [title]="'settings.deployment.title' | t"
   [subtitle]="deployment
-    ? (deployment.outstanding === 0 ? ('settings.deployment.subtitleDone' | t) : ('settings.deployment.subtitleOutstanding' | t:{ count: deployment.outstanding }))
+    ? (deploymentSubtitleKey(deployment.outstanding) | t:{ count: deployment.outstanding })
     : ('settings.deployment.subtitleDefault' | t)"
 >
   <p *ngIf="deploymentLoading" class="text-body-secondary mb-0">{{ 'common.loading' | t }}</p>

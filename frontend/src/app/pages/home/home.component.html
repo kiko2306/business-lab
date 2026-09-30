@@ -21,7 +21,7 @@
         {{ (lastBackupDaysAgo === 0 ? 'home.badge.backupToday' : 'home.badge.backupDaysAgo') | t:{ days: lastBackupDaysAgo } }}
       </span>
       <div class="card-body">
-        <span class="menu-tile__icon" aria-hidden="true">{{ tile.icon }}</span>
+        <span class="menu-tile__icon" aria-hidden="true">{{ tile.initials }}</span>
         <h2 class="h5 mb-1">{{ tile.titleKey | t }}</h2>
         <p class="menu-tile__desc text-body-secondary small mb-0">{{ tile.descriptionKey | t }}</p>
       </div>

@@ -63,6 +63,18 @@ describe('HomeComponent', () => {
     expect(el.querySelector('.menu-tile__badge')).toBeNull();
   });
 
+  it('shows a short initials avatar per tile, not an emoji (plan.md §761/§789)', () => {
+    setUp('all');
+    const icons = Array.from(el.querySelectorAll('.menu-tile__icon')).map((i) => i.textContent?.trim());
+    expect(icons.length).toBe(8);
+    // Every icon is plain letters — no emoji, which renders as a missing-glyph
+    // box on a system without a colour-emoji font (found live in §777's audit).
+    for (const icon of icons) {
+      expect(icon).withContext(icon ?? '').toMatch(/^[A-Z]{1,2}$/);
+    }
+    expect(new Set(icons).size).toBe(icons.length); // distinct per tile
+  });
+
   it('still shows Settings to a role that only holds exposure:settings', () => {
     setUp(['exposure:settings']);
     expect(links()).toEqual(['/settings', '/account']); // Account has no capability gate

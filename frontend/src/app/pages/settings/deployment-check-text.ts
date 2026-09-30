@@ -6,6 +6,17 @@ export function deploymentLabelKey(id: string): string {
 }
 
 /**
+ * The panel subtitle for the deployment checklist. A real singular/plural
+ * pair rather than an English "(s)"-style suffix — that read as literal
+ * "item(ns)" in Portuguese, not a plural, when found live during an audit
+ * (plan.md §789).
+ */
+export function deploymentSubtitleKey(outstanding: number): string {
+  if (outstanding === 0) return 'settings.deployment.subtitleDone';
+  return outstanding === 1 ? 'settings.deployment.subtitleOutstandingSingular' : 'settings.deployment.subtitleOutstandingPlural';
+}
+
+/**
  * `settings.deployment.check.<id>.detail<Done|Todo>[Variant]` — the backend
  * sends only raw values (`DeploymentCheck.params`); this picks which
  * translated sentence to interpolate them into, including the two cases with

@@ -13,8 +13,12 @@ interface MenuTile {
   descriptionKey: string;
   /** Router path the tile links to. */
   link: string;
-  /** Decorative — the compact tile layout (plan.md §781) always shows the title too. */
-  icon: string;
+  /**
+   * A short initials avatar, matching `service-card`'s convention — not an
+   * emoji, which renders as a missing-glyph box without a colour-emoji font
+   * and reads as a second, inconsistent icon system (plan.md §761, §789).
+   */
+  initials: string;
   /** Hidden unless the signed-in user's role grants this (plan.md §149). */
   capability?: Capability;
   /** Like `capability`, but any one of these is enough (the page's own route guard is any-of). */
@@ -55,15 +59,15 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   // Ordered so each row of three is one wide tile and one single.
   private readonly tiles: MenuTile[] = [
-    { titleKey: 'home.tiles.apps.title', descriptionKey: 'home.tiles.apps.description', link: '/apps', icon: '🧩', capability: 'apps:control', wide: true },
-    { titleKey: 'home.tiles.updates.title', descriptionKey: 'home.tiles.updates.description', link: '/updates', icon: '🔄', capability: 'system:update', badgeFor: 'updates' },
-    { titleKey: 'home.tiles.backups.title', descriptionKey: 'home.tiles.backups.description', link: '/backups', icon: '💾', capability: 'backups:manage', wide: true, badgeFor: 'backups' },
-    { titleKey: 'home.tiles.users.title', descriptionKey: 'home.tiles.users.description', link: '/users', icon: '👥', capability: 'users:manage' },
+    { titleKey: 'home.tiles.apps.title', descriptionKey: 'home.tiles.apps.description', link: '/apps', initials: 'AP', capability: 'apps:control', wide: true },
+    { titleKey: 'home.tiles.updates.title', descriptionKey: 'home.tiles.updates.description', link: '/updates', initials: 'UP', capability: 'system:update', badgeFor: 'updates' },
+    { titleKey: 'home.tiles.backups.title', descriptionKey: 'home.tiles.backups.description', link: '/backups', initials: 'BK', capability: 'backups:manage', wide: true, badgeFor: 'backups' },
+    { titleKey: 'home.tiles.users.title', descriptionKey: 'home.tiles.users.description', link: '/users', initials: 'US', capability: 'users:manage' },
     // Networking used to be its own tile onto the same /settings page; one tile now, gated like the route.
-    { titleKey: 'home.tiles.settings.title', descriptionKey: 'home.tiles.settings.description', link: '/settings', icon: '⚙️', anyCapability: ['settings:manage', 'exposure:settings'], wide: true },
-    { titleKey: 'home.tiles.utils.title', descriptionKey: 'home.tiles.utils.description', link: '/utils', icon: '🧰', capability: 'apps:control' },
-    { titleKey: 'home.tiles.account.title', descriptionKey: 'home.tiles.account.description', link: '/account', icon: '👤', wide: true },
-    { titleKey: 'home.tiles.auditLogs.title', descriptionKey: 'home.tiles.auditLogs.description', link: '/audit-logs', icon: '📜', capability: 'audit:view' },
+    { titleKey: 'home.tiles.settings.title', descriptionKey: 'home.tiles.settings.description', link: '/settings', initials: 'SE', anyCapability: ['settings:manage', 'exposure:settings'], wide: true },
+    { titleKey: 'home.tiles.utils.title', descriptionKey: 'home.tiles.utils.description', link: '/utils', initials: 'UT', capability: 'apps:control' },
+    { titleKey: 'home.tiles.account.title', descriptionKey: 'home.tiles.account.description', link: '/account', initials: 'AC', wide: true },
+    { titleKey: 'home.tiles.auditLogs.title', descriptionKey: 'home.tiles.auditLogs.description', link: '/audit-logs', initials: 'AL', capability: 'audit:view' },
   ];
 
   ngOnInit(): void {

@@ -48,10 +48,19 @@
   padding: 1.1rem 1.25rem;
 }
 
+/* Initials avatar, matching service-card's .service-icon rather than an
+   emoji — no font-fallback risk, and one icon system across the app. */
 .menu-tile__icon {
-  font-size: 1.6rem;
-  line-height: 1;
-  margin-bottom: 0.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.6rem;
+  background: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.12);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
 }
 
 .menu-tile .card-body h2 {
