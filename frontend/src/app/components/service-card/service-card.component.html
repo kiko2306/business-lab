@@ -98,7 +98,7 @@
 <!-- Configuration / exposure / admin-account modal -->
 <!-- No backdrop-click close here: it would silently drop unsaved edits. Escape and the X close. -->
 <div *ngIf="settingsModalOpen" class="settings-backdrop">
-  <div #settingsDialog tabindex="-1" style="outline:0" (keydown)="trapTab($event)" class="settings-dialog" role="dialog" aria-modal="true" [attr.aria-labelledby]="'settings-title-' + service.name">
+  <div #settingsDialog tabindex="-1" (keydown)="trapTab($event)" class="settings-dialog" role="dialog" aria-modal="true" [attr.aria-labelledby]="'settings-title-' + service.name">
     <div class="settings-head">
       <span class="service-icon service-icon-sm" aria-hidden="true">{{ initials(service.label) }}</span>
       <span class="fw-semibold" [id]="'settings-title-' + service.name">{{ 'serviceCard.settingsModalTitle' | t:{ label: service.label } }}</span>
@@ -108,7 +108,7 @@
     <div class="settings-body">
       <!-- About: what used to crowd the row heading (plan.md §761) -->
       <section class="settings-section settings-about small d-flex flex-wrap gap-2 align-items-center">
-        <span class="badge bg-body-tertiary border">ⓥ {{ 'serviceCard.installedLabel' | t:{ version: installedVersion() } }}</span>
+        <span class="badge bg-body-tertiary border">{{ 'serviceCard.installedLabel' | t:{ version: installedVersion() } }}</span>
         <span class="badge text-bg-secondary border" *ngFor="let port of service.ports" [title]="'serviceCard.portTitle' | t">{{ port.hostPort }} → {{ port.containerPort }}/{{ port.protocol }}</span>
         <span *ngIf="service.mobileApps?.android" class="badge bg-body-tertiary border">{{ 'serviceCard.androidAppTitle' | t }}</span>
         <span *ngIf="service.mobileApps?.ios" class="badge bg-body-tertiary border">{{ 'serviceCard.iosAppTitle' | t }}</span>
@@ -398,7 +398,7 @@
 </div>
 
 <div *ngIf="startupLogsOpen" class="startup-logs-backdrop" (click)="closeStartupLogs()">
-  <div #startupDialog tabindex="-1" style="outline:0" (keydown)="trapTab($event)" class="startup-logs-dialog" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" [attr.aria-labelledby]="'startup-title-' + service.name">
+  <div #startupDialog tabindex="-1" (keydown)="trapTab($event)" class="startup-logs-dialog" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" [attr.aria-labelledby]="'startup-title-' + service.name">
     <div class="startup-logs-head">
       <span
         *ngIf="startupPhase === 'streaming'"

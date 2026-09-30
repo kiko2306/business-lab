@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.155.3] — 2026-09-30
+
+### Frontend
+
+- Polish the Apps page: drop the ⓥ glyph, inline dialog outline styles and dead running-table CSS
+
 ## [0.155.2] — 2026-09-30
 
 ### Fixed

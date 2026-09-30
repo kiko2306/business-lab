@@ -34821,3 +34821,14 @@ startup dialog gets) per app and overlay it as `error` on status pushes while th
 in the backend `status.ts` — the text only exists in the failed POST response, and a
 backend copy would need persistence for something a reload can lose without harm.
 Test: `service-state.service.spec.ts`. The "Starting…" button remains unobserved.
+
+## 775. Apps page polish pass (impeccable `polish`)
+
+Source-only pass on the Apps page and service card (the page is behind login, so no
+render). Fixed: two inline `style="outline:0"` on the dialogs moved into their CSS
+classes (DESIGN.md: no inline layout styles); the `ⓥ` glyph on the Settings version badge
+dropped (the "Installed:" text says it, and a Unicode glyph is not an icon system); the
+dead running-table CSS in `apps.component.css` removed (§772 deleted that table, nothing
+renders `.service-group table`); the "four-up" comment corrected to three tiles. Left as
+is: `→` in the port badge, which is data notation, not an icon. Specs updated to match the
+glyph removal. No live-stack surface changed, so no README beta item.

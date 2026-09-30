@@ -266,16 +266,16 @@ describe('ServiceCardComponent installedVersion', () => {
     expect(component['installedVersion']()).toBe('latest');
   });
 
-  it('renders a single ⓥ badge with the version in the Settings dialog, and no pinned badges or Unpin button', () => {
+  it('renders a single version badge with the version in the Settings dialog, and no pinned badges or Unpin button', () => {
     component.service = service('guacamole', 'running', { pinnedImages: [], versionPinned: ['1.6.0'] });
     component.allServices = [component.service];
     component['settingsModalOpen'] = true;
     fixture.detectChanges();
 
     const root: HTMLElement = fixture.nativeElement;
-    const versionBadge = Array.from(root.querySelectorAll('.settings-about span')).find((el) => el.textContent?.includes('ⓥ'));
-    expect(versionBadge).withContext('ⓥ badge should render').toBeTruthy();
-    expect(versionBadge?.textContent?.trim()).toBe('ⓥ Installed: 1.6.0');
+    const versionBadge = Array.from(root.querySelectorAll('.settings-about span')).find((el) => el.textContent?.includes('Installed:'));
+    expect(versionBadge).withContext('version badge should render').toBeTruthy();
+    expect(versionBadge?.textContent?.trim()).toBe('Installed: 1.6.0');
 
     expect(root.textContent).not.toContain('pinned to a fixed image');
     expect(root.textContent).not.toContain('version pinned');
@@ -640,7 +640,7 @@ describe('ServiceCardComponent heading line', () => {
     expect(about.textContent).toContain('/api');
     expect(about.textContent).toContain('Android');
     expect(about.textContent).toContain('iPhone');
-    expect(about.textContent).toContain('ⓥ');
+    expect(about.textContent).toContain('Installed:');
   });
 });
 

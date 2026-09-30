@@ -1,7 +1,7 @@
 /* ---- Summary counts -----------------------------------------------------
-   A calm four-up strip of stat tiles above the panels: surface cards with a
+   A calm three-up strip of stat tiles above the panels: surface cards with a
    hairline border and a soft diffuse shadow, generous radius — the "icon
-   manager" desktop look. auto-fit so the row reflows to 2×2 on a phone with
+   manager" desktop look. auto-fit so the row reflows on a phone with
    no media query. */
 .summary-grid {
   display: grid;
@@ -136,32 +136,6 @@
   .summary-label {
     font-size: 0.72rem;
     letter-spacing: 0.05em;
-  }
-}
-
-/* ---- Running-apps tables: line the category tables up as one grid -------- */
-/* Each category renders its own <table>; auto layout would start App / URL /
-   Ports at a different x in every group. Fixed widths above the stacking
-   breakpoint make them read as one table broken by headings. */
-@media (min-width: 768px) {
-  .service-group table.table-stack {
-    table-layout: fixed;
-  }
-
-  .service-group table.table-stack thead th:nth-child(1) {
-    width: 20%;
-  }
-
-  .service-group table.table-stack thead th:nth-child(2) {
-    width: 44%;
-  }
-
-  .service-group table.table-stack thead th:nth-child(3) {
-    width: 36%;
-  }
-
-  .service-group table.table-stack tbody td:nth-child(2) {
-    overflow-wrap: anywhere;
   }
 }
 

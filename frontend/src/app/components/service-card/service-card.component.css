@@ -177,6 +177,7 @@
 }
 
 .settings-dialog {
+  outline: 0;
   display: flex;
   flex-direction: column;
   width: min(560px, 100%);
@@ -239,6 +240,7 @@
 }
 
 .startup-logs-dialog {
+  outline: 0;
   display: flex;
   flex-direction: column;
   width: min(880px, 100%);
