@@ -209,6 +209,11 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Backups
 
+- [ ] **Beta-test Immich's Postgres stays up and the backup is clean (plan.md §755)**
+      — after `beta` is updated, restart Immich, then press "Back up now" on the
+      dashboard: `docker inspect immich-immich-db-1` shows `OOMKilled=false` and
+      the run reports 0 failed dumps. The outline/hotel/tally `EACCES` is
+      unexplained; if the run lists it again, note the `_dump` dir's owner/mode.
 
 ### Exposure and platform
 

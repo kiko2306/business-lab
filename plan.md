@@ -34582,3 +34582,15 @@ hostname with a Navidrome user, listed the library and played a track — so the
 `/rest` Authelia bypass holds for `/rest/stream` as well as `/rest/ping`, the
 half the curl checks (§753) could not reach. Nothing to change in code; the
 README item is deleted.
+
+## 755. Backup dump errors: Immich's Postgres was OOM-killed at its 256 MB limit
+
+The dashboard's last app-data backup (2026-09-30 02:20 UTC) listed 4 failed
+dumps. Immich's was a real cause: `immich-db` (`mem_limit: 256m`) was
+cgroup-OOM-killed repeatedly at 02:15 UTC (`geodata_places` import, `OOM=true`,
+3 restarts), and the backup's `pg_dump` landed in crash recovery. Raised it to
+`512m`. The outline/hotel/tally `EACCES` on `data/_dump/*.sql.part` did not
+reproduce (root in the backend can write those dirs; re-running `dumpOneApp`
+for all four succeeded) and is unexplained — those three `_dump` dirs have an
+mtime of Sep 28 08:55 unlike the rest. Not chased further; if it recurs, capture
+the dir's owner/mode at failure time.
