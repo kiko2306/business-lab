@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import {
@@ -18,6 +19,8 @@ import {
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
+import { SectionCollapseService } from '../../core/section-collapse.service';
+import { FixTarget, fixTarget } from './fix-target';
 import { PanelComponent } from '../../components/panel/panel.component';
 import { NetworkSettingsComponent } from './network-settings.component';
 import { TranslatePipe } from '../../i18n/translate.pipe';
@@ -32,12 +35,14 @@ import { TranslateService } from '../../i18n/translate.service';
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, PanelComponent, NetworkSettingsComponent, TranslatePipe],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink, PanelComponent, NetworkSettingsComponent, TranslatePipe],
   templateUrl: './settings.component.html',
   styleUrl: './settings.component.css'
 })
 export class SettingsComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
+  private readonly collapse = inject(SectionCollapseService);
+  protected readonly fixTarget = fixTarget;
   private readonly settingsService = inject(SettingsService);
   private readonly toastService = inject(ToastService);
   protected readonly translate = inject(TranslateService);
@@ -478,5 +483,13 @@ export class SettingsComponent implements OnInit {
           this.mailFeedback = { type: 'danger', message: extractErrorMessage(error, this.translate.t('settings.errors.mailTestFailed')) };
         },
       });
+  }
+
+  /** Open the panel a checklist item points at, then scroll to it once it has rendered open. */
+  goToPanel(target: FixTarget): void {
+    if (!target.panelKey || !target.anchor) return;
+    this.collapse.open(target.panelKey);
+    const anchor = target.anchor;
+    setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ block: 'start' }));
   }
 }

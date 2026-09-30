@@ -27,6 +27,13 @@ export class SectionCollapseService {
     return this.state.get(key) ?? true;
   }
 
+  /** Expand `key` (a no-op when it already is), e.g. to land a link inside a panel. */
+  open(key: string): void {
+    if (!this.isCollapsed(key)) return;
+    this.state.set(key, false);
+    this.persist();
+  }
+
   toggle(key: string): void {
     this.state.set(key, !this.isCollapsed(key));
     this.persist();

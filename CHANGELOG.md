@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.155.6] — 2026-09-30
+
+### Frontend
+
+- Settings: the setup checklist's "set it in…" is now a link that opens the panel or page, and reseller and Docker wording is gone from the page
+
 ## [0.155.5] — 2026-09-30
 
 ### Frontend

@@ -34890,3 +34890,22 @@ troubleshooting.md` cited the old heading and is updated. Rejected: collapsing t
 destination kinds behind Advanced in the same commit; that is a layout change with its own
 render check, so it is a separate README item. Not rendered, so the longer pt-PT headings
 wrapping is for the §777 adapt pass.
+
+## 780. Settings plain copy and a checklist that leads somewhere (§776 item 3)
+
+The provisioning checklist said "set it in *Networking*" as static text. `fix-target.ts`
+maps each `fixIn` the backend sends (`deploymentStatus.ts`) to a destination: Networking and
+Email open and scroll to their panel on this page (new `anchor`s on the Cloudflare and Email
+panels, new `SectionCollapseService.open`), Backup destination and Users page are router
+links to their own pages. The label is translated per target (the backend name is English
+only); an unknown name falls back to the old plain text. Copy: the subtitle no longer
+promises "where backups are sent" (that panel is on the Backups page) or says "Stack-wide";
+"Contracted / Self-controlled" became "Yours" / "Managed for you"; the NPM URL hint dropped
+"Docker bridge gateway" and `plan.md §252`. Tests: `fix-target.spec.ts` (mapping, translated
+labels, and a jargon guard over every `settings.*` / `networkSettings.*` key in both
+languages). Rejected: a `fixIn` id from the backend instead of the English name; it is
+cleaner but a backend contract change for a link, and the name is stable.
+Networking lands on the Cloudflare panel; base domain and tunnel IDs are in the exposure
+panel just below it. Left open: the checklist's own `label` and `detail` come from the backend
+in English only, and two details tell the user to "run start.sh" and "open /setup", which
+breaks the no-console principle — a README item.
