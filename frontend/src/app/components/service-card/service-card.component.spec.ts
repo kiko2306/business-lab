@@ -621,14 +621,15 @@ describe('ServiceCardComponent heading line', () => {
 
   it('shows a health badge only when a running app fails its check', () => {
     render({ healthy: false });
-    expect(heading().textContent).toContain('check failed');
+    expect(heading().textContent).toContain('not responding');
   });
 
   it('lists the published host ports in Settings (the old Running table\'s other column)', () => {
     render({ ports: [{ hostPort: '10120', containerPort: '8080', protocol: 'tcp' }] });
     component.openSettings();
     fixture.detectChanges();
-    expect(el.querySelector('.settings-about')?.textContent).toContain('10120 → 8080/tcp');
+    expect(el.querySelector('.settings-about')?.textContent).toContain('Port 10120');
+    expect(el.querySelector('.settings-about')?.textContent).not.toContain('8080');
   });
 
   it('moves version, phone apps and secondary URLs into the Settings dialog', () => {

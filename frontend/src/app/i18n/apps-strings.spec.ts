@@ -27,4 +27,30 @@ describe('Apps page strings', () => {
     expect(humanizeEnvKey('SIGNUPS_ALLOWED')).toBe('Signups allowed');
     expect(humanizeEnvKey('NTFY_BEHIND_PROXY')).toBe('Ntfy behind proxy');
   });
+
+  // Plan.md §776: these strings reach a non-technical owner, so no tooling
+  // words. Each pattern is what the old wording leaked.
+  it('keeps developer jargon out of the state, health, connection and empty strings', () => {
+    const plain = [
+      'apps.subtitle',
+      'apps.empty',
+      'apps.status.polling',
+      'serviceCard.state.error',
+      'serviceCard.state.unknown',
+      'serviceCard.health.checkFailed',
+      'serviceCard.portTitle',
+      'serviceCard.startupLogs.couldNotStart',
+    ];
+    const enJargon = /\b(error|unknown|check failed|polling|docker|compose|stack|api|container|host)\b/i;
+    const ptJargon = /\b(erro|desconhecido|sondagem|docker|compose|api|contentor|anfitri[aã]o)\b/i;
+    for (const key of plain) {
+      expect(en[key]).withContext(`en ${key}`).not.toMatch(enJargon);
+      expect(ptPT[key]).withContext(`pt-PT ${key}`).not.toMatch(ptJargon);
+    }
+  });
+
+  it('has a plain port label in both languages', () => {
+    expect(en['serviceCard.portLabel']).toContain('{{port}}');
+    expect(ptPT['serviceCard.portLabel']).toContain('{{port}}');
+  });
 });

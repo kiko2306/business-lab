@@ -34862,3 +34862,17 @@ source-only, so contrast, layout and responsive behaviour are still unmeasured).
 covers a11y, contrast, focus and perf on Home, Apps, Backups and Settings. `adapt` covers
 phone and tablet widths and how longer pt-PT strings wrap. Findings from either become new
 README items rather than being fixed in passing.
+
+## 778. Apps page plain-language copy (§776 item 1)
+
+Copy only, en and pt-PT together. State "error"/"unknown" became "needs attention"/"checking"
+(the row's "Couldn't start X" already sits under it), health "check failed" became "not
+responding", "Polling" became "Refreshing regularly" (pt-PT "Sondagem" was a literal
+translation of a developer word), the subtitle drops "stack", the empty state drops "the
+API", and the startup log's "docker compose could not start this service" became "this app
+could not start". The Settings port badge showed `4000 → 80/tcp`; it now reads "Port 4000",
+because the container port means nothing to the owner. Tests: a jargon guard in
+`apps-strings.spec.ts` (the words the old strings leaked, in both languages) and the two
+service-card specs that asserted the old text. Rejected: renaming the `error` state itself;
+only the label changes, so filters, the tile and the API keep their values. Not rendered, so
+the longer pt-PT "precisa de atenção" badge wrapping is for the §777 adapt pass.

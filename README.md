@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.155.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.155.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,9 +212,6 @@ it is done — not ticked off and left behind. Section references point at
 Done one page at a time, test first, each its own commit and version bump. A finished
 item is deleted.
 
-- [ ] **Apps: plain-language state and row copy** — replace "error/unknown/inactive/check
-      failed", the raw `4000 → 80/tcp` chips and "Polling/Live" with words a business owner
-      reads, in en and pt-PT (`apps-strings.spec.ts` covers parity).
 - [ ] **Backups: rename and explain the two lists** — "Settings Backups" / "Full Backups"
       and the "Backup Settings" button say what they hold; one plain sentence per heading;
       Kopia/rclone terms move behind Advanced.

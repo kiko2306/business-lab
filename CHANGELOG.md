@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.155.4] — 2026-09-30
+
+### Frontend
+
+- Say it in plain words on the Apps page: "needs attention" instead of "error", "Port 4000" instead of a container mapping, no docker or API wording
+
 ## [0.155.3] — 2026-09-30
 
 ### Frontend
