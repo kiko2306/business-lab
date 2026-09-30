@@ -34854,3 +34854,11 @@ Settings copy, Home; then Stop confirm, Backups dialogs, Settings derive-don't-a
 Left for a later batch: Users, Updates, Account, Audit logs, Utils, Social (not critiqued).
 Rejected for now: rendering the pages via the e2e stack to measure contrast; a review of
 the copy alone can land first and the render check belongs to `audit`.
+
+## 777. Audit and adapt added to the §776 plan
+
+Both run after the §776 copy and safety fixes, on a real render (the critique was
+source-only, so contrast, layout and responsive behaviour are still unmeasured). `audit`
+covers a11y, contrast, focus and perf on Home, Apps, Backups and Settings. `adapt` covers
+phone and tablet widths and how longer pt-PT strings wrap. Findings from either become new
+README items rather than being fixed in passing.

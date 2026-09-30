@@ -230,6 +230,13 @@ item is deleted.
 - [ ] **Settings: derive the Cloudflare IDs** — tunnel, account and zone IDs from the token,
       any override under Advanced. Backend work; needs a `beta` test against the real tunnel.
 
+- [ ] **Audit Home, Apps, Backups and Settings on a real render (plan.md §777)** — after the
+      items above: `/impeccable audit` for contrast (the 0.68-0.78rem uppercase labels),
+      focus order, live regions and perf. New findings become new items here.
+- [ ] **Adapt the same four pages to phone and tablet (plan.md §777)** — `/impeccable adapt`:
+      widths from 360px up, and pt-PT string lengths in the Apps row, Backups forms and
+      Settings panels. New findings become new items here.
+
 ### Apps page (impeccable critique, plan.md §761)
 
 - [ ] **Beta-test "Show details" after a real failed start (plan.md §774)** — on `beta`,
