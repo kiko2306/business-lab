@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.155.1] — 2026-09-30
+
+### Fixed
+
+- Apps page: a running app that is not publicly exposed gets a Local network link in its row again, replacing the removed Running table's LAN link
+
 ## [0.155.0] — 2026-09-30
 
 ### Changed

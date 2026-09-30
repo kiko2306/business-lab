@@ -70,6 +70,7 @@ export const ptPT: Record<string, string> = {
   'apps.category.Other': 'Outras',
   'serviceCard.access.lanOnly': 'Só na rede local',
   'serviceCard.access.overlayOnly': 'Só por VPN',
+  'serviceCard.access.lan': 'Rede local',
   'serviceCard.boolean.true': 'Sim',
   'serviceCard.boolean.false': 'Não',
   'apps.search.placeholder': 'Pesquisar aplicações por nome, descrição ou categoria…',

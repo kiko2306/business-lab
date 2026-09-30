@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.155.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.155.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -236,7 +236,9 @@ it is done — not ticked off and left behind. Section references point at
 - [ ] **Beta-test the Running table's removal (plan.md §771)** — on `beta`: the page has
       no Running apps panel; clicking the Running tile lists only running apps (click again
       clears); an exposed app's public link is in its row, and Settings shows its published
-      ports (e.g. Paperless `10xxx → 8000/tcp`). Delete once seen.
+      ports (e.g. Paperless `10xxx → 8000/tcp`); a running app with no public hostname
+      (stop the tunnel, or use an app exposure skips) shows a "Local network" link that
+      opens on the host's LAN IP. Delete once seen.
 
 - [ ] **Beta-test the Apps page scale tools (plan.md §767)** — on `beta`: the heading line
       reads "All N apps are fine." or "N of M apps need you."; clicking the Issues or

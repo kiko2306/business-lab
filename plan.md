@@ -34778,3 +34778,12 @@ moved into the Settings "about" block (`serviceCard.portTitle`). The Running sum
 now a state filter like Issues/Stopped (`toggleStateFilter('running')`). The LAN URL for a
 non-exposed app was never lost: `lanAccessUrl()` in the card is the same pair. Tests: a
 ports-in-Settings spec, red first; the filter reuses the tested `filterServices(state)`.
+
+## 772. LAN fallback link on the row (correcting §771)
+
+§771 claimed the removed Running table's LAN link "was never lost"; it was: the row's
+link showed for LAN-only/VPN-only apps only. An ordinary running app with no
+`exposedHostname` (exposure off or failed) now gets a "Local network" badge to
+`lanAccessUrl()`, same href logic as the LAN-only badge. Stopped apps get none (no live
+port). Tests: running-unexposed link and stopped-none, one red first; `serviceCard.access.lan`
+added to the registry-wide i18n spec.

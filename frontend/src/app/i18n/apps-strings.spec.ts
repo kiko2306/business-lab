@@ -11,6 +11,7 @@ describe('Apps page strings', () => {
     ...CATEGORY_DISPLAY_ORDER.map((c) => `apps.category.${c}`),
     'serviceCard.access.lanOnly',
     'serviceCard.access.overlayOnly',
+    'serviceCard.access.lan',
     'serviceCard.boolean.true',
     'serviceCard.boolean.false',
   ];

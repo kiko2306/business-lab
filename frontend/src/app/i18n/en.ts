@@ -70,6 +70,7 @@ export const en: Record<string, string> = {
   'apps.category.Other': 'Other',
   'serviceCard.access.lanOnly': 'Local network only',
   'serviceCard.access.overlayOnly': 'VPN only',
+  'serviceCard.access.lan': 'Local network',
   'serviceCard.boolean.true': 'Yes',
   'serviceCard.boolean.false': 'No',
   'apps.search.placeholder': 'Search apps by name, description or category…',

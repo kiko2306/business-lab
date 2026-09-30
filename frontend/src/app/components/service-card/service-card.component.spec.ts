@@ -338,6 +338,26 @@ describe('ServiceCardComponent lanAccessUrl', () => {
     expect(link?.textContent?.trim()).toBe('VPN only');
   });
 
+  // Replaces the removed Running table's LAN link (plan.md §771): an ordinary app
+  // whose exposure is off or failed must still be reachable from its row.
+  it('falls back to a LAN link for a running, unexposed, ordinary app', () => {
+    component.service = service('jellyfin', 'running', { webPort: 10130 });
+    component.allServices = [component.service];
+    fixture.detectChanges();
+
+    const link = fixture.nativeElement.querySelector('a.badge') as HTMLAnchorElement | null;
+    expect(link?.textContent?.trim()).toBe('Local network');
+    expect(link?.getAttribute('href')).toBe(`http://${window.location.hostname}:10130`);
+  });
+
+  it('offers no fallback link for a stopped app', () => {
+    component.service = service('jellyfin', 'stopped', { webPort: 10130 });
+    component.allServices = [component.service];
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('a.badge')).toBeNull();
+  });
+
   it('does not render the LAN/overlay link when the app is publicly exposed instead', () => {
     component.service = service('nextcloud', 'running', { exposedHostname: 'nextcloud.example.com' });
     component.allServices = [component.service];

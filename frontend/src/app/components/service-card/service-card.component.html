@@ -17,14 +17,14 @@
         {{ service.exposedHostname }}{{ service.webPath }}
       </a>
       <a
-        *ngIf="!service.exposedHostname && (service.lanOnly || service.overlayOnly) && lanAccessUrl()"
+        *ngIf="!service.exposedHostname && (service.lanOnly || service.overlayOnly || service.state === 'running') && lanAccessUrl()"
         class="badge text-bg-secondary border text-decoration-none"
         [href]="lanAccessUrl()"
         target="_blank"
         rel="noopener noreferrer"
         [title]="'serviceCard.openUrlTitle' | t:{ url: lanAccessUrl() ?? '' }"
       >
-        {{ (service.lanOnly ? 'serviceCard.access.lanOnly' : 'serviceCard.access.overlayOnly') | t }}
+        {{ (service.lanOnly ? 'serviceCard.access.lanOnly' : service.overlayOnly ? 'serviceCard.access.overlayOnly' : 'serviceCard.access.lan') | t }}
       </a>
     </div>
     <div class="service-row-sub">
