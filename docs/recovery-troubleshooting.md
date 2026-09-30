@@ -53,7 +53,7 @@ There are **two** backups, for different jobs:
 
 ### Full Backup restore (manual, no dashboard flow yet)
 
-The dashboard only *lists* what Kopia holds (Backups page → "Full Backups") —
+The dashboard only *lists* what Kopia holds (Backups page → "App data backups") —
 there is no restore button. Restoring a Kopia snapshot needs a target-path
 picker, unlike the local archives' one-click restore, and that UI was
 deliberately never built (`plan.md` §577); `kopiaClient.ts`'s

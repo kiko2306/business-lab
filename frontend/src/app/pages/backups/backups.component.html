@@ -361,7 +361,8 @@
       </div>
     </div>
 
-    <h3 class="h5 mb-2">{{ 'backups.settingsBackups.heading' | t }}</h3>
+    <h3 class="h5 mb-1">{{ 'backups.settingsBackups.heading' | t }}</h3>
+    <p class="text-body-secondary small mb-2">{{ 'backups.settingsBackups.description' | t }}</p>
     <div class="list-group mb-4">
       <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2" *ngFor="let backup of backups">
         <div>
@@ -383,7 +384,8 @@
     <!-- What Kopia holds at the configured destination. Restore is per-app
          (plan.md §590): a whole-tree restore is the "the box is gone" case,
          and there is no dashboard to click in then. -->
-    <h3 class="h5 mb-2">{{ 'backups.fullBackups.heading' | t }}</h3>
+    <h3 class="h5 mb-1">{{ 'backups.fullBackups.heading' | t }}</h3>
+    <p class="text-body-secondary small mb-2">{{ 'backups.fullBackups.description' | t }}</p>
     <div class="list-group">
       <div class="list-group-item text-body-secondary" *ngIf="remoteBackupsLoading">{{ 'common.loading' | t }}</div>
       <ng-container *ngIf="!remoteBackupsLoading">

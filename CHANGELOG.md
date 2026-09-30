@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.155.5] — 2026-09-30
+
+### Frontend
+
+- Backups page: the two lists are now "Saved settings files" and "App data backups", each with a plain sentence, and no Kopia or rclone wording
+
 ## [0.155.4] — 2026-09-30
 
 ### Frontend

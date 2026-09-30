@@ -34876,3 +34876,17 @@ because the container port means nothing to the owner. Tests: a jargon guard in
 service-card specs that asserted the old text. Rejected: renaming the `error` state itself;
 only the label changes, so filters, the tile and the API keep their values. Not rendered, so
 the longer pt-PT "precisa de atenção" badge wrapping is for the §777 adapt pass.
+
+## 779. Backups page plain-language copy (§776 item 2)
+
+"Settings Backups" / "Full Backups" became "Saved settings files" / "App data backups", each
+with one sentence saying what it holds (a settings file is not the apps' data; an app data
+backup restores an app to that point). The "Backup Settings" button, which read like "open
+settings", is "Save settings file". Kopia, rclone, "repository" and "snapshot"/"captura" left
+every `backups.*` string (the backup engine, "backup"/"cópia"); the flag hints keep `--disable-tls`
+and `--region=…` because the user types them. Test: `backups-strings.spec.ts` fails on any
+tool name in a `backups.*` key in either language, and pins the new headings. `docs/recovery-
+troubleshooting.md` cited the old heading and is updated. Rejected: collapsing the eight
+destination kinds behind Advanced in the same commit; that is a layout change with its own
+render check, so it is a separate README item. Not rendered, so the longer pt-PT headings
+wrapping is for the §777 adapt pass.
