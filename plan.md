@@ -34933,3 +34933,18 @@ unique real destinations, the exposure-only role, copy guard); `e2e/tests/nav.sp
 asserts the new heading and the browser E2E suite passes. Left out: backup age and
 "update available" in the strip, which need APIs Home does not call yet; the fixed-height
 icon-less tiles (§776 P2) stay for `layout`. Not rendered by hand.
+
+## 782. Apps: confirm Stop on an exposed app, one live region (§776 item 5)
+
+Stop was one click even when the app is public: it drops the public page and the Home Page
+tile for everyone (only the core SSO/proxy services asked). The core check and a new one for
+any app with an `exposedHostname` now share `stopConfirmation()` in the service card, which
+returns the dialog options (or null); the exposed one names the hostname, says the Home Page
+tile leaves, and is a danger button. Start and Stop of an app with no public address stay one
+click. The `aria-live="polite"` on every row's state badge is gone: with 36 rows a poll could
+announce a burst of unrelated changes. The page headline ("3 of 36 apps need you.") already
+has one polite region and changes with every state change, so announcements now come from
+there. Tests in `service-card.component.spec.ts`: asks and names the hostname, declining
+emits nothing, no prompt without a public address or before a start, no `[aria-live]` in a
+row. Rejected: a per-row inline confirm instead of the shared modal, since `ConfirmService`
+already gives focus handling and Escape, and the core case used it. Not rendered.

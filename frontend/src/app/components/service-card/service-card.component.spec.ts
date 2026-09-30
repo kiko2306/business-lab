@@ -673,3 +673,63 @@ describe('serviceInitials', () => {
     expect(el.querySelector('.service-name')?.getAttribute('title')).toBe('Jellyfin');
   });
 });
+
+// plan.md §776: Stop is one click, but on an exposed app it takes the public
+// page and its Home Page tile offline for everyone — outward-facing, so it is
+// confirmed (PRODUCT.md). An app nobody outside can reach stops without a prompt.
+describe('ServiceCardComponent stop confirmation', () => {
+  let fixture: ComponentFixture<ServiceCardComponent>;
+  let component: ServiceCardComponent;
+  let confirm: jasmine.SpyObj<ConfirmService>;
+  let emitted: string[];
+
+  beforeEach(async () => {
+    confirm = jasmine.createSpyObj('ConfirmService', ['ask']);
+    await TestBed.configureTestingModule({
+      imports: [ServiceCardComponent],
+      providers: [
+        { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+        { provide: ConfirmService, useValue: confirm },
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ServiceCardComponent);
+    component = fixture.componentInstance;
+    emitted = [];
+    component.actionRequested.subscribe((a) => emitted.push(a));
+  });
+
+  const use = (extra: Partial<ServiceStatus>) => {
+    component.service = service('paperless', 'running', extra);
+    component.allServices = [component.service];
+    fixture.detectChanges();
+  };
+
+  it('asks before stopping an exposed app, naming where it goes offline', async () => {
+    use({ exposedHostname: 'paperless.example.com' });
+    confirm.ask.and.resolveTo(false);
+    await component.requestAction('stop');
+    expect(emitted).toEqual([]);
+    const options = confirm.ask.calls.mostRecent().args[0];
+    expect(options.message).toContain('paperless.example.com');
+    expect(options.danger).toBeTrue();
+
+    confirm.ask.and.resolveTo(true);
+    await component.requestAction('stop');
+    expect(emitted).toEqual(['stop']);
+  });
+
+  it('stops an app with no public address straight away, and never asks before a start', async () => {
+    use({});
+    await component.requestAction('stop');
+    await component.requestAction('start');
+    expect(confirm.ask).not.toHaveBeenCalled();
+    expect(emitted).toEqual(['stop', 'start']);
+  });
+
+  it('leaves live announcements to the page, not each of ~36 row badges', () => {
+    use({ exposedHostname: 'paperless.example.com' });
+    expect((fixture.nativeElement as HTMLElement).querySelector('[aria-live]')).toBeNull();
+  });
+});

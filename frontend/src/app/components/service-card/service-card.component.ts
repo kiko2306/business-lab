@@ -24,7 +24,7 @@ import {
   ServiceStatus,
   StartupActionEvent,
 } from '../../core/models';
-import { ConfirmService } from '../../core/confirm.service';
+import { ConfirmOptions, ConfirmService } from '../../core/confirm.service';
 import { OperationsService } from '../../core/operations.service';
 import { ServiceStateService } from '../../core/service-state.service';
 import { ToastService } from '../../core/toast.service';
@@ -171,15 +171,36 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     return `http://${host}:${this.service.webPort}${this.service.webPath ?? ''}`;
   }
 
-  async requestAction(action: ServiceAction): Promise<void> {
-    // Stopping the SSO or the proxy silently takes every gated/exposed app down.
-    if (action === 'stop' && CORE_SERVICES.has(this.service.name)) {
-      const confirmed = await this.confirm.ask({
-        title: this.translate.t('serviceCard.confirmStopCore.title', { label: this.service.label }),
-        message: this.translate.t('serviceCard.confirmStopCore.message', { label: this.service.label }),
+  /**
+   * What Stop must confirm first, or null when it is safe as one click.
+   * Stopping the SSO or the proxy silently takes every gated/exposed app down;
+   * stopping an exposed app takes its public page and Home Page tile down for
+   * everyone (an outward-facing action, PRODUCT.md), so it is confirmed too.
+   */
+  private stopConfirmation(): ConfirmOptions | null {
+    const label = this.service.label;
+    if (CORE_SERVICES.has(this.service.name)) {
+      return {
+        title: this.translate.t('serviceCard.confirmStopCore.title', { label }),
+        message: this.translate.t('serviceCard.confirmStopCore.message', { label }),
         confirmText: this.translate.t('serviceCard.confirmStopCore.confirmText'),
-      });
-      if (!confirmed) {
+      };
+    }
+    if (this.service.exposedHostname) {
+      return {
+        title: this.translate.t('serviceCard.confirmStopExposed.title', { label }),
+        message: this.translate.t('serviceCard.confirmStopExposed.message', { label, hostname: this.service.exposedHostname }),
+        confirmText: this.translate.t('serviceCard.confirmStopExposed.confirmText'),
+        danger: true,
+      };
+    }
+    return null;
+  }
+
+  async requestAction(action: ServiceAction): Promise<void> {
+    if (action === 'stop') {
+      const options = this.stopConfirmation();
+      if (options && !(await this.confirm.ask(options))) {
         return;
       }
     }

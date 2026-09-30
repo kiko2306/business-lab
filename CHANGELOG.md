@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.156.1] — 2026-09-30
+
+### Frontend
+
+- Apps: stopping an app that has a public address now asks first, naming where it goes offline; row badges no longer each announce state changes
+
 ## [0.156.0] — 2026-09-30
 
 ### Frontend

@@ -4,7 +4,7 @@
   <div class="service-row-main">
     <div class="service-row-heading">
       <span class="service-name" [title]="service.label">{{ service.label }}</span>
-      <span class="badge text-bg-{{ stateBadge(service.state) }}" aria-live="polite">{{ 'serviceCard.state.' + service.state | t }}</span>
+      <span class="badge text-bg-{{ stateBadge(service.state) }}">{{ 'serviceCard.state.' + service.state | t }}</span>
       <span *ngIf="service.state === 'running' && !service.healthy" class="badge bg-body-tertiary border" [ngClass]="healthClass()">{{ healthLabel() }}</span>
       <a
         *ngIf="service.exposedHostname"
