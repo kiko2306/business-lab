@@ -34629,3 +34629,13 @@ the service-row icon tile's 12% tint, now reads `--bs-primary-rgb` like the sear
 focus halo, so a re-themed primary recolours it too. CSS-only, no unit-test surface
 (computed colour of a themed variable); the diff is the proof, and DESIGN.md's list of
 known exceptions drops it.
+
+## 759. §755/§756's beta test: Immich stays up, the backup is clean
+
+On `beta` (0.153.13, `1008773`): after restarting Immich, `immich-immich-db-1` reports
+`OOMKilled=false` (512 MB limit) and "Back up now" wrote an audit row with 33 dumped,
+0 failed, no `failures` — the three `EACCES` from the 07:30 run are gone, and
+`data/_dump` is uid 100. One caveat: the run (08:23:07) finished 18 s before Immich's DB
+restarted (08:23:25), so the run did not exercise a freshly restarted Immich. Accepted;
+the OOM cause (§755) was the memory limit, now raised. Closes the §755/§756 item.
+The §757 Apps-page polish item stays open: it needs eyes in pt-PT.
