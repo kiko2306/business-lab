@@ -35640,3 +35640,51 @@ Test-first: new `settings.service.spec.ts` (26 cases, one per method —
 cases failed for the right reason before the fix, pass after.
 
 Frontend 235 tests, build clean. Version bump: see CHANGELOG.
+
+## 797. §777's phone/tablet adapt pass: two real overflow defects, fixed
+
+`/impeccable adapt` on Home, Apps, Backups and Settings (the same four pages §776/§777's
+audit covered), widths 360px up, both languages. Verified against the real stack —
+`docker-compose.test.yml` + a throwaway Playwright script, not just DevTools emulation:
+every category on Apps expanded, every panel on Settings expanded, Backups' destination
+form open, at 360 and 768px, in both `en` and `pt-PT`, reading
+`document.documentElement.scrollWidth` vs `clientWidth` and listing any element whose box
+right edge exceeded the viewport (excluding the header's own intentionally-scrolling nav
+strip). Two real defects, both only visible with long `pt-PT` strings at phone width —
+English's shorter category names and reason text never triggered either:
+
+**Apps category heading** (`apps.component.css` `.section-toggle`): `inline-flex` +
+`flex-wrap: wrap` on three unequal items (chevron, label, count badge) wraps whole items,
+not the label's own text. A long category name ("Cópias de segurança e armazenamento")
+couldn't fit next to the chevron at its own max-content width, so the *whole item* moved
+to its own line — chevron alone above, wrapped label below it, count badge below that.
+Fixed by giving the label `flex: 1 1 0%; min-width: 0`: a zero flex-basis makes the label
+absorb the line's available width instead of asking for its full max-content width, so it
+wraps internally while the chevron and badge stay put beside it.
+
+**Service row's blocked/degraded reason** (`service-card.component.css`
+`.service-row-sub > span:not(.text-truncate)`): was `flex: none; white-space: nowrap`, so
+the dependency reason ("mas precisa de ClamAV and OnlyOffice para funcionar corretamente")
+never shrank or wrapped and pushed the entire page into horizontal scroll at 360px
+(`scrollWidth` 553 vs `clientWidth` 360, confirmed before the fix). `flex: 1 1 100%` forces
+it onto its own full-width line below the truncated description (same technique as above,
+but with a 100% basis so it always starts a new flex line rather than sharing one), and
+`white-space: normal` + `min-width: 0` let it wrap naturally within that full width.
+
+A first pass gave the reason `flex: 1 1 0%` like the category label — this fixed the
+overflow but left it sharing the truncated description's flex line, wrapping inside an
+oddly narrow leftover column; `100%` basis was needed to force the full-width line break
+the longer text actually needs.
+
+Swept all 12 combinations (3 pages × 2 widths × 2 locales, Home included though it had no
+defect) after the fix: `scrollWidth === clientWidth` everywhere, zero offending elements.
+Backups' nested schedule/destination cards and Settings' seven panels (five own plus
+Cloudflare/exposure from `<app-network-settings>`) already held up at 360px with no
+changes needed — their forms stack and wrap through existing Bootstrap column classes.
+
+No unit-test surface for a layout-only CSS fix (CLAUDE.md: "don't test Docker/the
+browser itself"); proof is the live-stack Playwright sweep above, run against the actual
+built bundle in `docker-compose.test.yml`, not a claim from `ng build` succeeding. The
+throwaway spec and its screenshots were never committed — this section is the record.
+
+Frontend 235 tests (unchanged), build clean. Version bump: see CHANGELOG.

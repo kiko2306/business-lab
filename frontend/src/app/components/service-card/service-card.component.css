@@ -63,6 +63,7 @@
 
 .service-row-sub {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
   align-items: baseline;
   margin-top: 0.15rem;
@@ -79,9 +80,17 @@
   white-space: nowrap;
 }
 
+/* The blocked/degraded reason (pt-PT runs noticeably longer than English,
+   e.g. "mas precisa de ClamAV and OnlyOffice para funcionar corretamente")
+   was flex:none + nowrap, so it never shrank or wrapped and pushed the whole
+   page into horizontal scroll at phone widths (found live during the
+   phone/tablet adapt pass, plan.md §797). flex-basis: 0 lets it wrap onto
+   its own line below the truncated description, and wrap its own text
+   within the row's width, instead of overflowing it. */
 .service-row-sub > span:not(.text-truncate) {
-  flex: none;
-  white-space: nowrap;
+  flex: 1 1 100%;
+  min-width: 0;
+  white-space: normal;
 }
 
 /* ---- Dependency chips ---------------------------------------------------- */

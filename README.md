@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.158.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.158.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -239,10 +239,6 @@ item is deleted.
       and confirm that value wins instead of a fresh lookup. Also try saving
       with no Cloudflare token stored yet and confirm the error is the plain
       "save the token first" message, not a raw exception.
-
-- [ ] **Adapt the same four pages to phone and tablet (plan.md §777)** — `/impeccable adapt`:
-      widths from 360px up, and pt-PT string lengths in the Apps row, Backups forms and
-      Settings panels. New findings become new items here.
 
 ### Audit findings, the other 12 pages (plan.md §790, §791)
 

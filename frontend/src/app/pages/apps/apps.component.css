@@ -87,10 +87,17 @@
 }
 
 /* ---- All-apps category headings ------------------------------------------- */
+/* flex-wrap on three unequal items (icon, label, count) wraps whole items
+   rather than the label's own text — at 360px a long pt-PT category name
+   ("Cópias de segurança e armazenamento") pushed the chevron onto its own
+   line above the label and the count badge onto its own line below (found
+   live during the phone/tablet adapt pass, plan.md §797). flex-basis: 0 on
+   the label makes it, not its max-content width, absorb the row's width, so
+   it wraps internally while the icon and badge stay put beside it. */
 .section-toggle {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
   gap: 0.5rem;
   padding: 0;
   border: 0;
@@ -101,6 +108,15 @@
   text-transform: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.section-toggle > span:not(.badge) {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+.section-toggle .badge {
+  flex: none;
 }
 
 .section-toggle:focus-visible {

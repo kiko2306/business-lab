@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.158.4] — 2026-10-01
+
+### Responsive
+
+- Fix phone-width overflow: a category header's chevron/badge and a long dependency-warning line both pushed the Apps page into horizontal scroll
+
 ## [0.158.3] — 2026-10-01
 
 ### Error handling
