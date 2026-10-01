@@ -171,3 +171,14 @@ button.summary-card {
 .summary-card.active {
   border-color: var(--bs-primary);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .summary-card,
+  .section-toggle .chevron {
+    transition: none;
+  }
+
+  .summary-card:hover {
+    transform: none;
+  }
+}

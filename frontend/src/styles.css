@@ -22,6 +22,13 @@
   --app-shadow-k: 0.3;
   /* A token, not inline in service-card.component.css, which is at its size budget. */
   --app-shadow-service-card: 0 3px 8px rgba(2, 6, 23, 0.07), 0 18px 34px -18px rgba(2, 6, 23, 0.18);
+
+  /* Bootstrap's stock light border is #dee2e6, which against this canvas is
+     about 1.1:1 — with the shadow scaled to 0.3 as well, a card had almost no
+     edge. slate-300 keeps the palette and gives the surface a boundary that
+     survives a bright room. */
+  --bs-border-color: #cbd5e1;
+  --bs-border-color-translucent: rgba(15, 23, 42, 0.12);
 }
 
 [data-bs-theme='dark'] {
@@ -76,6 +83,9 @@ a {
 
 .card {
   border-radius: 1rem;
+  /* Bootstrap redeclares --bs-card-border-color *inside* .card, so pointing
+     the :root copy at the palette does nothing — set the colour here. */
+  border-color: var(--bs-border-color);
   /* A close contact shadow plus a soft wide one — cards sit above the page
      rather than being drawn flat on it. Alpha is scaled by
      `--app-shadow-k` so light mode is subtler. */

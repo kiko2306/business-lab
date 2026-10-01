@@ -67,7 +67,7 @@ interface DependencyState {
   standalone: true,
   imports: [CommonModule, FormsModule, TranslatePipe],
   templateUrl: './service-card.component.html',
-  styleUrl: './service-card.component.css'
+  styleUrls: ['./service-card.component.css', './startup-logs.css']
 })
 export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   private readonly operations = inject(OperationsService);

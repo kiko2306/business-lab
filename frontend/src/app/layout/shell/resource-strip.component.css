@@ -63,6 +63,9 @@
   height: 100%;
   border-radius: inherit;
   background: var(--bs-primary);
+  /* `width`, not `transform`: this is a 4.6rem meter in the header, so the
+     layout a width change can dirty is the bar itself, and a scaled fill would
+     need a wrapper and would blur its rounded end. */
   transition: width 0.4s ease;
 }
 
@@ -94,5 +97,11 @@
   .rs__meter {
     flex: 1 1 auto;
     min-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs__fill {
+    transition: none;
   }
 }

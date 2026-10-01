@@ -99,8 +99,12 @@
     flex-wrap: wrap;
   }
 
+  /* Stays on the brand's row with the language select and the theme toggle.
+     With `order: 2` it sorted *after* the full-width resource strip, so it sat
+     alone on a line of its own — an empty row with one button in it, which
+     only got more obvious once touch sizing made it 44px tall. */
   .app-header__logout {
-    order: 2;
+    order: 0;
     flex: 0 0 auto;
   }
 
@@ -131,6 +135,38 @@
 
   .app-nav__link {
     flex: 0 0 auto;
+  }
+}
+
+/* Touch gets taller header controls; a mouse keeps the compact row. The nav
+   strip scrolls natively (overflow-x), so there is no pointer handler here to
+   fight the page's own scrolling. */
+@media (pointer: coarse) {
+  .app-nav__link {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .app-header__theme,
+  .app-header__logout,
+  .app-header__lang {
+    min-height: 44px;
+  }
+}
+
+/* On a phone the header is sticky, so every row it takes is a row the page
+   never gets back. Shrinking the brand is what lets the language select, the
+   theme toggle and Logout share the first row instead of wrapping onto a
+   second one. */
+@media (max-width: 575.98px) {
+  .app-header__title {
+    font-size: 1rem;
+  }
+
+  .app-header__title img {
+    width: 20px;
+    height: 20px;
   }
 }
 

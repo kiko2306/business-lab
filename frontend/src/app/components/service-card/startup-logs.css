@@ -1,0 +1,59 @@
+/* The startup-log popup: a deliberately dark, terminal-like surface (the one
+   documented exception to the theme tokens, DESIGN.md). Its own file so the
+   row and settings-dialog styles stay inside the per-component size budget
+   rather than the budget being raised to hide them. */
+.startup-logs-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1085;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.startup-logs-dialog {
+  outline: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(880px, 100%);
+  max-height: 85vh;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: #1e1e1e;
+  color: #e6e6e6;
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.5);
+}
+
+.startup-logs-head,
+.startup-logs-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: #262626;
+}
+
+.startup-logs-head {
+  border-bottom: 1px solid #3a3a3a;
+}
+
+.startup-logs-foot {
+  border-top: 1px solid #3a3a3a;
+  background: #222;
+  color: #b8b8b8;
+}
+
+.startup-logs-body {
+  flex: 1;
+  margin: 0;
+  padding: 1rem;
+  overflow-y: auto;
+  font-family: var(--bs-font-monospace, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #1e1e1e;
+}

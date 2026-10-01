@@ -35955,3 +35955,60 @@ a `markForCheck()`, and each omission is an invisible stale-UI bug that no curre
 catch. The two fixes above remove most of the per-pass cost without that risk. A README item
 carries the rest, together with what makes it safe to attempt (the card's async state moving
 to signals first).
+
+## 803. §801's audit, parts 3 and 4: adapt and polish, verified in one batched browser round
+
+These two are one commit because they are one pass over the same four stylesheets; splitting
+them would have meant splitting hunks inside `shell.component.css` and
+`service-card.component.css` for no gain.
+
+**adapt — touch targets keyed on the pointer, not the width.** The audit measured the row
+actions at ~31px: above WCAG 2.5.8 AA's 24px, below the 44px convention, on controls (Start,
+Stop) that are consequential and adjacent. The rule is `@media (pointer: coarse)`, not a width
+breakpoint — a narrow desktop window driven by a mouse does not need bigger buttons, and a
+touch laptop at 1400px does. It covers the row actions, the nav links and the header's
+language/theme/logout controls.
+
+That change exposed a layout defect the audit had not seen: `.app-header__logout` carried
+`order: 2`, which sorted it *after* the full-width resource strip, so on a phone it sat alone
+on a row of its own — and once it was 44px tall, that empty row was a quarter of the header.
+With `order: 0` it stays on the brand's row, and shrinking the brand at ≤575.98px is what
+makes the four fit: the header goes from **216px to 161px** at 360 and 414 CSS px. At 320 it
+still wraps to two rows (213px), which is the right trade at that width.
+
+**polish.**
+
+- *Light mode had almost no surface separation.* Bootstrap's stock `#dee2e6` against the
+  `#f4f7fb` canvas is ~1.1:1, with the shadow scaled to 0.3 on top. The palette now supplies
+  `--bs-border-color: #cbd5e1` in light. The first attempt set `--bs-card-border-color` on
+  `:root` and did nothing, because Bootstrap **redeclares that variable inside `.card`**;
+  the fix is `border-color: var(--bs-border-color)` on our own `.card` rule. Measured in the
+  browser afterwards: `rgb(203, 213, 225)`, not the old translucent `rgba(15, 23, 42, .12)`.
+- *`scope="col"`* on Audit logs' and CrowdSec bans' table headers. Both collapse to
+  card-per-row below 768px, where the header association is the only thing left tying a value
+  to its column.
+- *`prefers-reduced-motion`* now covers the other five transitions (summary tile, both
+  chevrons, the meter fill), each by stopping the movement and keeping the state change — not
+  a global `0.01ms` kill, which would destroy useful feedback. The meter's `width` transition
+  stays and now says why in a comment: it is a 4.6rem bar in the header, so the only layout a
+  width change can dirty is its own, and a scaled fill would need a wrapper and would blur its
+  rounded end. The detector still flags it; that is the documented answer.
+- *The component style budget* (`service-card.component.css`, 4.21 kB against a 4 kB warning)
+  is fixed by moving the startup-log popup into `startup-logs.css` beside it and listing both
+  in `styleUrls`, rather than by raising the budget to hide the growth.
+
+**The batched verification round** (Playwright, Chromium, against the `docker-compose.test.yml`
+stack — the audit's findings were static, so this is where they were actually checked):
+document titles change per route (`Apps · Business Lab`, …); heading levels run 1,2,2,… with
+no skips on all six shell pages; the skip link is the first thing Tab reaches, becomes visible
+(`top: 9.6px`) and moves focus to `#main-content`; zero console errors; touch targets measure
+44px for row actions, nav links and header buttons with `(pointer: coarse)` matching; and no
+horizontal overflow at 320, 360, 414 or 1440.
+
+The nav strip is a native `overflow-x` scroller with no pointer handler, so there is nothing
+to steal the page's scroll — confirmed scrollable (379px of range) and a vertical swipe across
+it still scrolls the page. **Untested:** the horizontal drag itself at driver level.
+Synthesized `TouchEvent`s do not drive Chromium's native scrolling, and Chromium is not Safari;
+that one needs a physical device, and it is a reported gap rather than a blocker. The full
+12-test E2E suite passed before and after, which is what proves the new `<label for>` elements
+did not break the `getByLabel` selectors the suite navigates by.

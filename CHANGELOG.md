@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.160.2] — 2026-10-01
+
+### Changed
+
+- Touch-sized controls on touch devices, a shorter phone header, visible card edges in light mode and reduced-motion support throughout (plan.md §803)
+
 ## [0.160.1] — 2026-10-01
 
 ### Performance
