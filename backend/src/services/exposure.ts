@@ -81,6 +81,17 @@ export async function getServiceExposureRow(serviceName: string): Promise<Servic
 }
 
 /**
+ * Every exposure row, primary and secondary alike. A whole-registry status
+ * pass wants the table once rather than two queries per app (status.ts's
+ * `buildStatusCycle`); the table has one row per app, so reading it whole is
+ * cheaper than ~100 round trips.
+ */
+export async function getAllExposureRows(): Promise<ServiceExposureRow[]> {
+  const result = await query<ServiceExposureRow>('SELECT * FROM service_exposure');
+  return result.rows;
+}
+
+/**
  * A service's `additionalExposures` rows (keyed `<service>:<suffix|apex>`,
  * see the module docstring) — the secondary hostnames a native client
  * (NetBird's mobile/desktop app hitting the Management API, not the browser

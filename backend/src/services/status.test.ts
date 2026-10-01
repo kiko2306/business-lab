@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateContainerState, healthProbeReachable, hostNetworkPortMappings, resolveAdditionalExposureUrls } from './status';
+import {
+  aggregateContainerState,
+  groupExposureRows,
+  healthProbeReachable,
+  hostNetworkPortMappings,
+  parseDockerPs,
+  resolveAdditionalExposureUrls,
+} from './status';
 import { ServiceAdditionalExposure, ServiceExposureRow } from '../types';
 
 describe('aggregateContainerState', () => {
@@ -59,6 +66,83 @@ describe('hostNetworkPortMappings', () => {
     expect(hostNetworkPortMappings(8123)).toEqual([
       { hostPort: '8123', containerPort: '8123', protocol: 'tcp' },
     ]);
+  });
+});
+
+describe('parseDockerPs', () => {
+  const line = (project: string, state: string, ports = '') => `${project}\t${state}\t${ports}`;
+
+  it('is empty for empty output', () => {
+    expect(parseDockerPs('').size).toBe(0);
+    expect(parseDockerPs('\n  \n').size).toBe(0);
+  });
+
+  it('groups every container by its compose project', () => {
+    const snapshot = parseDockerPs(
+      [line('vaultwarden', 'running'), line('vaultwarden', 'exited'), line('outline', 'running')].join('\n')
+    );
+    expect(snapshot.get('vaultwarden')?.states).toEqual(['running', 'exited']);
+    expect(snapshot.get('outline')?.states).toEqual(['running']);
+  });
+
+  it('skips a container with no compose project label', () => {
+    // Hand-run containers (docker run) have an empty label and belong to no app.
+    expect(parseDockerPs(line('', 'running', '0.0.0.0:9000->9000/tcp')).size).toBe(0);
+  });
+
+  it('lowercases the state so aggregation sees a known value', () => {
+    expect(parseDockerPs(line('outline', 'Running')).get('outline')?.states).toEqual(['running']);
+  });
+
+  it('collects published ports, deduplicated and sorted by host port', () => {
+    const snapshot = parseDockerPs(
+      [
+        line('netbird-vpn', 'running', '0.0.0.0:10520->80/tcp, [::]:10520->80/tcp'),
+        line('netbird-vpn', 'running', '0.0.0.0:10521->33073/tcp'),
+      ].join('\n')
+    );
+    expect(snapshot.get('netbird-vpn')?.ports).toEqual([
+      { hostPort: '10520', containerPort: '80', protocol: 'tcp' },
+      { hostPort: '10521', containerPort: '33073', protocol: 'tcp' },
+    ]);
+  });
+
+  it('reports a published port range', () => {
+    const snapshot = parseDockerPs(line('nginx-proxy-manager', 'running', '0.0.0.0:80-81->80-81/tcp'));
+    expect(snapshot.get('nginx-proxy-manager')?.ports).toEqual([
+      { hostPort: '80-81', containerPort: '80-81', protocol: 'tcp' },
+    ]);
+  });
+
+  it('ignores a container-only port with no host binding', () => {
+    const snapshot = parseDockerPs(line('outline', 'running', '5432/tcp'));
+    expect(snapshot.get('outline')?.ports).toEqual([]);
+  });
+
+  it('ignores the ports of a container that is not running', () => {
+    // A single `docker ps -a` answers both questions, but a stopped
+    // container's stale mapping is not bound to anything on the host.
+    const snapshot = parseDockerPs(line('outline', 'exited', '0.0.0.0:10620->3000/tcp'));
+    expect(snapshot.get('outline')?.ports).toEqual([]);
+  });
+});
+
+describe('groupExposureRows', () => {
+  const row = (service_name: string) => ({ service_name }) as ServiceExposureRow;
+
+  it('splits primary rows from their secondary hostnames', () => {
+    const grouped = groupExposureRows([row('netbird-vpn'), row('netbird-vpn:api'), row('homepage:apex')]);
+    expect(grouped.primary.get('netbird-vpn')).toEqual(row('netbird-vpn'));
+    expect(grouped.primary.has('netbird-vpn:api')).toBe(false);
+    expect(grouped.secondary.get('netbird-vpn')).toEqual([row('netbird-vpn:api')]);
+    // A secondary row with no primary row of its own still groups under its parent.
+    expect(grouped.secondary.get('homepage')).toEqual([row('homepage:apex')]);
+  });
+
+  it('is empty maps for no rows', () => {
+    const grouped = groupExposureRows([]);
+    expect(grouped.primary.size).toBe(0);
+    expect(grouped.secondary.size).toBe(0);
   });
 });
 

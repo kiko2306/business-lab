@@ -9,25 +9,10 @@ import https from 'https';
 import http from 'http';
 import logger from '../utils/logger';
 import { getAllServices, getService, getProjectName, getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
-import { getServiceExposureRow, getSecondaryExposureRows } from './exposure';
+import { getAllExposureRows } from './exposure';
 import { baseTagPins, pinnedImages } from './composeOverride';
 import { getCachedHostLanIp } from './networkScan';
 import { ServiceAdditionalExposure, ServiceExposureRow, ServicePortMapping, ServiceState, ServiceStatusPayload, ServiceStatusResponse } from '../types';
-
-/**
- * The service's live public hostname, if exposure is enabled and was
- * provisioned successfully. Swallows lookup failures — exposure status is
- * secondary to the container status this call is really for.
- */
-async function getExposedHostname(serviceName: string): Promise<string | null> {
-  try {
-    const row = await getServiceExposureRow(serviceName);
-    return row && row.enabled && row.status === 'provisioned' ? row.hostname : null;
-  } catch (error) {
-    logger.error(`Error loading exposure status for service ${serviceName}`, { error: (error as Error).message });
-    return null;
-  }
-}
 
 /**
  * Resolve a service's declared `additionalExposures` (services.ts) against
@@ -49,19 +34,27 @@ export function resolveAdditionalExposureUrls(
   });
 }
 
-async function getAdditionalExposureUrls(
-  serviceName: string,
-  additionalExposures: ServiceAdditionalExposure[] | undefined
-): Promise<{ label: string; hostname: string }[]> {
-  if (!additionalExposures?.length) return [];
-  try {
-    return resolveAdditionalExposureUrls(additionalExposures, await getSecondaryExposureRows(serviceName));
-  } catch (error) {
-    logger.error(`Error loading secondary exposure status for service ${serviceName}`, {
-      error: (error as Error).message,
-    });
-    return [];
-  }
+/**
+ * The host and database facts a status pass needs, each fetched exactly once
+ * however many services the pass covers: one `docker ps -a` and one read of
+ * `service_exposure`. A failed exposure read is logged and treated as no rows
+ * — exposure is secondary to the container state a status call is really for,
+ * so it must not fail the whole payload.
+ */
+export interface StatusCycle {
+  docker: DockerSnapshot | null;
+  exposure: ReturnType<typeof groupExposureRows>;
+}
+
+export async function buildStatusCycle(): Promise<StatusCycle> {
+  const [docker, rows] = await Promise.all([
+    dockerPsSnapshot(),
+    getAllExposureRows().catch((error: Error) => {
+      logger.error('Error loading exposure rows for a status pass', { error: error.message });
+      return [] as ServiceExposureRow[];
+    }),
+  ]);
+  return { docker, exposure: groupExposureRows(rows) };
 }
 
 /**
@@ -102,77 +95,125 @@ function aggregateContainerState(states: string[]): ServiceState {
   return 'stopped';
 }
 
-/**
- * Get the aggregated state of a compose project's containers.
- * Matching is done on the compose project label rather than container names,
- * because compose prefixes/suffixes the names it generates.
- */
-function getContainerStatus(projectName: string | null): Promise<ServiceState> {
-  return new Promise((resolve) => {
-    const command = `docker ps -a --filter "label=com.docker.compose.project=${projectName}" --format "{{.State}}"`;
-    exec(command, (error, stdout) => {
-      if (error) {
-        resolve('unknown');
-        return;
-      }
-
-      const states = stdout
-        .trim()
-        .split('\n')
-        .map((line) => line.trim().toLowerCase())
-        .filter(Boolean);
-
-      resolve(aggregateContainerState(states));
-    });
-  });
-}
-
 // Matches one `docker ps --format {{.Ports}}` entry, e.g.
 // "0.0.0.0:8080->80/tcp" or "0.0.0.0:80-81->80-81/tcp" (port ranges).
 // Unpublished container-only ports (e.g. "5432/tcp", no "->") don't match
 // and are skipped, since there's nothing reachable from the host to report.
 const PORT_MAPPING_PATTERN = /(?:\S+:)?(\d+(?:-\d+)?)->(\d+(?:-\d+)?)\/(tcp|udp)/g;
 
+/** One compose project's containers, as a single `docker ps -a` reported them. */
+export interface ProjectContainers {
+  /** Every container's `{{.State}}`, lowercased, for `aggregateContainerState`. */
+  states: string[];
+  /**
+   * The live published host ports, straight from `docker ps` rather than
+   * parsed from the compose file — this way it reflects what's actually bound
+   * right now and covers every container in a multi-container project, not
+   * just the first `ports:` entry.
+   */
+  ports: ServicePortMapping[];
+}
+
+/** project name -> its containers. A project with no containers is absent. */
+export type DockerSnapshot = Map<string, ProjectContainers>;
+
 /**
- * Get the live published host ports for a compose project's containers,
- * straight from `docker ps` rather than parsed from the compose file — this
- * way it reflects what's actually bound right now and covers every
- * container in a multi-container project, not just the first `ports:` entry.
+ * Parse one tab-separated `docker ps -a` listing of *every* container on the
+ * host into per-project state. One exec answers all ~50 registry apps: the
+ * previous shape ran two `docker ps --filter` execs per app on every status
+ * cycle (~100 process spawns every 15 s), which is what made a poll expensive
+ * rather than anything Docker itself was doing.
+ *
+ * Grouping is on the compose project label rather than container names,
+ * because compose prefixes/suffixes the names it generates. Ports are taken
+ * only from `running` containers — the single `-a` listing also carries
+ * stopped ones, whose mapping is not bound to anything on the host.
  */
-function getContainerPorts(projectName: string | null): Promise<ServicePortMapping[]> {
-  return new Promise((resolve) => {
-    if (!projectName) {
-      resolve([]);
-      return;
+export function parseDockerPs(stdout: string): DockerSnapshot {
+  const snapshot: DockerSnapshot = new Map();
+  // Keyed per project so a host port published by two containers of the same
+  // project is reported once, as the per-project query used to.
+  const portsByProject = new Map<string, Map<string, ServicePortMapping>>();
+
+  for (const line of stdout.split('\n')) {
+    const [project, state, portField = ''] = line.split('\t');
+    if (!project?.trim() || !state?.trim()) {
+      continue;
     }
+    const entry = snapshot.get(project) ?? { states: [], ports: [] };
+    const lowerState = state.trim().toLowerCase();
+    entry.states.push(lowerState);
+    snapshot.set(project, entry);
 
-    const command = `docker ps --filter "label=com.docker.compose.project=${projectName}" --format "{{.Ports}}"`;
-    exec(command, (error, stdout) => {
-      if (error) {
-        resolve([]);
-        return;
+    if (lowerState !== 'running') {
+      continue;
+    }
+    const ports = portsByProject.get(project) ?? new Map<string, ServicePortMapping>();
+    portsByProject.set(project, ports);
+    PORT_MAPPING_PATTERN.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = PORT_MAPPING_PATTERN.exec(portField)) !== null) {
+      const [, hostPort, containerPort, protocol] = match;
+      const key = `${hostPort}/${protocol}`;
+      if (!ports.has(key)) {
+        ports.set(key, { hostPort, containerPort, protocol });
       }
+    }
+  }
 
-      const ports = new Map<string, ServicePortMapping>();
-      for (const line of stdout.split('\n')) {
-        PORT_MAPPING_PATTERN.lastIndex = 0;
-        let match: RegExpExecArray | null;
-        while ((match = PORT_MAPPING_PATTERN.exec(line)) !== null) {
-          const [, hostPort, containerPort, protocol] = match;
-          const key = `${hostPort}/${protocol}`;
-          if (!ports.has(key)) {
-            ports.set(key, { hostPort, containerPort, protocol });
-          }
-        }
-      }
-
-      resolve(
-        [...ports.values()].sort(
-          (a, b) => Number(a.hostPort.split('-')[0]) - Number(b.hostPort.split('-')[0])
-        )
+  for (const [project, ports] of portsByProject) {
+    const entry = snapshot.get(project);
+    if (entry) {
+      entry.ports = [...ports.values()].sort(
+        (a, b) => Number(a.hostPort.split('-')[0]) - Number(b.hostPort.split('-')[0])
       );
+    }
+  }
+  return snapshot;
+}
+
+/**
+ * List every container on the host, once. Returns null when docker itself
+ * can't be reached, so callers can tell "no containers" from "no answer" —
+ * the latter leaves a service `unknown` rather than claiming it stopped.
+ */
+export function dockerPsSnapshot(): Promise<DockerSnapshot | null> {
+  return new Promise((resolve) => {
+    // Single-quoted for the shell: the Go template's own double quotes around
+    // the label name must survive to docker, or it parses `com` as a function
+    // and the whole listing fails (verified against a real docker, not just
+    // type-checked).
+    const format = '{{.Label "com.docker.compose.project"}}\\t{{.State}}\\t{{.Ports}}';
+    exec(`docker ps -a --format '${format}'`, (error, stdout) => {
+      resolve(error ? null : parseDockerPs(stdout));
     });
   });
+}
+
+/**
+ * Split one `SELECT * FROM service_exposure` into the primary row per service
+ * and the `<service>:<suffix>` secondary rows grouped under their parent — so
+ * a whole-registry status cycle reads the table once instead of running two
+ * queries per app.
+ */
+export function groupExposureRows(rows: ServiceExposureRow[]): {
+  primary: Map<string, ServiceExposureRow>;
+  secondary: Map<string, ServiceExposureRow[]>;
+} {
+  const primary = new Map<string, ServiceExposureRow>();
+  const secondary = new Map<string, ServiceExposureRow[]>();
+  for (const row of rows) {
+    const separator = row.service_name.indexOf(':');
+    if (separator === -1) {
+      primary.set(row.service_name, row);
+      continue;
+    }
+    const parent = row.service_name.slice(0, separator);
+    const list = secondary.get(parent) ?? [];
+    list.push(row);
+    secondary.set(parent, list);
+  }
+  return { primary, secondary };
 }
 
 /**
@@ -254,7 +295,10 @@ function checkHealthHttp(target: { url: string; hostHeader?: string }, timeout =
 /**
  * Get status for a single service
  */
-export async function getServiceStatus(serviceName: string): Promise<ServiceStatusPayload> {
+export async function getServiceStatus(
+  serviceName: string,
+  cycle?: StatusCycle
+): Promise<ServiceStatusPayload> {
   const service = getService(serviceName);
 
   if (!service) {
@@ -267,12 +311,19 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
   }
 
   try {
-    // Get container state
-    const containerState = await getContainerStatus(getProjectName(serviceName));
+    const { docker, exposure } = cycle ?? (await buildStatusCycle());
+    const projectName = getProjectName(serviceName);
+    const containers = projectName ? docker?.get(projectName) : undefined;
+    // A missing docker answer leaves the service `unknown`; an answer with no
+    // containers for this project means they are genuinely gone.
+    const containerState: ServiceState = !docker
+      ? 'unknown'
+      : aggregateContainerState(containers?.states ?? []);
 
     // `compose down` removes containers, so an installed app with no containers
     // is stopped rather than unknown. Uninstalled apps stay unknown.
-    const installed = Boolean(resolveComposeFile(serviceName)?.composeFile);
+    const resolved = resolveComposeFile(serviceName);
+    const installed = Boolean(resolved?.composeFile);
     const state: ServiceState = containerState === 'unknown' && installed ? 'stopped' : containerState;
 
     const webPort =
@@ -306,19 +357,24 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
         ? []
         : service.hostNetworkPort
           ? hostNetworkPortMappings(service.hostNetworkPort)
-          : await getContainerPorts(getProjectName(serviceName));
-    const exposedHostname = state === 'running' ? await getExposedHostname(serviceName) : null;
+          : (containers?.ports ?? []);
+    const primaryRow = exposure.primary.get(serviceName);
+    const exposedHostname =
+      state === 'running' && primaryRow?.enabled && primaryRow.status === 'provisioned'
+        ? primaryRow.hostname
+        : null;
     const additionalExposureUrls =
-      state === 'running' ? await getAdditionalExposureUrls(serviceName, service.additionalExposures) : [];
+      state === 'running'
+        ? resolveAdditionalExposureUrls(service.additionalExposures, exposure.secondary.get(serviceName) ?? [])
+        : [];
     // Image digests the last self-update (§209) pinned into
     // docker-compose.override.yml (composeOverride.ts). Non-empty means the
     // app is frozen on a specific build until "Unpin" — surfaced so the card
     // can say so.
-    const resolvedForPins = resolveComposeFile(serviceName);
-    const pinned = resolvedForPins?.appDir ? [...pinnedImages(resolvedForPins.appDir).values()] : [];
+    const pinned = resolved?.appDir ? [...pinnedImages(resolved.appDir).values()] : [];
     // Version pin baked into docker-compose.yml itself (compat, not
     // self-update) — informational badge only, see baseTagPins' docstring.
-    const versionPinned = resolvedForPins?.composeFile ? baseTagPins(resolvedForPins.composeFile) : [];
+    const versionPinned = resolved?.composeFile ? baseTagPins(resolved.composeFile) : [];
 
     return {
       name: serviceName,
@@ -364,7 +420,8 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
  */
 export async function getAllServiceStatus(): Promise<ServiceStatusResponse> {
   const services = getAllServices();
-  const statuses = await Promise.all(services.map((service) => getServiceStatus(service.name)));
+  const cycle = await buildStatusCycle();
+  const statuses = await Promise.all(services.map((service) => getServiceStatus(service.name, cycle)));
 
   return {
     timestamp: new Date(),
@@ -380,4 +437,4 @@ export async function getAllServiceStatus(): Promise<ServiceStatusResponse> {
   };
 }
 
-export { aggregateContainerState, getContainerStatus, getContainerPorts, checkHealthHttp };
+export { aggregateContainerState, checkHealthHttp };

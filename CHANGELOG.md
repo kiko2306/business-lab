@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.159.0] — 2026-10-01
+
+### Performance
+
+- Status polls now build from one `docker ps` and one exposure query instead of ~100 of each, cache compose YAML on mtime, and share a single build across every open dashboard stream
+
 ## [0.158.4] — 2026-10-01
 
 ### Responsive

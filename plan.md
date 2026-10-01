@@ -35688,3 +35688,84 @@ built bundle in `docker-compose.test.yml`, not a claim from `ng build` succeedin
 throwaway spec and its screenshots were never committed — this section is the record.
 
 Frontend 235 tests (unchanged), build clean. Version bump: see CHANGELOG.
+
+## 798. The status poll stops being a process storm: one `docker ps`, one exposure read, memoised YAML, one shared stream tick
+
+A scan for performance work (bugs/refactor/perf, user-asked) kept coming back to the same
+place: `getAllServiceStatus()`. It ran `getServiceStatus()` for every one of the ~50
+registry apps in parallel, and each of those did, per app, per poll:
+
+- `docker ps -a --filter label=com.docker.compose.project=<app>` for the state,
+- a second `docker ps --filter …` for the published ports,
+- `SELECT * FROM service_exposure WHERE service_name = $1`,
+- `SELECT * FROM service_exposure WHERE service_name LIKE '<app>:%'`,
+- a synchronous `readFileSync` + `yaml.load` of `docker-compose.override.yml`
+  (`pinnedImages`) and another of `docker-compose.yml` (`baseTagPins`).
+
+That is ~100 process spawns, ~100 queries and ~100 synchronous YAML parses on the request
+path, every 15 s, for bytes that almost never move. Worse, the per-client multiplier: the
+WebSocket broadcaster built the payload once and fanned it out to every socket, but
+`sseHandler` gave each SSE client its own `setInterval` and its own full build — so N tabs
+on the SSE fallback (which is the path that gets used whenever the WebSocket upgrade is
+blocked, cf. §792) cost N times everything above.
+
+Four changes, all behind unit tests:
+
+**One `docker ps` for the whole host.** `parseDockerPs()` (pure) turns one tab-separated
+`docker ps -a --format '{{.Label "com.docker.compose.project"}}\t{{.State}}\t{{.Ports}}'`
+listing into `Map<project, { states, ports }>`; `dockerPsSnapshot()` is the exec wrapper,
+returning `null` when docker itself can't be answered so a service stays `unknown` rather
+than being reported stopped. The existing `aggregateContainerState` and the port regex are
+reused unchanged. One subtlety kept deliberately: the single listing is `-a`, so it also
+carries stopped containers, and ports are collected only from `running` rows — a stopped
+container's mapping is not bound to anything on the host, which is what the old
+running-only `docker ps` gave us.
+
+This is also where the change nearly shipped broken, and the reason it was run against a
+real docker rather than only type-checked (CLAUDE.md "Never"): built as
+`exec(\`docker ps -a --format "${format}"\`)`, the Go template's own double quotes around
+the label name close the shell's quoting, and docker answers
+`failed to parse template: template: :1: function "com" not defined` — every app would
+have gone `unknown` on the live box while every test stayed green. Single-quoting the
+format for the shell fixes it; the real 45-container listing from this host was then fed
+through `parseDockerPs` and checked by hand (projects grouped, ports deduplicated per
+protocol, exited projects reporting none).
+
+**One exposure read.** `getAllExposureRows()` (exposure.ts) reads the table whole — it has
+about one row per app — and `groupExposureRows()` (pure, status.ts) splits it into the
+primary row per service and the `<service>:<suffix>` rows grouped under their parent. The
+two per-service query helpers in status.ts (`getExposedHostname`,
+`getAdditionalExposureUrls`) are gone; `resolveAdditionalExposureUrls` was already pure and
+is now called directly with the grouped rows.
+
+Both land in a `StatusCycle` (`buildStatusCycle()`): the host and database facts a status
+pass needs, fetched once however many services it covers. `getServiceStatus(name, cycle?)`
+takes one optionally and builds its own when called for a single app — so the single-app
+path also drops from two execs to one.
+
+**Memoised YAML.** `composeOverride.ts` now parses through `loadYamlCached()`, keyed on the
+file's own `mtimeMs` + size. The mtime key, rather than an explicit invalidation call, is
+what makes an outside write safe — a `git pull` during a self-update changes compose files
+with no API of ours involved. `writeImagePins`/`clearImagePins` drop the entry anyway,
+because `writeImagePins` mutates the document `readOverride` handed it.
+
+**One shared stream tick.** `realtime.ts` keeps a single `Set` of subscribers covering both
+WebSocket sockets and SSE responses, with one ticker that builds the payload once per cycle
+and hands the same object to all of them; a subscriber that throws (a socket that died
+between the build and the write) no longer costs the others their update. The ticker now
+starts with the first subscriber and is cleared with the last, so an idle box runs no timer
+— previously it ran forever once `initWebSocket` had been called, and `wss.on('close')` was
+the only thing that cleared it. The WebSocket handshake also stopped duplicating the
+ticket-expiry check and calls `resolveStreamTicketUser()` like the SSE path does.
+
+Net effect per poll cycle: 2 execs instead of ~100, 1 query instead of ~100, ~0 YAML parses
+instead of ~100 (one `statSync` each), and one build regardless of how many streams are
+open.
+
+Rejected along the way: caching the payload itself behind `getAllServiceStatus()` with a
+short TTL. It would have covered the REST route too, but it makes "stop an app, then read
+its status" return the pre-stop answer for up to the TTL — the sharing does the same work
+with no staleness, since the streams were already on a 15 s cadence. Also left alone:
+`exposureReconciler`'s per-service `getServiceStatus()` loop. It sleeps between services
+deliberately and starts/provisions things as it goes, so a cycle built once at the top
+would be answering with facts from before its own changes.

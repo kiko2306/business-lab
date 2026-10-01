@@ -112,13 +112,42 @@ export function overridePath(appDir: string): string {
   return path.join(appDir, OVERRIDE_FILENAME);
 }
 
+/**
+ * Parsed YAML per file, keyed on the file's own mtime and size. Every status
+ * poll asks all ~50 apps for their pins (status.ts), so without this the
+ * request path re-parses every app's compose file and override dozens of times
+ * a minute for bytes that almost never change. `statSync` is what replaces
+ * that work, and it also catches an outside write — a `git pull` during a
+ * self-update — which no invalidation call of ours would see.
+ */
+const yamlCache = new Map<string, { mtimeMs: number; size: number; doc: unknown }>();
+
+/** Throws on unparseable YAML, like `yaml.load` — each caller decides. */
+function loadYamlCached(file: string): unknown {
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(file);
+  } catch {
+    yamlCache.delete(file);
+    return null; // missing file — the callers' "nothing pinned"
+  }
+  const hit = yamlCache.get(file);
+  if (hit && hit.mtimeMs === stat.mtimeMs && hit.size === stat.size) {
+    return hit.doc;
+  }
+  const doc = yaml.load(fs.readFileSync(file, 'utf8'));
+  yamlCache.set(file, { mtimeMs: stat.mtimeMs, size: stat.size, doc });
+  return doc;
+}
+
+/**
+ * Callers get the cached document itself, not a copy. `writeImagePins` is the
+ * only one that mutates it, and it drops the entry after writing.
+ */
 export function readOverride(appDir: string): OverrideDoc | null {
   const file = overridePath(appDir);
-  if (!fs.existsSync(file)) {
-    return null;
-  }
   try {
-    const doc = yaml.load(fs.readFileSync(file, 'utf8'));
+    const doc = loadYamlCached(file);
     return doc && typeof doc === 'object' ? (doc as OverrideDoc) : null;
   } catch (error) {
     logger.warn('Ignoring an unparseable compose override', { file, error: (error as Error).message });
@@ -155,6 +184,9 @@ export function writeImagePins(appDir: string, pins: Map<string, string | null>)
   }
 
   const file = overridePath(appDir);
+  // `doc` may be the cached parse, now mutated — drop the entry either way so
+  // the next read reflects the file rather than this half-step.
+  yamlCache.delete(file);
   if (Object.keys(services).length === 0) {
     if (fs.existsSync(file)) {
       fs.rmSync(file);
@@ -179,7 +211,7 @@ export function writeImagePins(appDir: string, pins: Map<string, string | null>)
 export function baseTagPins(composeFile: string): string[] {
   let doc: OverrideDoc | null;
   try {
-    doc = yaml.load(fs.readFileSync(composeFile, 'utf8')) as OverrideDoc | null;
+    doc = loadYamlCached(composeFile) as OverrideDoc | null;
   } catch (error) {
     logger.warn('Could not read compose file for version pins', { composeFile, error: (error as Error).message });
     return [];
@@ -201,6 +233,7 @@ export function baseTagPins(composeFile: string): string[] {
 /** Drop the whole override file (the "Unpin" action). */
 export function clearImagePins(appDir: string): void {
   const file = overridePath(appDir);
+  yamlCache.delete(file);
   if (fs.existsSync(file)) {
     fs.rmSync(file);
     logger.info('Cleared all compose image pins', { file });

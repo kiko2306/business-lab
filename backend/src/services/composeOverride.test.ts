@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -169,5 +169,41 @@ describe('baseTagPins', () => {
     fs.writeFileSync(composeFile, ': not yaml : [');
     expect(baseTagPins(composeFile)).toEqual([]);
     expect(baseTagPins(path.join(appDir, 'missing.yml'))).toEqual([]);
+  });
+});
+
+// Every status poll asks all ~50 apps for their pins, so these two parse the
+// same unchanged YAML dozens of times a minute on the request path.
+describe('the YAML read cache', () => {
+  it('parses an unchanged file once however often it is read', () => {
+    const composeFile = path.join(appDir, 'docker-compose.yml');
+    fs.writeFileSync(composeFile, yaml.dump({ services: { app: { image: 'outline:0.90.0' } } }));
+    expect(baseTagPins(composeFile)).toEqual(['0.90.0']);
+
+    const read = vi.spyOn(fs, 'readFileSync');
+    expect(baseTagPins(composeFile)).toEqual(['0.90.0']);
+    expect(baseTagPins(composeFile)).toEqual(['0.90.0']);
+    expect(read).not.toHaveBeenCalled();
+    read.mockRestore();
+  });
+
+  it('re-parses once the file changes on disk', () => {
+    const composeFile = path.join(appDir, 'docker-compose.yml');
+    fs.writeFileSync(composeFile, yaml.dump({ services: { app: { image: 'outline:0.90.0' } } }));
+    expect(baseTagPins(composeFile)).toEqual(['0.90.0']);
+
+    // A `git pull` of a new compose file is an outside write: no API of ours
+    // runs, so only the file's own mtime/size can invalidate the entry.
+    fs.writeFileSync(composeFile, yaml.dump({ services: { app: { image: 'outline:0.91.0' } } }));
+    fs.utimesSync(composeFile, new Date(), new Date(Date.now() + 1000));
+    expect(baseTagPins(composeFile)).toEqual(['0.91.0']);
+  });
+
+  it('sees a pin written through writeImagePins straight away', () => {
+    expect(pinnedImages(appDir).size).toBe(0);
+    writeImagePins(appDir, pins({ web: 'nginx:latest@sha256:aaa' }));
+    expect([...pinnedImages(appDir).values()]).toEqual(['nginx:latest@sha256:aaa']);
+    clearImagePins(appDir);
+    expect(pinnedImages(appDir).size).toBe(0);
   });
 });

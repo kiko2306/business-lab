@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.158.4** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.159.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,6 +212,21 @@ it is done — not ticked off and left behind. Section references point at
 Done one page at a time, test first, each its own commit and version bump. A finished
 item is deleted.
 
+- [ ] **Beta-test the rebuilt status poll (plan.md §798)** — the whole status
+      payload now comes from one `docker ps -a` and one `service_exposure`
+      read, so a mistake here shows up as *every* app reading wrong at once.
+      On `beta`: open Apps and confirm each app's state matches
+      `docker ps` on the host (running/stopped/error), that a running
+      multi-container app still lists **all** its published host ports (check
+      Pi-hole, which publishes 53/tcp *and* 53/udp on the same host port, and
+      netbird-vpn), that a stopped app lists none, and that the public URL and
+      any secondary URLs (netbird-vpn's Management API) still appear on the
+      card. Start and stop an app and confirm the card follows within one
+      15 s tick. Then open the dashboard in **two** tabs at once and confirm
+      both update — they now share one build rather than each running their
+      own. Finally check an app with a pinned image still shows its pin badge
+      after the pin is cleared from the Updates page (the compose YAML is now
+      memoised on mtime, so a stale badge would be the bug).
 - [ ] **Beta-test the WebSocket/SSE fix for live service status (plan.md §792)** —
       on `beta`, open Apps and expand "All apps": confirm it shows real rows (not
       a permanent "Loading services…") and a **Connected** badge, not **sse** or

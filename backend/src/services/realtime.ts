@@ -6,8 +6,57 @@ import { getAllServiceStatus } from './status';
 import { ServiceStatusResponse } from '../types';
 
 const STREAM_INTERVAL_MS = 15000;
-const wsClients = new Set<WebSocket>();
 const streamTickets = new Map<string, { userId: number; expiresAt: number }>();
+
+type StatusSubscriber = (payload: ServiceStatusResponse) => void;
+
+/**
+ * Every open stream, WebSocket and SSE alike. They share one ticker and one
+ * status build per cycle: a full build costs one `docker ps` and one exposure
+ * read across ~50 apps, and SSE used to run that per client — three open tabs
+ * on the SSE fallback cost three times as much as one, for identical bytes.
+ */
+const subscribers = new Set<StatusSubscriber>();
+let ticker: ReturnType<typeof setInterval> | null = null;
+
+/** Builds the payload once and hands it to every live stream. */
+export async function broadcastStatusTick(
+  build: () => Promise<ServiceStatusResponse> = getAllServiceStatus
+): Promise<void> {
+  if (!subscribers.size) {
+    return;
+  }
+  let payload: ServiceStatusResponse;
+  try {
+    payload = await build();
+  } catch {
+    return; // keep every stream alive even if one status cycle fails
+  }
+  for (const subscriber of [...subscribers]) {
+    try {
+      subscriber(payload);
+    } catch {
+      // A socket that died between the build and the write must not cost the
+      // rest of the clients their update.
+    }
+  }
+}
+
+/** The ticker only runs while something is listening, so an idle box is idle. */
+export function addStatusSubscriber(subscriber: StatusSubscriber): void {
+  subscribers.add(subscriber);
+  if (!ticker) {
+    ticker = setInterval(() => void broadcastStatusTick(), STREAM_INTERVAL_MS);
+  }
+}
+
+export function removeStatusSubscriber(subscriber: StatusSubscriber): void {
+  subscribers.delete(subscriber);
+  if (!subscribers.size && ticker) {
+    clearInterval(ticker);
+    ticker = null;
+  }
+}
 
 export function createStreamTicket(userId: number): string {
   for (const [key, value] of streamTickets.entries()) {
@@ -73,51 +122,26 @@ function sendJson(socket: WebSocket, payload: ServiceStatusResponse): void {
   }
 }
 
-async function getStatusPayload(): Promise<ServiceStatusResponse> {
-  return getAllServiceStatus();
-}
-
-function startStatusBroadcaster(): ReturnType<typeof setInterval> {
-  return setInterval(async () => {
-    if (!wsClients.size) {
-      return;
-    }
-    try {
-      const payload = await getStatusPayload();
-      for (const socket of wsClients) {
-        sendJson(socket, payload);
-      }
-    } catch {
-      // Keep stream alive even if one status cycle fails.
-    }
-  }, STREAM_INTERVAL_MS);
-}
-
 export function initWebSocket(server: Server): void {
   const wss = new WebSocketServer({ server, path: '/ws/services' });
-  const broadcaster = startStatusBroadcaster();
 
   wss.on('connection', async (socket: WebSocket, req) => {
     const searchParams = new URL(req.url || '', 'http://localhost').searchParams;
-    const ticket = searchParams.get('ticket');
-    const ticketPayload = ticket ? streamTickets.get(ticket) : null;
-    if (!ticketPayload || ticketPayload.expiresAt <= Date.now()) {
+    if (resolveStreamTicketUser(searchParams.get('ticket')) === null) {
       socket.close(1008, 'Unauthorized');
       return;
     }
 
-    wsClients.add(socket);
-    socket.on('close', () => wsClients.delete(socket));
+    const subscriber: StatusSubscriber = (payload) => sendJson(socket, payload);
+    addStatusSubscriber(subscriber);
+    socket.on('close', () => removeStatusSubscriber(subscriber));
 
     try {
-      sendJson(socket, await getStatusPayload());
+      sendJson(socket, await getAllServiceStatus());
     } catch {
+      removeStatusSubscriber(subscriber);
       socket.close(1011, 'Unable to fetch status');
     }
-  });
-
-  wss.on('close', () => {
-    clearInterval(broadcaster);
   });
 }
 
@@ -145,20 +169,11 @@ export async function sseHandler(req: Request, res: Response): Promise<Response 
   };
 
   try {
-    sendEvent(await getStatusPayload());
+    sendEvent(await getAllServiceStatus());
   } catch {
     res.write(`event: error\ndata: {"error":"Unable to fetch status"}\n\n`);
   }
 
-  const interval = setInterval(async () => {
-    try {
-      sendEvent(await getStatusPayload());
-    } catch {
-      res.write(`event: error\ndata: {"error":"Unable to fetch status"}\n\n`);
-    }
-  }, STREAM_INTERVAL_MS);
-
-  req.on('close', () => {
-    clearInterval(interval);
-  });
+  addStatusSubscriber(sendEvent);
+  req.on('close', () => removeStatusSubscriber(sendEvent));
 }

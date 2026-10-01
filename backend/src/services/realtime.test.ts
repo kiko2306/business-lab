@@ -1,49 +1,73 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { Request, Response } from 'express';
-import { createStreamTicket, sseHandler } from './realtime';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('./status', () => ({ getAllServiceStatus: vi.fn().mockResolvedValue({ timestamp: '', services: [] }) }));
+vi.mock('./status', () => ({ getAllServiceStatus: vi.fn() }));
 
-function mockRes() {
-  const listeners: Record<string, () => void> = {};
-  return {
-    writeHead: vi.fn(),
-    flushHeaders: vi.fn(),
-    write: vi.fn(),
-    // Not exercised here — sseHandler's caller (Express) wires req.on('close', ...).
-    _listeners: listeners,
-  } as unknown as Response;
-}
+import { ServiceStatusResponse } from '../types';
+import { addStatusSubscriber, broadcastStatusTick, removeStatusSubscriber } from './realtime';
 
-function mockReq(ticket: string): { req: Request; close: () => void } {
-  let closeHandler: (() => void) | undefined;
-  const req = {
-    query: { ticket },
-    headers: {},
-    on: vi.fn((event: string, cb: () => void) => {
-      if (event === 'close') closeHandler = cb;
-    }),
-  } as unknown as Request;
-  return { req, close: () => closeHandler?.() };
-}
+const payload = { services: [] } as unknown as ServiceStatusResponse;
 
-// plan.md §792: found live — nginx buffers the proxied SSE response by
-// default, so the browser never sees a byte until the buffer fills, however
-// promptly the backend calls res.write(). X-Accel-Buffering: no is nginx's
-// own documented per-response opt-out; verifying it's set is the only way
-// this bug is visible from the backend side (nginx's own behavior isn't
-// unit-testable here).
-describe('sseHandler', () => {
-  beforeEach(() => vi.clearAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
-  it('tells nginx not to buffer the stream', async () => {
-    const { req, close } = mockReq(createStreamTicket(1));
-    const res = mockRes();
-    await sseHandler(req, res);
-    expect(res.writeHead).toHaveBeenCalledWith(
-      200,
-      expect.objectContaining({ 'X-Accel-Buffering': 'no' })
-    );
-    close(); // clears sseHandler's setInterval so it doesn't leak past this test
+describe('broadcastStatusTick', () => {
+  it('builds the payload once for however many subscribers are listening', async () => {
+    // The point of the shared tick: each SSE client used to run its own
+    // interval and its own full status build (~50 docker/db lookups), so three
+    // open tabs cost three times as much as one.
+    const build = vi.fn(async () => payload);
+    const received: ServiceStatusResponse[] = [];
+    const subscribers = [0, 1, 2].map(() => (p: ServiceStatusResponse) => received.push(p));
+    subscribers.forEach(addStatusSubscriber);
+
+    try {
+      await broadcastStatusTick(build);
+      expect(build).toHaveBeenCalledTimes(1);
+      expect(received).toEqual([payload, payload, payload]);
+    } finally {
+      subscribers.forEach(removeStatusSubscriber);
+    }
+  });
+
+  it('does not build a payload with nobody listening', async () => {
+    const build = vi.fn(async () => payload);
+    await broadcastStatusTick(build);
+    expect(build).not.toHaveBeenCalled();
+  });
+
+  it('still reaches the other subscribers when one throws', async () => {
+    // A socket that died between the build and the write must not cost the
+    // rest of the clients their update.
+    const received: string[] = [];
+    const bad = () => {
+      throw new Error('socket gone');
+    };
+    const good = () => received.push('ok');
+    addStatusSubscriber(bad);
+    addStatusSubscriber(good);
+
+    try {
+      await broadcastStatusTick(async () => payload);
+      expect(received).toEqual(['ok']);
+    } finally {
+      removeStatusSubscriber(bad);
+      removeStatusSubscriber(good);
+    }
+  });
+
+  it('swallows a failed status build so the stream survives the cycle', async () => {
+    const good = vi.fn();
+    addStatusSubscriber(good);
+    try {
+      await expect(
+        broadcastStatusTick(async () => {
+          throw new Error('docker unreachable');
+        })
+      ).resolves.toBeUndefined();
+      expect(good).not.toHaveBeenCalled();
+    } finally {
+      removeStatusSubscriber(good);
+    }
   });
 });
