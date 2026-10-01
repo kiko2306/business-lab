@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.162.0] — 2026-10-01
+
+### Fixed
+
+- A running app that never published its host port now reports as an error instead of green — the state that left every Authelia-gated app answering 500 for 28 hours (plan.md §805)
+
 ## [0.161.0] — 2026-10-01
 
 ### Accessibility

@@ -252,6 +252,34 @@ function resolveHealthTarget(rawUrl: string, publishedPort: number | null): { ur
 }
 
 /**
+ * A running project that publishes nothing while its compose file declares a
+ * host port: docker accepted the container but never programmed the publish.
+ *
+ * Found live (plan.md §805). Authelia's start lost host port 10100 to a stale
+ * `docker-proxy` from its previous container — `failed to bind host port
+ * 0.0.0.0:10100/tcp: address already in use` — and docker left the container
+ * *running* with no network attachment and no published port. Its healthcheck
+ * runs inside the container, so it stayed `healthy`, the dashboard showed it
+ * green, and every Authelia-gated app answered 500 for 28 hours with nothing
+ * on the Apps page suggesting why.
+ *
+ * `expectedHostPort` comes from the compose file plus `.env`
+ * (`getPublishedUpstreamPort`), `livePorts` from `docker ps`. A host-networked
+ * app binds the host directly and publishes nothing by design, so it is
+ * exempt; so is an app whose compose file declares no published port.
+ */
+export function publishedPortMissing(
+  expectedHostPort: number | null,
+  hostNetworkPort: number | undefined,
+  livePorts: ServicePortMapping[]
+): boolean {
+  if (hostNetworkPort !== undefined || expectedHostPort === null) {
+    return false;
+  }
+  return livePorts.length === 0;
+}
+
+/**
  * Whether a running service can actually be reached for an HTTP health probe.
  *
  * The probe connects to the service's *published* host port (`webPort`), or —
@@ -358,6 +386,22 @@ export async function getServiceStatus(
         : service.hostNetworkPort
           ? hostNetworkPortMappings(service.hostNetworkPort)
           : (containers?.ports ?? []);
+    // Docker can leave a container running with its publish un-programmed —
+    // see publishedPortMissing. Nothing else in the payload notices: the
+    // container is up and its own healthcheck passes from inside, while
+    // everything that reaches it through the host port is dead.
+    if (state === 'running' && publishedPortMissing(webPort, service.hostNetworkPort, ports)) {
+      return {
+        name: serviceName,
+        label: service.label,
+        category: service.category,
+        state: 'error',
+        healthy: false,
+        error: `${service.label} is running but published no host port — expected ${webPort}. Docker most likely could not bind it (another process still holds it). Stop and start the app to republish.`,
+        lastChecked: new Date(),
+      };
+    }
+
     const primaryRow = exposure.primary.get(serviceName);
     const exposedHostname =
       state === 'running' && primaryRow?.enabled && primaryRow.status === 'provisioned'

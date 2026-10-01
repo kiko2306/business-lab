@@ -36069,3 +36069,66 @@ one literal §801 introduced.
 Remaining, unchanged: `OnPush` on the service card (README item), the nav strip's drag at
 driver level (needs a physical device), and the 320px header's two rows. Detector: the same
 two findings, both documented in the source.
+
+## 805. Every gated app answered 500 for 28 hours: Authelia was "running + healthy" with no network and no published port
+
+Reported as "tally is showing 500". Tally was fine — so was every other app. The symptom was
+the whole Authelia gate.
+
+**What was observed.** `https://tally.tx-home-utils.com/` returned `500` with
+`<center>openresty</center>` in the body, so the 500 came from Nginx Proxy Manager, not from
+Cloudflare and not from the app. Tally's own containers were `Up 2 days (healthy)` and had
+logged nothing in two hours — no request was reaching them. Vaultwarden, Paperless,
+Uptime Kuma and Wiki all returned 500 too, while the dashboard and the bare-domain Home Page
+returned 200: exactly the two surfaces that are *not* behind Authelia's `auth_request`.
+
+NPM's per-host error log named it in one line (the §-whatever habit of reading that log first
+paid for itself again):
+
+```
+connect() failed (111: Connection refused) while connecting to upstream,
+  subrequest: "/internal/authelia/authz",
+  upstream: "http://10.201.0.1:10100/api/authz/auth-request"
+auth request unexpected status: 502
+```
+
+Authelia's container was `Up 28 hours (healthy)` and its own log was clean. But
+`docker port authelia-authelia-1` printed nothing, `.NetworkSettings.Ports` was `{}`, its
+container IP was empty, and `docker network inspect authelia_default` listed **no containers**
+— while `.HostConfig.PortBindings` still said `9091/tcp -> 10100`. A running container,
+attached to nothing, publishing nothing, with its configuration insisting otherwise.
+
+**Root cause**, from the daemon journal at the moment it started:
+
+```
+failed to set up container networking: driver failed programming external connectivity
+on endpoint authelia-authelia-1: failed to bind host port 0.0.0.0:10100/tcp: address already in use
+```
+
+A stale `docker-proxy` from the previous Authelia container still held host port 10100 when
+the new one started. Docker failed to program external connectivity, and left the container
+**running** anyway — no network, no publish. By the time this was investigated the conflicting
+process was gone and the port was free, so `docker compose up -d` on the app's own project
+recreated it, the publish succeeded (`local-10100=200`), and all five gated apps went from
+`500` to `302` (the Authelia portal redirect, which is the correct answer to an
+unauthenticated request).
+
+**Why nothing noticed for 28 hours.** Authelia's healthcheck runs *inside* the container
+against `localhost:9091`, which was perfectly healthy; `docker ps` said `running`; so
+`getServiceStatus` said running + healthy and the Apps page showed it green. Every signal the
+dashboard had was green while the thing it exists to protect was unreachable.
+
+**The fix in code.** `publishedPortMissing()` (pure, status.ts): a project in state `running`
+whose compose file declares a published host port but whose live `docker ps` shows none has a
+publish that never happened. `getServiceStatus` now returns `error` for it, with a message
+naming the expected port and saying to stop and start the app. A host-networked app (binds the
+host directly, publishes nothing by design) and an app whose compose file declares no port are
+both exempt, so neither can trip it.
+
+Deliberately *not* done: auto-restarting the app from a status read. The reconciler sweep
+could republish, but a restart triggered by a status check is one bad read away from a restart
+loop, and the condition is rare enough that naming it on the card is the better trade. The
+error text tells the user the exact action.
+
+The hand restart above was a diagnostic, not the fix (CLAUDE.md): the fix is that the next
+time docker does this, the Apps page says so instead of showing green.

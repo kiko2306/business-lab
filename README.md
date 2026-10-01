@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.161.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.162.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,6 +212,16 @@ it is done — not ticked off and left behind. Section references point at
 Done one page at a time, test first, each its own commit and version bump. A finished
 item is deleted.
 
+- [ ] **Beta-test the lost-publish detection (plan.md §805)** — on `beta`,
+      simulate what happened to Authelia: `docker network disconnect
+      authelia_default authelia-authelia-1` on the host, then watch the Apps
+      page. Authelia's card must flip to **error** within one 15 s tick, with
+      a message naming port 10100 — not stay green because its internal
+      healthcheck still passes. Reconnect (`docker network connect`) or stop
+      and start the app from the dashboard and confirm the card goes back to
+      running. Also confirm no other app flips to error while this runs: a
+      host-networked app (Home Assistant) and an app with no published port
+      must both be unaffected.
 - [ ] **Put the service card on `OnPush` (plan.md §802)** — the last of the
       audit's performance findings, and the 50x one: with 50 cards on a page,
       every card's bindings are re-checked on every event. It was left out

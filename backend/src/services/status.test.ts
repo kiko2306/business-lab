@@ -1,13 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as services from '../config/services';
 import {
   aggregateContainerState,
   groupExposureRows,
   healthProbeReachable,
   hostNetworkPortMappings,
   parseDockerPs,
+  getServiceStatus,
+  publishedPortMissing,
   resolveAdditionalExposureUrls,
 } from './status';
-import { ServiceAdditionalExposure, ServiceExposureRow } from '../types';
+import { ServiceAdditionalExposure, ServiceExposureRow, ServicePortMapping } from '../types';
 
 describe('aggregateContainerState', () => {
   it('is unknown with no containers', () => {
@@ -198,5 +201,69 @@ describe('resolveAdditionalExposureUrls', () => {
     expect(resolveAdditionalExposureUrls([managementApi], [row({ enabled: false })])).toEqual([]);
     expect(resolveAdditionalExposureUrls([managementApi], [row({ status: 'not_provisioned' })])).toEqual([]);
     expect(resolveAdditionalExposureUrls([managementApi], [row({ hostname: null })])).toEqual([]);
+  });
+});
+
+describe('publishedPortMissing', () => {
+  const live = [{ hostPort: '10100', containerPort: '9091', protocol: 'tcp' as const }];
+
+  it('is false when the project publishes what its compose file declares', () => {
+    expect(publishedPortMissing(10100, undefined, live)).toBe(false);
+  });
+
+  // The real failure this exists for (plan.md §805): Authelia's start lost the
+  // race for host port 10100 to a stale docker-proxy, so docker reported
+  // "failed to bind host port 0.0.0.0:10100/tcp: address already in use" and
+  // left the container *running* with no network attachment and no published
+  // port. Its own healthcheck passes from inside, so the dashboard showed it
+  // green for 28 hours while every Authelia-gated app answered 500.
+  it('is true when a running project publishes nothing but compose declares a port', () => {
+    expect(publishedPortMissing(10100, undefined, [])).toBe(true);
+  });
+
+  it('is false for a host-networked app, which never publishes anything', () => {
+    expect(publishedPortMissing(8123, 8123, [])).toBe(false);
+  });
+
+  it('is false when the compose file declares no published port at all', () => {
+    expect(publishedPortMissing(null, undefined, [])).toBe(false);
+  });
+
+  it('is false when some other container of the project carries the publish', () => {
+    expect(publishedPortMissing(10100, undefined, [{ hostPort: '9000', containerPort: '80', protocol: 'tcp' }])).toBe(
+      false
+    );
+  });
+});
+
+describe('getServiceStatus with a lost port publish', () => {
+  // The compose file cannot be resolved from the test container's cwd, so the
+  // expected host port is stubbed; everything else is the real code path.
+  const cycle = (ports: ServicePortMapping[]) => ({
+    docker: new Map([['authelia', { states: ['running'], ports }]]),
+    exposure: groupExposureRows([]),
+  });
+
+  beforeEach(() => {
+    vi.spyOn(services, 'getPublishedUpstreamPort').mockReturnValue(10100);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('reports a running project that publishes nothing as an error, not as healthy', async () => {
+    const status = await getServiceStatus('authelia', cycle([]));
+    expect(status.state).toBe('error');
+    expect(status.healthy).toBe(false);
+    expect(status.error).toContain('10100');
+  });
+
+  it('leaves a project that did publish alone', async () => {
+    const status = await getServiceStatus(
+      'authelia',
+      cycle([{ hostPort: '10100', containerPort: '9091', protocol: 'tcp' }])
+    );
+    expect(status.state).toBe('running');
   });
 });
