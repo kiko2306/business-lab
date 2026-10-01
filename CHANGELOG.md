@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.158.2] — 2026-10-01
+
+### Error handling
+
+- Stop a failed request from showing two stacked error toasts, across 28 call sites
+
 ## [0.158.1] — 2026-10-01
 
 ### Updates

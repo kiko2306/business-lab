@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.158.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.158.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -252,18 +252,14 @@ account). A raw Joi validation leak on set-password/unsubscribe, the theme toggl
 icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§790,
 §791). One deferred, deliberately not folded into that fix:
 
-- [ ] **A failed request can show two error toasts (plan.md §794.1)** — found on the
-      Users "Create user" failure and the Updates "Check now"/"Update now" failure,
-      independently, on two unrelated components. Root cause confirmed:
-      `api-error.interceptor.ts` toasts any failing request unless its
-      `HttpContext` sets `SKIP_GLOBAL_ERROR_HANDLING`, and re-throws either way — a
-      component that *also* toasts in its own `subscribe`'s `error` handler (for a
-      better message than the interceptor's generic one) gets both.
-      `operations.service.ts`'s `getSelfUpdateStatus`/`getLastSuccessfulBackup`
-      already set the flag correctly; `checkForSelfUpdate`/`triggerSelfUpdate` and
-      the Users create-user call don't. Ten files in `frontend/src/app` match the
-      shape `toast.error(extractErrorMessage(...))` inside a subscribe error
-      handler — check each one's call site for the flag before assuming it's fine.
+- [ ] **A failed request can still show a toast and an inline message together
+      (plan.md §795)** — a smaller, related leftover from fixing the double-toast
+      bug: Settings' and Backups' destination-save forms, and Account's TOTP
+      enrolment, show their own error inline (not via toast) but don't set
+      `SKIP_GLOBAL_ERROR_HANDLING` either, so a failure there still shows the
+      interceptor's generic toast *alongside* the specific inline one. Lower
+      urgency than two stacked toasts were — the inline message is still the
+      most visible one — but the same fix shape once someone's looking at it.
 
 ### Apps page (impeccable critique, plan.md §761)
 

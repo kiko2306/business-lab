@@ -35550,3 +35550,55 @@ while mid-way through an unrelated copy rewrite. New README item names the two
 confirmed instances and the pattern to search for in the rest.
 
 Frontend 177 tests, build clean. Version bump: see CHANGELOG.
+
+## 795. §794.1's double-toast bug, fixed across every confirmed call site
+
+Flagged, not fixed, in §794.1 — "ten files... check each one's call site for the flag
+before assuming it's fine." Did that check now rather than leave it as a loose end.
+
+Went through all ten files' `toast.error(extractErrorMessage(...))` call sites one by
+one against `operations.service.ts`/`settings.service.ts`, distinguishing two different
+problems that look similar: a request whose failure shows **two toasts** (the bug), and
+one that shows a toast *and* an inline feedback message (Settings' and Backups'
+destination forms, Account's TOTP flow) — a different, lower-urgency smell that wasn't
+what was reported or scoped, and stays untouched.
+
+28 call sites across six components had the real bug, all through
+`operations.service.ts` (`settings.service.ts`'s equivalents all route through inline
+feedback already, confirmed by grep — no changes needed there):
+
+- **Users** (8): `listUsers`, `createUser`, `resendInvite`, `updateUserAccess`,
+  `updateUserRoles`, `updateUserCapabilities`, `updateUserPassword`, `deleteUser`.
+- **Backups** (6): `listBackups`, `createBackup`, `restoreBackup`, `downloadBackup`,
+  `getBackupSchedule`, `updateBackupSchedule`.
+- **Service cards** (9): `getServiceEnv`, `updateServiceEnv`, `getAutheliaAdminUser`,
+  `updateAutheliaAdminUser`, `listAppBackups`, `createAppBackup`, `restoreAppBackup`,
+  `deleteAppBackup`, `downloadAppBackup`.
+- **Audit logs** (2): `getAuditLogs`, `downloadAuditCsv`.
+- **Utils** (1): `scanNetwork`.
+- **Updates** (2): `checkForSelfUpdate`, `triggerSelfUpdate` (the exact pair §794.1 was
+  found on).
+
+Confirmed, method by method, that each has exactly one caller — the component with its
+own toast — before adding `SKIP_GLOBAL_ERROR_HANDLING`; a method with any other caller
+relying on the global toast's visibility would have needed that caller given its own
+handling first, not just the flag. None did.
+
+Left alone on purpose: `listAppAccessOptions` and the Users page's own
+`getMailSettings` check both fail silently already (no toast at all, by design — "a
+soft failure, user creation still works"); flagging those would change nothing visible
+and isn't what was broken. `getTotpStatus`/`setupTotp`/`activateTotp`/`disableTotp`
+(Account) and every Settings/Backups-destination save use inline feedback, not a
+toast — the toast-plus-inline duplication they might still have is the other, deferred
+problem, not this one.
+
+Test-first: no test file for `operations.service.ts` existed at all (28 methods, zero
+coverage) — new `operations.service.spec.ts` uses `HttpTestingController` to assert
+`SKIP_GLOBAL_ERROR_HANDLING` on all 28 fixed calls in one pass, table-driven rather than
+28 near-identical `it` blocks. Caught its own bug immediately: the three blob-response
+downloads (`downloadAuditCsv`, `downloadBackup`, `downloadAppBackup`) can't `flush({})`
+— fixed the test, not the production code, once that was clear. Verified live: the
+same `docker-compose.test.yml` REPO_ROOT-missing failure that showed two stacked error
+cards in §794.1's screenshot now shows exactly one.
+
+Frontend 205 tests (177 + 28 new), build clean. Version bump: see CHANGELOG.
