@@ -30,3 +30,56 @@
     white-space: nowrap;
   }
 }
+
+/* The one figure the page exists to show. Fluid rather than stepped: the
+   reader is at arm's length in a shop, and a phone and a wall screen want
+   different sizes of the same number. */
+.hero-value {
+  font-size: clamp(2.5rem, 9vw, 3.5rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The comparison sentence. Colour reinforces the words; it never carries them
+   on its own — the direction is written out either way. */
+.hero-compare {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.hero-compare.up {
+  color: var(--bs-success-text-emphasis);
+}
+
+.hero-compare.down {
+  color: var(--bs-danger-text-emphasis);
+}
+
+.counters-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+}
+
+.counters-toggle .chevron {
+  transition: transform 0.15s ease;
+}
+
+.counters-toggle .chevron.open {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .counters-toggle .chevron {
+    transition: none;
+  }
+}
+

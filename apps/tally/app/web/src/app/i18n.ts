@@ -119,6 +119,12 @@ const PT: Record<string, string> = {
   "Its agent is not connected, so there are no live figures to show. Nothing is displayed rather than showing the last known numbers as though they were current. It reconnects by itself once the shop's machine and network are back.":
     'O agente não está ligado, por isso não há valores em direto para mostrar. Não se mostra nada em vez de apresentar os últimos valores conhecidos como se fossem atuais. Volta a ligar-se sozinho assim que a máquina e a rede da loja estiverem de volta.',
   'Invoiced': 'Faturado',
+  'Taken today': 'Faturado hoje',
+  'Day counters': 'Contadores do dia',
+  '{amount} more than last {weekday}': '{amount} acima de {weekday} passado',
+  '{amount} less than last {weekday}': '{amount} abaixo de {weekday} passado',
+  'The same as last {weekday}': 'Igual a {weekday} passado',
+  'No figures for last {weekday}': 'Sem valores de {weekday} passado',
   'Open tabs': 'Contas abertas',
   'Forecast': 'Previsto',
   'Tables in use': 'Mesas em uso',

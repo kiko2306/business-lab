@@ -5,7 +5,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../api.service';
 import { BarChartComponent, BarDatum } from '../charts/bar-chart.component';
 import { HourlyChartComponent } from '../charts/hourly-chart.component';
-import { TPipe, t } from '../i18n';
+import { TPipe, numberLocale, t } from '../i18n';
+import { Comparison, comparableTotal, comparisonDate, describeComparison } from './comparison';
 import { AgentPackage, Overview, ShopTable, SoldItemsView, Store, TablesView } from '../models';
 
 type Tab = 'tables' | 'items';
@@ -44,6 +45,10 @@ export class ShopComponent implements OnInit, OnDestroy {
   offline = false;
   error = '';
   openTable: number | null = null;
+  /** "€412 more than last Saturday", or null until the reference day resolves. */
+  comparison: Comparison | null = null;
+  /** The six Wintouch counters: reference, not the answer, so they start folded. */
+  countersOpen = false;
 
   private timer?: ReturnType<typeof setInterval>;
 
@@ -87,6 +92,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     if (this.date && this.tab === 'tables') this.tab = 'items';
     this.overview = null;
     this.soldItems = null;
+    this.comparison = null;
     this.refresh();
   }
 
@@ -100,6 +106,7 @@ export class ShopComponent implements OnInit, OnDestroy {
         this.offline = false;
         this.error = '';
         this.loading = false;
+        this.loadComparison(overview);
       },
       error: (err) => this.fail(err),
     });
@@ -115,6 +122,36 @@ export class ShopComponent implements OnInit, OnDestroy {
         error: (err) => this.fail(err),
       });
     }
+  }
+
+  /**
+   * Fetch the same weekday a week back and phrase the difference.
+   *
+   * A running day is compared only up to the hour it has reached — holding a
+   * morning's takings against last week's whole day reads as a collapse. A
+   * failure here is silent on purpose: the comparison is an extra, and a shop
+   * owner who cannot reach last week should still see today.
+   */
+  private loadComparison(today: Overview): void {
+    const reference = comparisonDate(today.businessDate);
+    if (!reference) {
+      this.comparison = null;
+      return;
+    }
+    const uptoHour = today.archive ? null : (today.hourly ?? []).reduce((max, h) => Math.max(max, h.hour), -1);
+    this.api.overview(this.storeId, reference).subscribe({
+      next: (past) => {
+        this.comparison = describeComparison(
+          today.totals.invoiced,
+          comparableTotal(past, uptoHour !== null && uptoHour >= 0 ? uptoHour : null),
+          reference,
+          numberLocale
+        );
+      },
+      error: () => {
+        this.comparison = describeComparison(today.totals.invoiced, null, reference, numberLocale);
+      },
+    });
   }
 
   /** Largest first: the comparison is the point, so rank carries it. */

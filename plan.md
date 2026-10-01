@@ -36191,3 +36191,42 @@ the dashboard's is, run in the existing `business-lab-frontend-test` image (node
 Chrome already installed), with a CI job beside the api one. If that install proves heavy, the
 fallback is a bounded Playwright round per commit plus a README beta item, and this section gets
 an addendum saying so.
+
+### 806.1 — the hero figure and the comparison (items 1 and 2)
+
+The shop day view now opens with the figure it exists to show. `Taken today` (`Faturado hoje`)
+at `clamp(2.5rem, 9vw, 3.5rem)` — 56px on a desktop, 40px on a phone, measured in a real
+Chromium — with `Previsto` as its subline, then a three-up row for the running moment (open
+tabs, tables, guests). The six Wintouch counters sit behind a `Day counters` / `Contadores do
+dia` toggle, folded by default: they are reference, not the answer, and they were nine-elevenths
+of why the page had no focal point.
+
+**The comparison is the half that needed thinking.** "€412.18 more than last Saturday", in
+words, with the arrow reinforcing rather than carrying it. Three decisions:
+
+- **Same weekday a week back**, not yesterday: a shop compares Saturdays to Saturdays.
+- **Invoiced, not forecast.** A closed day has no open tabs, so invoiced is the only figure
+  that exists on both sides.
+- **Cut to the hour already reached** (`comparableTotal`). This is the trap the whole feature
+  turns on: at 14:00 today's takings are two-thirds of a day, and holding them against last
+  week's *whole* day reads as a collapse. The stubbed data makes it concrete — last Saturday
+  finished on €5,200 but stood at €4,170 by 14:00, so the honest sentence is "€412.18 more",
+  not "€617.82 less". Both sides are summed from `hourly`, which both responses already carry.
+  A closed day compares whole-to-whole.
+
+No API work: `shopRoutes` is a pure relay that already takes `?date=`, so this is a second
+client-side `overview` call. It fails silently on purpose — the comparison is an extra, and an
+owner who cannot reach last week should still see today; when the reference day is missing or
+unreadable the sentence says so ("No figures for last Saturday") rather than inventing a delta.
+
+22 specs: `comparison.spec.ts` covers the date arithmetic across month and year boundaries, the
+hour-cut, the sub-cent "level" case and the Portuguese weekday; `shop.component.spec.ts` renders
+the component against a stubbed API and asserts the hero exists, the sentence appears with its
+direction class, the running-day cut is applied, the failure case degrades, the counters fold,
+and a closed day drops the running-moment row.
+
+Verified in a browser as well: built, served against a stub API, screenshotted at 1440×1000 and
+390×900 in both themes — hero 56px/40px, no horizontal overflow. That render also confirmed two
+of the critique's findings first-hand: the native date input shows `10/03/2026` (US order) two
+lines under `Business day 03/10/2026`, and the secondary labels are visibly dim. Both are items
+3 and 4 below.

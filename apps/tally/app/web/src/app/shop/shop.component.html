@@ -51,56 +51,75 @@
 } @else if (loading && !overview) {
   <p class="text-secondary">{{ 'Loading…' | t }}</p>
 } @else if (overview) {
-  <!-- Current magnitude, so a figure rather than a chart: there is no series
-       and no time axis to plot. -->
-  <div class="row g-3 mb-4">
-    <div class="col-6 col-lg-3">
-      <div class="card stat-card h-100">
-        <div class="card-body">
-          <p class="stat-label text-secondary mb-1">{{ 'Invoiced' | t }}</p>
-          <p class="stat-value mb-0">{{ overview.totals.invoiced | currency: 'EUR' }}</p>
-        </div>
-      </div>
+  <!-- The answer, then everything else. This page used to open with eleven
+       identically-weighted tiles, so the figure the owner came for was one
+       cell in a grid (plan.md §806). -->
+  <div class="card stat-card hero mb-3">
+    <div class="card-body">
+      <p class="stat-label text-secondary mb-1">{{ (overview.archive ? 'Invoiced' : 'Taken today') | t }}</p>
+      <p class="hero-value mb-0">{{ overview.totals.invoiced | currency: 'EUR' }}</p>
+      @if (!overview.archive) {
+        <p class="small text-secondary mb-0">{{ 'Forecast' | t }} {{ forecast | currency: 'EUR' }}</p>
+      }
+      <!-- The words carry the comparison; the arrow only reinforces them. -->
+      @if (comparison) {
+        <p class="hero-compare mb-0 mt-2" [class.up]="comparison.direction === 'up'"
+           [class.down]="comparison.direction === 'down'">
+          @if (comparison.direction === 'up') { <span aria-hidden="true">&#9650;</span> }
+          @if (comparison.direction === 'down') { <span aria-hidden="true">&#9660;</span> }
+          {{ comparison.text }}
+        </p>
+      }
     </div>
-    <!-- Open tabs, tables and guests are the running moment: a closed day has none. -->
-    @if (!overview.archive) {
-    <div class="col-6 col-lg-3">
-      <div class="card stat-card h-100">
-        <div class="card-body">
-          <p class="stat-label text-secondary mb-1">{{ 'Open tabs' | t }}</p>
-          <p class="stat-value mb-0">{{ overview.totals.open | currency: 'EUR' }}</p>
-          <p class="small text-secondary mb-0">{{ 'Forecast' | t }} {{ forecast | currency: 'EUR' }}</p>
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-lg-3">
-      <div class="card stat-card h-100">
-        <div class="card-body">
-          <p class="stat-label text-secondary mb-1">{{ 'Tables in use' | t }}</p>
-          <p class="stat-value mb-0">
-            {{ overview.tables.occupied }}<span class="fs-6 text-secondary">
-              / {{ overview.tables.occupied + overview.tables.free + overview.tables.awaitingPayment }}</span>
-          </p>
-          <p class="small text-secondary mb-0">{{ overview.tables.awaitingPayment }} {{ 'awaiting payment' | t }}</p>
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-lg-3">
-      <div class="card stat-card h-100">
-        <div class="card-body">
-          <p class="stat-label text-secondary mb-1">{{ 'Guests in' | t }}</p>
-          <p class="stat-value mb-0">{{ overview.clients.present }}</p>
-        </div>
-      </div>
-    </div>
-    }
   </div>
+
+  <!-- The running moment, beside the answer rather than competing with it. A
+       closed day has no open tabs, tables or guests. -->
+  @if (!overview.archive) {
+    <div class="row g-3 mb-4">
+      <div class="col-4">
+        <div class="card stat-card h-100">
+          <div class="card-body">
+            <p class="stat-label text-secondary mb-1">{{ 'Open tabs' | t }}</p>
+            <p class="stat-value mb-0">{{ overview.totals.open | currency: 'EUR' }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="card stat-card h-100">
+          <div class="card-body">
+            <p class="stat-label text-secondary mb-1">{{ 'Tables in use' | t }}</p>
+            <p class="stat-value mb-0">
+              {{ overview.tables.occupied }}<span class="fs-6 text-secondary">
+                / {{ overview.tables.occupied + overview.tables.free + overview.tables.awaitingPayment }}</span>
+            </p>
+            <p class="small text-secondary mb-0">{{ overview.tables.awaitingPayment }} {{ 'awaiting payment' | t }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="card stat-card h-100">
+          <div class="card-body">
+            <p class="stat-label text-secondary mb-1">{{ 'Guests in' | t }}</p>
+            <p class="stat-value mb-0">{{ overview.clients.present }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
 
   <!-- Wintouch's own day counters, beside the takings. Each was reproduced against
        Wintouch's dashboard on the running day (§683). Hidden for an agent that
        does not send them yet. -->
   @if (overview.stats) {
-    <div class="row g-3 mb-4">
+    <h3 class="h6 mb-2">
+      <button type="button" class="counters-toggle" [attr.aria-expanded]="countersOpen"
+              (click)="countersOpen = !countersOpen">
+        <span class="chevron" [class.open]="countersOpen" aria-hidden="true">&#9656;</span>
+        {{ 'Day counters' | t }}
+      </button>
+    </h3>
+    <div class="row g-3 mb-4" [hidden]="!countersOpen">
       <div class="col-6 col-lg-2">
         <div class="card stat-card h-100">
           <div class="card-body">
