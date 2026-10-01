@@ -19,17 +19,14 @@
           <dd class="col-sm-8 font-monospace">v{{ s.appVersion }}</dd>
 
           <ng-container *ngIf="s.check as check">
-            <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.currentCommit' | t }}</dt>
-            <dd class="col-sm-8 font-monospace">{{ check.currentCommit.slice(0, 12) }}</dd>
-
-            <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.latestOn' | t:{ branch: check.branch } }}</dt>
-            <dd class="col-sm-8 font-monospace">{{ check.remoteCommit.slice(0, 12) }}</dd>
-
+            <!-- The raw commit hashes this used to show here were never
+                 meaningful to a non-technical reader — removed rather than
+                 translated (found during an audit, plan.md §791, §794). -->
             <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.statusLabel' | t }}</dt>
             <dd class="col-sm-8">
               <span *ngIf="check.commitsBehind === 0" class="badge text-bg-success">{{ 'selfUpdate.upToDate' | t }}</span>
               <span *ngIf="check.commitsBehind > 0" class="badge text-bg-warning">
-                {{ (check.commitsBehind === 1 ? 'selfUpdate.commitsBehind.one' : 'selfUpdate.commitsBehind.other') | t:{ count: check.commitsBehind } }}
+                {{ (check.commitsBehind === 1 ? 'selfUpdate.updatesAvailable.one' : 'selfUpdate.updatesAvailable.other') | t:{ count: check.commitsBehind } }}
               </span>
             </dd>
 

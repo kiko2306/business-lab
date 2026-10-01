@@ -35483,3 +35483,70 @@ of Audit logs) were already built to the same plain-language, correctly-degradin
 standard as everything audited before them. Nothing to add to the README from this
 section; §790's two still-open items and §792's beta-test item stand as the only
 outstanding threads from this run of audits.
+
+## 794. Updates page: the deferred commit-hash rewrite, finished
+
+§791 fixed the title/subtitle and deliberately left the rest — "a real design pass,
+not a wording swap" — because the panel body still showed raw commit hashes and
+"N commits behind", and the in-progress alert still said "Pulling…"/"Building the
+images that changed…". Did that pass now: what does "is my box current" need to say
+to someone who's never heard of a commit?
+
+**Removed outright**: the "Current commit" / "Latest on {{branch}}" `<dt>/<dd>` rows
+and their two translation keys, in both languages. A commit hash has never meant
+anything to the product's actual audience (PRODUCT.md: a non-technical small-business
+operator), and nothing else on the page needs them — `Status` already carries the
+real answer.
+
+**Reworded, not removed** — `Status`'s own badge: `selfUpdate.commitsBehind.one/other`
+("{{count}} commit(s) behind") → `selfUpdate.updatesAvailable.one/other` ("{{count}}
+update(s) available"), matching the page's own "Update now" button language instead
+of git's. The five `selfUpdate.progress.*` in-flight messages — "Pulling the latest
+code…", "Building the images that changed…", "Pulling and recreating the apps that
+changed…", "Restarting the frontend…" / "…the backend…" — became "Downloading the
+latest version…", "Getting the update ready…", "Updating the apps that changed…",
+and "Restarting the dashboard…" for both of the last two (a user doesn't experience
+"frontend" and "backend" as different things; showing the same sentence for both
+restart phases in sequence reads as continued progress, not a duplicate). The confirm
+dialog before triggering an update — "Pull {{count}} commit(s) and rebuild + restart
+the dashboard now?" — became "Install {{count}} update(s) now?\nThe dashboard will be
+briefly unavailable while it restarts."
+
+One more leftover jargon string found while sweeping the full namespace (not part of
+the original quote, but the same bug): `selfUpdate.toast.alreadyUpToDate` read
+"Already up to date — nothing to pull." in English only (pt-PT already said "nada
+para obter"); now "nothing to install."
+
+Test-first: widened `self-update-strings.spec.ts` from the three keys §791 scoped it
+to into a namespace-wide guard over every `selfUpdate.*` string (the premise for the
+narrow scope — "the commit-detail block's keys are supposed to say commit until that
+rewrite happens" — no longer holds), plus explicit checks that the two removed keys
+are gone and that the new count keys exist with `{{count}}` wired through. Verified
+live: the panel now shows only `Running version` / `Status`, no hash anywhere;
+triggering "Check now" against this stack's expected `REPO_ROOT`-missing error
+confirmed the rest of the page (buttons, error alert) renders unchanged.
+
+### 794.1 A second real bug, found verifying this one: toasts double up
+
+Triggering that same "Check now" failure showed **two** identical error toasts
+stacked on screen. Not new to this change — reproduced it independently minutes
+earlier on the Users page's "Create user" failure too, a completely unrelated
+component. Read `api-error.interceptor.ts` to find out why: it shows its own toast
+for any failing request *unless* that request's `HttpContext` carries
+`SKIP_GLOBAL_ERROR_HANDLING` — and it re-throws the error either way, so a component
+that also calls `toast.error(extractErrorMessage(...))` in its own `subscribe`'s
+`error` handler (for a more specific message than the interceptor's generic one)
+gets both: the interceptor's generic toast *and* its own specific one. Confirmed at
+the two call sites that produced it (`OperationsService.checkForSelfUpdate` /
+`triggerSelfUpdate`, and the Users page's create-user call) — neither request's
+`HttpContext` sets the skip flag. `operations.service.ts` already has the fix's own
+precedent sitting right next to the broken ones: `getSelfUpdateStatus` and
+`getLastSuccessfulBackup` *do* set it, for exactly this reason.
+
+Not fixed here — ten files in `frontend/src/app` match the shape ("component calls
+`toast.error(extractErrorMessage(...))` in a subscribe error handler"), and checking
+each one's call site for the flag, correctly, is its own pass, not a line to change
+while mid-way through an unrelated copy rewrite. New README item names the two
+confirmed instances and the pattern to search for in the rest.
+
+Frontend 177 tests, build clean. Version bump: see CHANGELOG.
