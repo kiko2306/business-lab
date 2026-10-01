@@ -16,15 +16,15 @@
   </section>
 
   <section class="summary-grid mb-3" *ngIf="serviceState.summary$ | async as summary">
-    <button type="button" class="summary-card text-start" [class.active]="stateFilter === 'running'" [attr.aria-pressed]="stateFilter === 'running'" (click)="toggleStateFilter('running')">
+    <button type="button" class="summary-card text-start" [class.active]="stateFilter() === 'running'" [attr.aria-pressed]="stateFilter() === 'running'" (click)="toggleStateFilter('running')">
       <span class="summary-label text-success">{{ 'apps.summary.running' | t }}</span>
       <strong>{{ summary.running }}</strong>
     </button>
-    <button type="button" class="summary-card text-start" [class.active]="stateFilter === 'stopped'" [attr.aria-pressed]="stateFilter === 'stopped'" (click)="toggleStateFilter('stopped')">
+    <button type="button" class="summary-card text-start" [class.active]="stateFilter() === 'stopped'" [attr.aria-pressed]="stateFilter() === 'stopped'" (click)="toggleStateFilter('stopped')">
       <span class="summary-label text-secondary">{{ 'apps.summary.stopped' | t }}</span>
       <strong>{{ summary.stopped }}</strong>
     </button>
-    <button type="button" class="summary-card text-start" [class.active]="stateFilter === 'error'" [attr.aria-pressed]="stateFilter === 'error'" (click)="toggleStateFilter('error')">
+    <button type="button" class="summary-card text-start" [class.active]="stateFilter() === 'error'" [attr.aria-pressed]="stateFilter() === 'error'" (click)="toggleStateFilter('error')">
       <span class="summary-label text-danger">{{ 'apps.summary.issues' | t }}</span>
       <strong>{{ summary.error }}</strong>
     </button>
@@ -55,11 +55,12 @@
             class="form-control"
             [placeholder]="'apps.search.placeholder' | t"
             [attr.aria-label]="'apps.search.ariaLabel' | t"
-            [(ngModel)]="appFilter"
+            [ngModel]="appFilter()"
+            (ngModelChange)="appFilter.set($event)"
             maxlength="64"
           />
           <button
-            *ngIf="appFilter"
+            *ngIf="appFilter()"
             type="button"
             class="btn btn-outline-secondary"
             (click)="clearAppFilter()"
@@ -68,11 +69,14 @@
           </button>
         </div>
 
-        <ng-container *ngIf="filterServices(services, appFilter, stateFilter) as matches">
-          <p *ngIf="!matches.length" class="text-body-secondary">
-            {{ (appFilter.trim() ? 'apps.search.noMatches' : 'apps.search.noneInState') | t:{ query: appFilter } }}
+        <!-- One subscription each for the two per-row inputs: they were inside
+             the row binding, so the page opened ~50 subscriptions to each of
+             the same two observables and re-made them on every re-render. -->
+        <ng-container *ngIf="{ operating: serviceState.operating$ | async, hostLanIp: serviceState.hostLanIp$ | async } as shared">
+          <p *ngIf="!matchCount()" class="text-body-secondary">
+            {{ (appFilter().trim() ? 'apps.search.noMatches' : 'apps.search.noneInState') | t:{ query: appFilter() } }}
           </p>
-          <div class="service-group mb-4" *ngFor="let group of groupServicesByCategory(matches); trackBy: trackByCategory">
+          <div class="service-group mb-4" *ngFor="let group of groups(); trackBy: trackByCategory">
             <h3 class="h6 text-body-secondary text-uppercase mb-2">
               <button
                 type="button"
@@ -93,8 +97,8 @@
                 *ngFor="let service of group.services; trackBy: trackByService"
                 [service]="service"
                 [allServices]="services"
-                [loadingAction]="(serviceState.operating$ | async)?.[service.name] ?? null"
-                [hostLanIp]="serviceState.hostLanIp$ | async"
+                [loadingAction]="shared.operating?.[service.name] ?? null"
+                [hostLanIp]="shared.hostLanIp"
                 (actionRequested)="handleAction(service.name, $event)"
                 (startWithNeedsRequested)="startWithNeeds(service.name)"
               ></app-service-card>

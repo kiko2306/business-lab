@@ -822,3 +822,59 @@ describe('ServiceCardComponent port fields', () => {
     expect(save?.disabled ?? true).toBeTrue();
   });
 });
+
+// Dependency rows are read several times per change-detection pass (the chips,
+// the blocked-start reason, the degraded note, the Start button's disabled
+// state), and each read used to scan the whole service list once per declared
+// dependency. On a 50-app box, with 50 cards on screen, that is tens of
+// thousands of comparisons per mouse move.
+describe('ServiceCardComponent dependency resolution', () => {
+  let fixture: ComponentFixture<ServiceCardComponent>;
+  let component: ServiceCardComponent;
+
+  const all = [
+    service('authelia', 'running'),
+    service('tailscale', 'stopped'),
+    ...Array.from({ length: 48 }, (_, i) => service(`filler-${i}`, 'running')),
+  ];
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [ServiceCardComponent],
+      providers: [
+        { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+        { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ServiceCardComponent);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('service', service('netbird-vpn', 'stopped', { dependsOn: ['authelia'], requires: ['tailscale'] }));
+    fixture.componentRef.setInput('allServices', all);
+    fixture.detectChanges();
+  });
+
+  it('resolves the list once and reuses it', () => {
+    const first = component.dependencies();
+    fixture.detectChanges();
+    expect(component.dependencies()).toBe(first);
+    expect(component.dependencies().map((d) => d.name)).toEqual(['authelia', 'tailscale']);
+  });
+
+  it('re-resolves when a dependency changes state', () => {
+    const first = component.dependencies();
+    fixture.componentRef.setInput('allServices', [service('authelia', 'running'), service('tailscale', 'running')]);
+    fixture.detectChanges();
+    expect(component.dependencies()).not.toBe(first);
+    expect(component.dependencies().every((d) => d.running)).toBeTrue();
+  });
+
+  it('re-resolves when the card is handed a different app', () => {
+    const first = component.dependencies();
+    fixture.componentRef.setInput('service', service('vaultwarden', 'running', { dependsOn: ['authelia'] }));
+    fixture.detectChanges();
+    expect(component.dependencies()).not.toBe(first);
+    expect(component.dependencies().map((d) => d.name)).toEqual(['authelia']);
+  });
+});

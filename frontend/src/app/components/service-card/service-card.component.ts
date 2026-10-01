@@ -460,7 +460,26 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
    * the app does without stopping it from coming up, so they are shown and
    * warned about but never gate the button.
    */
+  /**
+   * Resolved once per input change, not per call. The template reads this
+   * through four different helpers, each read scanned the whole service list
+   * once per declared dependency, and change detection runs on every event —
+   * so a 50-app box was doing tens of thousands of comparisons per mouse move.
+   */
   dependencies(): DependencyState[] {
+    // Keyed on the two inputs by identity rather than on ngOnChanges: a status
+    // payload replaces both objects, so this recomputes exactly when the
+    // answer can have changed, and it cannot go stale if something assigns an
+    // input directly.
+    if (!this.resolved || this.resolved.service !== this.service || this.resolved.all !== this.allServices) {
+      this.resolved = { service: this.service, all: this.allServices, deps: this.resolveDependencies() };
+    }
+    return this.resolved.deps;
+  }
+
+  private resolved?: { service: ServiceStatus; all: ServiceStatus[]; deps: DependencyState[] };
+
+  private resolveDependencies(): DependencyState[] {
     const resolve = (names: string[] | undefined, blocking: boolean): DependencyState[] =>
       (names ?? []).map((name) => {
         const dep = this.allServices.find((s) => s.name === name);

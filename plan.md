@@ -35911,3 +35911,47 @@ product, the no-title fallback, and the language switch), and `pages/a11y-labels
 which renders Audit logs, Recovery and Users and asserts **every** control has a name from a
 label, `aria-label` or a wrapping label — so the next unlabelled input fails the build rather
 than waiting for the next audit.
+
+## 802. §801's audit, part 2: optimize — the work the Apps page was redoing on every event
+
+The audit scored Performance 3/4: the structure is right (all 16 routes lazy, bundle budgets
+configured and enforced, `trackBy` on the one hot list, transform-only animations), and the
+one unaddressed axis was how much work a change-detection pass does. Two real sources, both
+measured by identity rather than by eye, and both now covered by specs that fail if the work
+comes back.
+
+**The Apps page re-filtered and re-grouped ~50 services per pass.** `filterServices(...)` and
+`groupServicesByCategory(...)` were called *from the template*, so every keystroke, every
+click anywhere on the page, and every status push re-bucketed and re-ordered the whole
+registry — not only when the data or the filter moved. `appFilter` and `stateFilter` are now
+signals, the service list comes through `toSignal`, and `groups` is a `computed` the template
+reads: one run per real change, the same arrays until then. `apps.component.spec.ts` asserts
+the identity directly — the same array across repeated `detectChanges()`, a different one
+after a search, a new payload or a summary-tile filter.
+
+Two `| async` pipes also sat *inside* the per-row binding (`operating$`, `hostLanIp$`), so a
+50-app page opened ~100 subscriptions to two observables and rebuilt them on every re-render.
+They are hoisted to one wrapper that reads both once.
+
+**Dependency resolution was the expensive half, and it was hiding.** `dependencies()` does
+`allServices.find(...)` per declared dependency — a linear scan of all ~50 apps. The template
+reaches it through four helpers (`dependenciesSatisfied`, `startBlockedTitle` twice,
+`degradedTitle`, the chip list), so each card ran several full scans per pass, on 50 cards: on
+the order of tens of thousands of comparisons per mouse move. It is now resolved once and
+cached.
+
+The cache is keyed on the **identity of the two inputs**, not on `ngOnChanges`. The first
+attempt used the lifecycle hook and broke two existing specs that assign `component.service`
+directly — in production Angular always sets inputs through a binding, so the hook would have
+been correct, but a cache that silently goes stale when someone assigns a field is the wrong
+shape for a value read this often. Two reference comparisons per call cost nothing and cannot
+go stale; a status payload replaces both objects, so it recomputes exactly when the answer can
+have changed.
+
+**`OnPush` was considered and deliberately not taken.** It is the remaining 50× win and the
+audit named it. `ServiceCardComponent` holds 12 `subscribe` callbacks, two `EventSource`
+listeners and two timers that mutate component state; under `OnPush` every one of those needs
+a `markForCheck()`, and each omission is an invisible stale-UI bug that no current test would
+catch. The two fixes above remove most of the per-pass cost without that risk. A README item
+carries the rest, together with what makes it safe to attempt (the card's async state moving
+to signals first).

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.160.1] — 2026-10-01
+
+### Performance
+
+- Apps page filters and groups its services once per change instead of on every event, and each card resolves its dependencies once instead of scanning every app on every pass (plan.md §802)
+
 ## [0.160.0] — 2026-10-01
 
 ### Accessibility

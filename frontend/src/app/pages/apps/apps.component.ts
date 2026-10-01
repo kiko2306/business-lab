@@ -1,6 +1,7 @@
 import { AsyncPipe, CommonModule } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ServiceStateService } from '../../core/service-state.service';
 import { ServiceCardComponent } from '../../components/service-card/service-card.component';
@@ -31,7 +32,7 @@ function orderCategories(present: Iterable<string>): string[] {
   return CATEGORY_DISPLAY_ORDER.filter((category) => seen.has(category));
 }
 
-interface ServiceGroup {
+export interface ServiceGroup {
   category: string;
   services: ServiceStatus[];
 }
@@ -94,16 +95,30 @@ export class AppsComponent implements OnInit, OnDestroy {
   protected readonly collapse = inject(SectionCollapseService);
   protected readonly translate = inject(TranslateService);
 
-  protected readonly groupServicesByCategory = groupServicesByCategory;
-  protected readonly filterServices = filterServices;
+  protected readonly hasIssue = hasIssue;
 
   // Bound to the "All apps" search box. While it is non-empty every category
   // is force-expanded (isAppGroupCollapsed), so a match is never hidden inside
   // a collapsed section.
-  protected appFilter = '';
+  readonly appFilter = signal('');
   // Set by the Issues/Stopped summary tiles; click the active tile again to clear.
-  protected stateFilter: ServiceStatus['state'] | null = null;
-  protected readonly hasIssue = hasIssue;
+  readonly stateFilter = signal<ServiceStatus['state'] | null>(null);
+
+  private readonly services = toSignal(this.serviceState.services$, { initialValue: [] as ServiceStatus[] });
+
+  /**
+   * The list the template renders. Filtering and grouping used to be two
+   * function calls *in* the template, so ~50 services were re-filtered,
+   * re-bucketed and re-ordered on every change-detection pass — every
+   * keystroke and every click anywhere on the page — rather than when the data
+   * or the filter actually moved. As a computed it runs once per real change
+   * and hands back the same arrays until then.
+   */
+  readonly groups = computed<ServiceGroup[]>(() =>
+    groupServicesByCategory(filterServices(this.services() ?? [], this.appFilter(), this.stateFilter()))
+  );
+
+  readonly matchCount = computed(() => this.groups().reduce((total, group) => total + group.services.length, 0));
 
   ngOnInit(): void {
     this.serviceState.startPolling();
@@ -148,11 +163,13 @@ export class AppsComponent implements OnInit, OnDestroy {
   // group.
   isAppGroupCollapsed(key: string, services: ServiceStatus[] = []): boolean {
     // A failed app is what the owner most needs to see: never hide it.
-    return this.appFilter.trim() || this.stateFilter || hasIssue(services) ? false : this.collapse.isCollapsed(key);
+    return this.appFilter().trim() || this.stateFilter() || hasIssue(services)
+      ? false
+      : this.collapse.isCollapsed(key);
   }
 
   toggleStateFilter(state: 'running' | 'error' | 'stopped'): void {
-    this.stateFilter = this.stateFilter === state ? null : state;
+    this.stateFilter.update((current) => (current === state ? null : state));
   }
 
   toggleAppGroup(key: string): void {
@@ -160,7 +177,7 @@ export class AppsComponent implements OnInit, OnDestroy {
   }
 
   clearAppFilter(): void {
-    this.appFilter = '';
-    this.stateFilter = null;
+    this.appFilter.set('');
+    this.stateFilter.set(null);
   }
 }

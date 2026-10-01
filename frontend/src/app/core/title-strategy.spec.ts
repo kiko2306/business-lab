@@ -23,6 +23,13 @@ describe('AppTitleStrategy', () => {
   // Every route used to leave the tab, the history entry and the screen-reader
   // announcement on navigation reading "Business Lab" — nothing said which
   // page had loaded.
+  // The locale is persisted, so a spec that switches it has to put it back —
+  // otherwise every later spec in the run reads pt-PT strings.
+  afterEach(() => {
+    translate.setLocale('en');
+    localStorage.clear();
+  });
+
   it('names the page, then the product', () => {
     strategy.updateTitle(snapshotWithTitle('shell.nav.apps'));
     TestBed.flushEffects();

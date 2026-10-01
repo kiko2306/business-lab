@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.160.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.160.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,6 +212,16 @@ it is done — not ticked off and left behind. Section references point at
 Done one page at a time, test first, each its own commit and version bump. A finished
 item is deleted.
 
+- [ ] **Put the service card on `OnPush` (plan.md §802)** — the last of the
+      audit's performance findings, and the 50x one: with 50 cards on a page,
+      every card's bindings are re-checked on every event. It was left out
+      because the card mutates state from 12 `subscribe` callbacks, two
+      `EventSource` listeners and two timers, and each one needs a
+      `markForCheck()` under `OnPush` — a missed one is a silently stale card
+      that no test catches. Do it by moving that async state to signals first
+      (which mark automatically), then flip the strategy; the existing card
+      specs plus a new one that asserts a late-arriving backup list still
+      renders are what makes it provable.
 - [ ] **Beta-test that a config save leaves allocated ports alone (plan.md §800)** —
       the Settings panel no longer shows or submits `*_PORT` fields. On `beta`,
       open an app that has both a port and a real setting (Vaultwarden, ntfy),
