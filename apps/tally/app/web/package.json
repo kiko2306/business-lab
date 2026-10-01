@@ -5,7 +5,8 @@
   "scripts": {
     "build": "ng build",
     "start": "ng serve",
-    "test": "ng test --watch=false --browsers=ChromeHeadless"
+    "test": "ng test",
+    "test:ci": "ng test --no-watch --no-progress --browsers=ChromeHeadlessCI"
   },
   "dependencies": {
     "@angular/common": "^18.2.0",
@@ -24,7 +25,15 @@
     "@angular-devkit/build-angular": "^18.2.0",
     "@angular/cli": "^18.2.0",
     "@angular/compiler-cli": "^18.2.0",
+    "@types/jasmine": "~5.1.0",
     "chokidar": "^3.6.0",
+    "jasmine-core": "~5.1.0",
+    "karma": "~6.4.0",
+    "karma-chrome-launcher": "~3.2.0",
+    "karma-coverage": "~2.2.0",
+    "karma-jasmine": "~5.1.0",
+    "karma-jasmine-html-reporter": "~2.1.0",
+    "puppeteer": "~23.0.0",
     "typescript": "~5.5.4"
   }
 }

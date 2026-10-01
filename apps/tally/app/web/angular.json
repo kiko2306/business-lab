@@ -16,7 +16,13 @@
             "index": "src/index.html",
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
-            "assets": [{ "glob": "**/*", "input": "src/pwa", "output": "/" }],
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "src/pwa",
+                "output": "/"
+              }
+            ],
             "styles": [
               "src/theme.css",
               "src/styles.css"
@@ -61,6 +67,29 @@
             }
           },
           "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular-devkit/build-angular:karma",
+          "options": {
+            "polyfills": [
+              "zone.js",
+              "zone.js/testing"
+            ],
+            "tsConfig": "tsconfig.spec.json",
+            "karmaConfig": "karma.conf.js",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "src/pwa",
+                "output": "/"
+              }
+            ],
+            "styles": [
+              "src/theme.css",
+              "src/styles.css"
+            ],
+            "scripts": []
+          }
         }
       }
     }

@@ -254,6 +254,8 @@ jobs:
           cache-dependency-path: apps/tally/app/web/package-lock.json
       - run: npm ci
         working-directory: apps/tally/app/web
+      - run: npm run test:ci
+        working-directory: apps/tally/app/web
       - run: npm run build
         working-directory: apps/tally/app/web
 
