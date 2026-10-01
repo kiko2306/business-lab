@@ -35440,3 +35440,46 @@ tests + typecheck, frontend 175 tests, both clean.
 
 Original task — seed Users/Backups/Content and audit those populated
 states — not done yet; this finding took the session first. Still open.
+
+## 793. §792's original task, finished: populated Users/Backups/Content/Audit states
+
+With the WebSocket/SSE fix in, went back to what §790 actually set out to do —
+screenshot the states that need real data, on `docker-compose.test.yml`, driving
+everything through the real UI rather than seeding the database directly.
+
+**Users.** The Add User form is correctly gated behind two prerequisites before its
+submit button enables: a configured mailbox (invites are emailed) and a base domain
+(the invite link is built from it) — filled dummy values for both to get past the
+gate, same as any real first-time setup would need to. Account creation itself then
+failed cleanly on the Cloudflare-token/zone lookup §785 added (no real token on this
+stack) — expected, not chased further; the **Accounts** table already renders a real
+populated row for the seed admin (username, email, roles, `Created` date, Edit
+access/Reset password/Delete, the "you" badge with "You can't change your own roles"
+on the disabled checkboxes) without needing a second user at all.
+
+**Backups.** "Save settings file" and "Full Backup" both surfaced real, well-written
+error states rather than anything broken: a **Backing up app data** modal reporting
+"the backup engine has no password configured yet" in plain language, and a genuinely
+populated "Last app-database dump" row (14 of 44 apps' file-based dumps succeeded
+without Docker access; the Kopia snapshot step after them correctly didn't). The
+Backups page has clearly already been built to degrade informatively — nothing here
+needed fixing.
+
+**Content.** "Generate a draft" opens into a real form (Brief textarea with a good
+example placeholder, disabled Generate button until something's typed) — did not
+submit it, since that needs a real AI provider key this session has no business
+fabricating.
+
+**Audit logs.** Every action taken above (mail/exposure settings saved, the user
+invite attempt, both backup attempts) landed as real rows — Time/User/IP/Action/
+Resource/Result, colour-coded success/failure badges, Export CSV, working
+pagination ("Showing 6 of 6"). `IP` reads `—` throughout, expected on this direct
+container-to-container test path with no real client address to forward.
+
+No new defects found in any of these four — §789–§792's earlier fixes hold up under
+real data, and the parts of the app this pass touched for the first time (Users'
+Accounts table, Backups' failure modal and dump history, Content's form, the whole
+of Audit logs) were already built to the same plain-language, correctly-degrading
+standard as everything audited before them. Nothing to add to the README from this
+section; §790's two still-open items and §792's beta-test item stand as the only
+outstanding threads from this run of audits.
