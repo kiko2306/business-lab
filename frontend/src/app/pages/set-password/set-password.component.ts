@@ -9,6 +9,7 @@ import { sanitizePastedText } from '../../core/input-sanitize';
 import { ToastService } from '../../core/toast.service';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
+import { FieldErrorDirective } from '../../components/field-error.directive';
 
 /**
  * Public landing for a `/set-password?token=…` invite link (plan.md §158).
@@ -18,7 +19,7 @@ import { TranslateService } from '../../i18n/translate.service';
 @Component({
   selector: 'app-set-password',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective],
   templateUrl: './set-password.component.html',
   styleUrl: './set-password.component.css',
 })

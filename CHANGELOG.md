@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.161.0] — 2026-10-01
+
+### Accessibility
+
+- Every inline form error now names its field for a screen reader, the alert switches and draft editors carry names, and Users' table headers have a scope (plan.md §804)
+
 ## [0.160.2] — 2026-10-01
 
 ### Changed

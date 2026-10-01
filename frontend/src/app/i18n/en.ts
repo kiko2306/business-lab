@@ -681,6 +681,7 @@ export const en: Record<string, string> = {
   'social.generatePanel.title': 'Generate a draft',
   'social.generatePanel.subtitle': 'Describe the post you want',
   'social.briefLabel': 'Brief',
+  'social.draftEditorLabel': 'Draft for: {{brief}}',
   'social.briefPlaceholder': 'e.g. Announce that our booking system now supports group reservations. Friendly, one line, one emoji.',
   'social.generateButton': 'Generate',
   'social.generating': 'Generating…',

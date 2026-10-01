@@ -75,7 +75,7 @@
         </ng-container>
         {{ 'settings.general.dashboardUrlBlank' | t }}
       </p>
-      <div class="form-text text-danger" *ngIf="generalForm.controls.dashboardUrl.touched && generalForm.controls.dashboardUrl.invalid">
+      <div class="form-text text-danger" *ngIf="generalForm.controls.dashboardUrl.touched && generalForm.controls.dashboardUrl.invalid" appFieldError="dashboardUrl">
         {{ 'settings.general.dashboardUrlError' | t }}
       </div>
     </div>
@@ -91,7 +91,7 @@
       <p class="form-text mb-0">
         {{ 'settings.general.updateBranchHint' | t:{ branch: generalSettings.defaultUpdateBranch ?? '' } }}
       </p>
-      <div class="form-text text-danger" *ngIf="generalForm.controls.updateBranch.touched && generalForm.controls.updateBranch.invalid">
+      <div class="form-text text-danger" *ngIf="generalForm.controls.updateBranch.touched && generalForm.controls.updateBranch.invalid" appFieldError="updateBranch">
         {{ 'settings.general.updateBranchError' | t }}
       </div>
     </div>
@@ -134,13 +134,18 @@
             type="checkbox"
             role="switch"
             [id]="'categoryEnabled-' + category.key"
+            [attr.aria-labelledby]="'categoryLabel-' + category.key"
             [checked]="alertSettings.enabled[category.key]"
             [disabled]="savingAlerts"
             (change)="toggleCategoryEnabled(category.key, $any($event.target).checked)"
           />
         </div>
         <div class="flex-grow-1">
-          <label class="form-label fw-semibold mb-1" [for]="'categoryTopic-' + category.key">
+          <label
+            class="form-label fw-semibold mb-1"
+            [id]="'categoryLabel-' + category.key"
+            [for]="'categoryTopic-' + category.key"
+          >
             {{ ('settings.alertCategory.' + category.key) | t }}
           </label>
           <div class="input-group input-group-sm">

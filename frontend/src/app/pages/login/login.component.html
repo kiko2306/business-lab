@@ -31,7 +31,7 @@
                 maxlength="64"
                 (paste)="sanitizePaste($event, 'username', 64)"
               />
-              <div *ngIf="form.controls.username.touched && form.controls.username.invalid" class="text-danger small mt-1">
+              <div *ngIf="form.controls.username.touched && form.controls.username.invalid" class="text-danger small mt-1" appFieldError="username">
                 {{ 'login.username.error' | t }}
               </div>
             </div>
@@ -47,7 +47,7 @@
                 maxlength="128"
                 (paste)="sanitizePaste($event, 'password', 128)"
               />
-              <div *ngIf="form.controls.password.touched && form.controls.password.invalid" class="text-danger small mt-1">
+              <div *ngIf="form.controls.password.touched && form.controls.password.invalid" class="text-danger small mt-1" appFieldError="password">
                 {{ 'login.password.error' | t }}
               </div>
             </div>
@@ -74,7 +74,7 @@
                 maxlength="32"
                 autofocus
               />
-              <div *ngIf="mfaForm.controls.code.touched && mfaForm.controls.code.invalid" class="text-danger small mt-1">
+              <div *ngIf="mfaForm.controls.code.touched && mfaForm.controls.code.invalid" class="text-danger small mt-1" appFieldError="code">
                 {{ 'login.mfa.error' | t }}
               </div>
             </div>

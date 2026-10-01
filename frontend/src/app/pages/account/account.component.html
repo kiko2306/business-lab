@@ -93,6 +93,7 @@
           />
           <div
             class="text-danger small mt-1"
+            appFieldError="activate-code"
             *ngIf="activateForm.controls.code.touched && activateForm.controls.code.invalid"
           >
             {{ 'account.enrolling.codeError' | t }}

@@ -10,11 +10,12 @@ import { isMfaChallenge } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { TranslateService } from '../../i18n/translate.service';
 import { TranslatePipe } from '../../i18n/translate.pipe';
+import { FieldErrorDirective } from '../../components/field-error.directive';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective],
   templateUrl: './login.component.html',
   styleUrl: './login.component.css'
 })

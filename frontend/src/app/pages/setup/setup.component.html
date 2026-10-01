@@ -25,7 +25,7 @@
                 maxlength="64"
                 (paste)="sanitizePaste($event, 'username', 64)"
               />
-              <div *ngIf="form.controls.username.touched && form.controls.username.invalid" class="text-danger small mt-1">
+              <div *ngIf="form.controls.username.touched && form.controls.username.invalid" class="text-danger small mt-1" appFieldError="setupUsername">
                 {{ 'setup.usernameError' | t }}
               </div>
             </div>
@@ -41,7 +41,7 @@
                 maxlength="255"
                 (paste)="sanitizePaste($event, 'email', 255)"
               />
-              <div *ngIf="form.controls.email.touched && form.controls.email.invalid" class="text-danger small mt-1">
+              <div *ngIf="form.controls.email.touched && form.controls.email.invalid" class="text-danger small mt-1" appFieldError="setupEmail">
                 {{ 'setup.emailError' | t }}
               </div>
             </div>
@@ -57,7 +57,7 @@
                 maxlength="128"
                 (paste)="sanitizePaste($event, 'password', 128)"
               />
-              <div *ngIf="form.controls.password.touched && form.controls.password.invalid" class="text-danger small mt-1">
+              <div *ngIf="form.controls.password.touched && form.controls.password.invalid" class="text-danger small mt-1" appFieldError="setupPassword">
                 {{ 'setup.passwordError' | t }}
               </div>
             </div>
@@ -73,7 +73,7 @@
                 maxlength="128"
                 (paste)="sanitizePaste($event, 'confirmPassword', 128)"
               />
-              <div *ngIf="form.controls.confirmPassword.touched && form.controls.confirmPassword.invalid" class="text-danger small mt-1">
+              <div *ngIf="form.controls.confirmPassword.touched && form.controls.confirmPassword.invalid" class="text-danger small mt-1" appFieldError="confirmPassword">
                 <span *ngIf="form.controls.confirmPassword.hasError('required')">{{ 'setup.confirmPasswordRequired' | t }}</span>
                 <span *ngIf="form.controls.confirmPassword.hasError('maxlength')">{{ 'setup.confirmPasswordTooLong' | t }}</span>
               </div>

@@ -7,6 +7,7 @@ import { extractErrorMessage } from '../../core/api';
 import { OperationsService } from '../../core/operations.service';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
+import { FieldErrorDirective } from '../../components/field-error.directive';
 
 /**
  * Public landing for a locked-out app (plan.md §463): nginx's Authelia
@@ -18,7 +19,7 @@ import { TranslateService } from '../../i18n/translate.service';
 @Component({
   selector: 'app-access-denied',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective],
   templateUrl: './access-denied.component.html',
   styleUrl: './access-denied.component.css',
 })

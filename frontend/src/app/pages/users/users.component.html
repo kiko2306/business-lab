@@ -15,7 +15,7 @@
       <div class="col-12 col-md-6">
         <label class="form-label small mb-1" for="new-user-username">{{ 'users.form.usernameLabel' | t }}</label>
         <input id="new-user-username" class="form-control" [placeholder]="'users.form.usernamePlaceholder' | t" formControlName="username" autocomplete="off" />
-        <div class="form-text text-danger" *ngIf="createForm.controls.username.touched && createForm.controls.username.invalid">
+        <div class="form-text text-danger" *ngIf="createForm.controls.username.touched && createForm.controls.username.invalid" appFieldError="new-user-username">
           {{ 'users.form.usernameError' | t }}
         </div>
       </div>
@@ -25,7 +25,7 @@
         <div class="form-text" *ngIf="createForm.controls.email.valid || !createForm.controls.email.touched">
           {{ 'users.form.emailHint' | t }}
         </div>
-        <div class="form-text text-danger" *ngIf="createForm.controls.email.touched && createForm.controls.email.invalid">
+        <div class="form-text text-danger" *ngIf="createForm.controls.email.touched && createForm.controls.email.invalid" appFieldError="new-user-email">
           {{ 'users.form.emailError' | t }}
         </div>
       </div>
@@ -43,7 +43,7 @@
             <label class="form-check-label" [for]="'new-role-' + role">{{ ('users.role.' + role) | t }}</label>
           </div>
         </div>
-        <div class="form-text text-danger" *ngIf="!newRolesValid()">{{ 'users.form.rolesError' | t }}</div>
+        <div class="form-text text-danger" role="alert" *ngIf="!newRolesValid()">{{ 'users.form.rolesError' | t }}</div>
       </div>
       <div class="col-12" *ngIf="newCapsShown()">
         <span class="form-label small fw-semibold d-block mb-1">{{ 'users.form.featuresLabel' | t }}</span>
@@ -62,7 +62,7 @@
             <label class="form-check-label" [for]="'new-cap-' + cap">{{ ('users.capability.' + cap) | t }}</label>
           </div>
         </div>
-        <div class="form-text text-danger" *ngIf="!newCapsValid()">{{ 'users.form.featuresError' | t }}</div>
+        <div class="form-text text-danger" role="alert" *ngIf="!newCapsValid()">{{ 'users.form.featuresError' | t }}</div>
       </div>
       <div class="col-12" *ngIf="appOptions.length">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
@@ -119,11 +119,11 @@
       <table class="table table-sm table-stack align-middle mb-0">
         <thead>
           <tr>
-            <th>{{ 'users.table.username' | t }}</th>
-            <th>{{ 'users.table.email' | t }}</th>
-            <th>{{ 'users.table.roles' | t }}</th>
-            <th>{{ 'users.table.created' | t }}</th>
-            <th class="text-end">{{ 'users.table.actions' | t }}</th>
+            <th scope="col">{{ 'users.table.username' | t }}</th>
+            <th scope="col">{{ 'users.table.email' | t }}</th>
+            <th scope="col">{{ 'users.table.roles' | t }}</th>
+            <th scope="col">{{ 'users.table.created' | t }}</th>
+            <th scope="col" class="text-end">{{ 'users.table.actions' | t }}</th>
           </tr>
         </thead>
         <tbody>

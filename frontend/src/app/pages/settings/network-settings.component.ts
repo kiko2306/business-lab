@@ -16,6 +16,7 @@ import { ToastService } from '../../core/toast.service';
 import { PanelComponent } from '../../components/panel/panel.component';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
+import { FieldErrorDirective } from '../../components/field-error.directive';
 
 // Trims before counting, unlike Validators.maxLength — so a value that is only
 // too long because of leading/trailing whitespace doesn't fail (plan.md §785).
@@ -34,7 +35,7 @@ function trimmedMaxLength(max: number): (control: AbstractControl) => Validation
 @Component({
   selector: 'app-network-settings',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, PanelComponent, TranslatePipe],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, PanelComponent, TranslatePipe, FieldErrorDirective],
   templateUrl: './network-settings.component.html',
   styleUrl: './network-settings.component.css',
 })

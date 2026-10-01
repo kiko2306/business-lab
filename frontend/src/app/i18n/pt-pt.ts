@@ -681,6 +681,7 @@ export const ptPT: Record<string, string> = {
   'social.generatePanel.title': 'Gerar um rascunho',
   'social.generatePanel.subtitle': 'Descreva a publicação que pretende',
   'social.briefLabel': 'Briefing',
+  'social.draftEditorLabel': 'Rascunho para: {{brief}}',
   'social.briefPlaceholder': 'ex.: Anuncie que o nosso sistema de reservas agora suporta reservas de grupo. Amigável, uma linha, um emoji.',
   'social.generateButton': 'Gerar',
   'social.generating': 'A gerar…',

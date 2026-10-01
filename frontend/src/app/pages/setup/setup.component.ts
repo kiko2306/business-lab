@@ -9,11 +9,12 @@ import { sanitizePastedText } from '../../core/input-sanitize';
 import { ToastService } from '../../core/toast.service';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
+import { FieldErrorDirective } from '../../components/field-error.directive';
 
 @Component({
   selector: 'app-setup',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective],
   templateUrl: './setup.component.html',
   styleUrl: './setup.component.css'
 })

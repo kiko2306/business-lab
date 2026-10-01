@@ -38,6 +38,7 @@
       </p>
       <textarea
         class="form-control mb-2"
+        [attr.aria-label]="'social.draftEditorLabel' | t:{ brief: draft.prompt }"
         rows="4"
         [ngModel]="edits[draft.id]"
         (ngModelChange)="edits[draft.id] = $event"

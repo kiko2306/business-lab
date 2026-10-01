@@ -432,7 +432,7 @@
           {{ 'backups.runModal.progressCount' | t:{ index: progress.index, total: progress.total } }}
         </p>
 
-        <p class="text-danger small mt-2 mb-0" *ngIf="runError">{{ runError }}</p>
+        <p class="text-danger small mt-2 mb-0" role="alert" *ngIf="runError">{{ runError }}</p>
       </div>
       <div class="backup-progress-foot" *ngIf="progress?.phase === 'done' || runError">
         <button type="button" class="btn btn-primary" (click)="closeRunModal()">{{ 'common.close' | t }}</button>
@@ -468,7 +468,7 @@
           <p class="text-body-secondary small mt-2 mb-0" *ngIf="restoringSnapshot">
             {{ 'backups.restoreModal.restoringNotice' | t }}
           </p>
-          <p class="text-danger small mt-2 mb-0" *ngIf="snapshotRestoreError">{{ snapshotRestoreError }}</p>
+          <p class="text-danger small mt-2 mb-0" role="alert" *ngIf="snapshotRestoreError">{{ snapshotRestoreError }}</p>
         </ng-container>
 
         <ng-container *ngIf="snapshotRestoreResult as result">

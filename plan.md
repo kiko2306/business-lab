@@ -36012,3 +36012,60 @@ Synthesized `TouchEvent`s do not drive Chromium's native scrolling, and Chromium
 that one needs a physical device, and it is a reported gap rather than a blocker. The full
 12-test E2E suite passed before and after, which is what proves the new `<label for>` elements
 did not break the `getByLabel` selectors the suite navigates by.
+
+## 804. The second `/impeccable audit`: 15/20 → 18/20, and the four findings the first one missed
+
+Re-running the audit after §801–§803 moved Accessibility 2→3, Responsive 3→4 and Theming
+3→4 (18/20, "Excellent — minor polish"), and surfaced four real things. Three of them existed
+before and the **first audit missed them**, which is worth recording: a first pass over a
+surface with a dozen loud defects does not see the quiet ones.
+
+**Error messages were never associated with their field — 25 of them.** The app had 25 inline
+`text-danger` validation blocks and not one `aria-describedby`, `aria-invalid` or
+`role="alert"`. A sighted user saw red text under the input; someone on a screen reader
+tabbed into the field, heard the label, and got nothing, because the message was an
+unconnected text node beside it (WCAG 3.3.1, 1.3.1). On the invite form or the exposure
+settings that means submitting again and again without ever learning why.
+
+The fix is one directive rather than 25 edits. `FieldErrorDirective` goes on the *message*,
+named with the control's `id`; because every one of these messages is rendered by an `*ngIf`,
+**the directive's own lifecycle is the error state** — it wires `aria-invalid`,
+`aria-describedby` and `role="alert"` when the message appears and removes them when it goes,
+so nothing tracks validity twice. It preserves any `aria-describedby` the field already had
+(a hint) rather than overwriting it. Wired into 21 field errors across setup, login,
+set-password, access-denied, account, users, settings and network-settings; the four
+group-level and status messages (role/capability pickers, backup run/restore failures) have no
+single control to point at and take `role="alert"` alone.
+
+Verified in the browser, not just in a spec: on `/login`, a 2-character username yields
+`role="alert"`, `aria-describedby="username-error"` and `aria-invalid="true"`, and both
+attributes are gone once the field is valid again.
+
+**The alert-category switches had no name at all.** `settings.component.html` renders
+`<input type="checkbox" role="switch">` per category, and the visible label beside it points
+at the *topic text field*, not the switch — so a screen reader announced "switch, not checked"
+with no indication of which category it silences. The label now carries an id and the switch
+an `aria-labelledby` to it; one label legitimately names two controls here.
+
+**The draft editors on Content had no name**, one `<textarea>` per generated draft. Each is
+now labelled with the brief it came from ("Draft for: …"), which is also what tells two drafts
+apart.
+
+**Users' table headers still had no `scope`** — the same defect §803 fixed on two tables, in
+the fourth one, which my first audit's `grep | head` cut off. It is the one that matters most:
+it collapses to card-per-row below 768px, where the header association is all that ties a value
+to its column.
+
+**Why the spec additions mattered more than the fixes.** Extending `a11y-labels.spec.ts` to
+Settings, Content and Backups first produced three *passing* tests — because panels are
+collapsed by default, so the assertions were finding no controls at all and congratulating
+themselves. Expanding every panel before asserting turned them red (4 unnamed switches, 1
+unnamed editor) and made them worth having. A green test that renders nothing is worse than no
+test, and this one was two lines from shipping.
+
+Also from the polish half: the skip link's `color: #fff` now reads `var(--bs-white, #fff)`, the
+one literal §801 introduced.
+
+Remaining, unchanged: `OnPush` on the service card (README item), the nav strip's drag at
+driver level (needs a physical device), and the 320px header's two rows. Detector: the same
+two findings, both documented in the source.

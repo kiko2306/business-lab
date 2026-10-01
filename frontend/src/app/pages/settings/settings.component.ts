@@ -26,6 +26,7 @@ import { PanelComponent } from '../../components/panel/panel.component';
 import { NetworkSettingsComponent } from './network-settings.component';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
+import { FieldErrorDirective } from '../../components/field-error.directive';
 
 /**
  * Stack-wide settings on its own route (§131.1): networking (the Cloudflare
@@ -36,7 +37,7 @@ import { TranslateService } from '../../i18n/translate.service';
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink, PanelComponent, NetworkSettingsComponent, TranslatePipe],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink, PanelComponent, NetworkSettingsComponent, TranslatePipe, FieldErrorDirective],
   templateUrl: './settings.component.html',
   styleUrl: './settings.component.css'
 })

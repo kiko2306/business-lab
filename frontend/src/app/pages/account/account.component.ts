@@ -12,6 +12,7 @@ import { AuthService } from '../../core/auth.service';
 import { CrowdsecBansComponent } from './crowdsec-bans.component';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
+import { FieldErrorDirective } from '../../components/field-error.directive';
 
 // Which panel is on screen. 'enrolling' and 'recovery-codes' are transient and
 // only reachable by walking through the flow — never on a fresh load.
@@ -20,7 +21,7 @@ type View = 'loading' | 'status' | 'enrolling' | 'recovery-codes';
 @Component({
   selector: 'app-account',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, PanelComponent, CrowdsecBansComponent, TranslatePipe],
+  imports: [CommonModule, ReactiveFormsModule, PanelComponent, CrowdsecBansComponent, TranslatePipe, FieldErrorDirective],
   templateUrl: './account.component.html',
   styleUrl: './account.component.css',
 })

@@ -38,7 +38,7 @@
       <div class="form-text">
         {{ configuredSettings?.permissionExplanation }}
       </div>
-      <div *ngIf="validationMessage() && (form.controls.token.touched || form.controls.token.dirty)" class="text-danger small mt-2">
+      <div *ngIf="validationMessage() && (form.controls.token.touched || form.controls.token.dirty)" class="text-danger small mt-2" appFieldError="cloudflareToken">
         {{ validationMessage() }}
       </div>
     </div>
@@ -103,14 +103,14 @@
         <div class="col-12 col-md-6">
           <label class="form-label fw-semibold" for="exposureBaseDomain">{{ 'networkSettings.field.baseDomain' | t }}</label>
           <input id="exposureBaseDomain" class="form-control" placeholder="example.com" formControlName="baseDomain" />
-          <div *ngIf="exposureValidationMessage('baseDomain', 'networkSettings.field.baseDomain' | t)" class="text-danger small mt-2">
+          <div *ngIf="exposureValidationMessage('baseDomain', 'networkSettings.field.baseDomain' | t)" class="text-danger small mt-2" appFieldError="exposureBaseDomain">
             {{ exposureValidationMessage('baseDomain', 'networkSettings.field.baseDomain' | t) }}
           </div>
         </div>
         <div class="col-12 col-md-6">
           <label class="form-label fw-semibold" for="exposureCloudflareTunnelId">{{ 'networkSettings.field.cloudflareTunnelId' | t }}</label>
           <input id="exposureCloudflareTunnelId" class="form-control" formControlName="cloudflareTunnelId" />
-          <div *ngIf="exposureValidationMessage('cloudflareTunnelId', 'networkSettings.field.cloudflareTunnelId' | t)" class="text-danger small mt-2">
+          <div *ngIf="exposureValidationMessage('cloudflareTunnelId', 'networkSettings.field.cloudflareTunnelId' | t)" class="text-danger small mt-2" appFieldError="exposureCloudflareTunnelId">
             {{ exposureValidationMessage('cloudflareTunnelId', 'networkSettings.field.cloudflareTunnelId' | t) }}
           </div>
         </div>
@@ -122,7 +122,7 @@
         <div class="col-12 col-md-6">
           <label class="form-label fw-semibold" for="exposureNpmEmail">{{ 'networkSettings.field.npmEmail' | t }}</label>
           <input id="exposureNpmEmail" class="form-control" type="email" formControlName="npmEmail" />
-          <div *ngIf="exposureValidationMessage('npmEmail', 'networkSettings.field.npmEmail' | t)" class="text-danger small mt-2">
+          <div *ngIf="exposureValidationMessage('npmEmail', 'networkSettings.field.npmEmail' | t)" class="text-danger small mt-2" appFieldError="exposureNpmEmail">
             {{ exposureValidationMessage('npmEmail', 'networkSettings.field.npmEmail' | t) }}
           </div>
         </div>
@@ -136,7 +136,7 @@
             [placeholder]="exposureSettings?.npmPasswordConfigured ? ('networkSettings.npmPasswordPlaceholder' | t) : ''"
             formControlName="npmPassword"
           />
-          <div *ngIf="exposureValidationMessage('npmPassword', 'networkSettings.field.npmPassword' | t)" class="text-danger small mt-2">
+          <div *ngIf="exposureValidationMessage('npmPassword', 'networkSettings.field.npmPassword' | t)" class="text-danger small mt-2" appFieldError="exposureNpmPassword">
             {{ exposureValidationMessage('npmPassword', 'networkSettings.field.npmPassword' | t) }}
           </div>
         </div>
