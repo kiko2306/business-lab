@@ -35850,3 +35850,64 @@ one ambiguity in the request and was settled before coding.
 
 An app whose only settings were ports (nginx-proxy-manager) now shows "No settings for this
 app" with the Save button disabled, which is accurate: there is nothing there a person sets.
+
+## 801. `/impeccable audit` on the dashboard, then the four fixes it recommended — part 1: harden
+
+`/impeccable audit dashboard` scored the frontend 15/20 (Good): Accessibility 2,
+Performance 3, Responsive 3, Theming 3, Implementation Integrity 4. The integrity verdict
+passed — the token system, the paired light/dark values and the written-down reasoning read
+as one deliberate product — and the bundled detector found only two things, one of which
+(Inter as an "overused font") is a false positive against a brief that pins Inter on purpose.
+Accessibility was the weak dimension by a wide margin, and this section is its fix. §802–§804
+are the other three.
+
+**Form controls with no accessible name (P1).** Ten of them. Audit logs' filter row was the
+worst: the two `datetime-local` inputs and the result `<select>` had no name at all, so a
+screen reader announced "edit" and "combo box". The rest were placeholder-only (Recovery's
+username/password, the new-user username/email, the 2FA-disable code) — a name that vanishes
+the moment someone types, leaving anyone returning to a half-filled form with nothing to
+read. Account's 2FA-disable password field had neither. All ten now carry a visible `<label
+for>`, with keys in both dictionaries. The two filter rows that gained a label row also
+gained `align-self-end` on their button column, so the button still lines up with the inputs
+beside it.
+
+**Panels had no heading (P1).** `panel.component` rendered its title as `<span
+class="panel__title">` inside the toggle button. Panels *are* the structure of Settings,
+Backups, Utils and Audit logs, so heading navigation — the way a screen-reader user moves
+through a long page — found nothing but the page's own `h1`. The title is now wrapped in an
+`<h2>` that carries no appearance of its own (`font: inherit`, `margin: 0`, and `display:
+flex` so the toggle's `flex: 1 1 auto` still works through it). That one change also fixes
+the **h1 → h3 skips** the audit flagged separately on Apps, Settings and Utils: every in-page
+`h3` already sat inside a panel, so with the panel at `h2` the order is correct everywhere
+without touching those pages.
+
+Considered and rejected: moving the subtitle out of the toggle so the heading's accessible
+name is the panel title alone. It would shrink the click target that the whole header
+currently provides, for a heading that reads "Backup schedule When the box backs itself up"
+— verbose, but it says true things in the right order.
+
+**No skip link (P2).** The sticky header repeats 11 nav links plus the language select, the
+theme toggle and Logout on every route, so a keyboard-only user tabbed through 14 controls
+after every navigation. The shell now starts with a skip link (off-screen at `top: -4rem`,
+not `display: none` — a hidden element cannot be focused), and the routed page renders inside
+`<div id="main-content" tabindex="-1">`; a routed component is inserted as a sibling of
+`<router-outlet>`, so wrapping the outlet does contain it.
+
+**`<main>` missing on four pages (P2).** Users, Audit logs, Account and Recovery opened with
+a bare `container-fluid` div where the other twelve opened `<main>` — the inconsistency was
+the finding, and those four are exactly where the skip target would have been weakest.
+
+**Every route had the same document title (P2).** `index.html` says "Business Lab" and no
+route ever changed it, so the browser tab, the history entry and the announcement a screen
+reader makes on navigation said the same thing everywhere (WCAG 2.4.2). `AppTitleStrategy`
+resolves each route's `title` as an **i18n key** rather than finished text — "Apps · Business
+Lab" — and holds the last key in a signal with an `effect`, so a language switch, which
+changes no route, retitles the page too.
+
+Five new spec files/cases carry this: `panel.component.spec.ts` (heading level, the toggle
+still inside it with its expanded state), `shell.component.spec.ts` (the skip link is the
+first focusable element and its target is focusable), `title-strategy.spec.ts` (page then
+product, the no-title fallback, and the language switch), and `pages/a11y-labels.spec.ts`,
+which renders Audit logs, Recovery and Users and asserts **every** control has a name from a
+label, `aria-label` or a wrapping label — so the next unlabelled input fails the build rather
+than waiting for the next audit.

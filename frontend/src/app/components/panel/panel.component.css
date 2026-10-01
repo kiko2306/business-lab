@@ -1,3 +1,15 @@
+/* The title is an h2 for the document outline only; all of its appearance
+   comes from .panel__title inside the toggle. */
+.panel__heading {
+  display: flex;
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 :host {
   display: block;
   margin-bottom: 1.25rem;

@@ -1,4 +1,4 @@
-<div class="container-fluid py-4">
+<main class="container-fluid py-4">
   <div class="mb-4">
     <h1 class="h3 mb-1">{{ 'auditLogs.title' | t }}</h1>
     <p class="text-body-secondary mb-0">{{ 'auditLogs.subtitle' | t }}</p>
@@ -7,22 +7,26 @@
   <app-panel key="audit:filters" [title]="'auditLogs.filters.title' | t" [subtitle]="'auditLogs.filters.subtitle' | t">
     <div class="row g-2">
       <div class="col-12 col-md-3">
-        <input class="form-control" [placeholder]="'auditLogs.filters.actionPlaceholder' | t" [(ngModel)]="action" />
+        <label class="form-label small mb-1" for="audit-action">{{ 'auditLogs.filters.actionLabel' | t }}</label>
+        <input id="audit-action" class="form-control" [placeholder]="'auditLogs.filters.actionPlaceholder' | t" [(ngModel)]="action" />
       </div>
       <div class="col-12 col-md-2">
-        <select class="form-select" [(ngModel)]="result">
+        <label class="form-label small mb-1" for="audit-result">{{ 'auditLogs.filters.resultLabel' | t }}</label>
+        <select id="audit-result" class="form-select" [(ngModel)]="result">
           <option value="">{{ 'auditLogs.filters.allResults' | t }}</option>
           <option value="success">{{ 'auditLogs.filters.success' | t }}</option>
           <option value="failure">{{ 'auditLogs.filters.failure' | t }}</option>
         </select>
       </div>
       <div class="col-12 col-md-3">
-        <input class="form-control" type="datetime-local" [(ngModel)]="startDate" />
+        <label class="form-label small mb-1" for="audit-from">{{ 'auditLogs.filters.fromLabel' | t }}</label>
+        <input id="audit-from" class="form-control" type="datetime-local" [(ngModel)]="startDate" />
       </div>
       <div class="col-12 col-md-3">
-        <input class="form-control" type="datetime-local" [(ngModel)]="endDate" />
+        <label class="form-label small mb-1" for="audit-to">{{ 'auditLogs.filters.toLabel' | t }}</label>
+        <input id="audit-to" class="form-control" type="datetime-local" [(ngModel)]="endDate" />
       </div>
-      <div class="col-12 col-md-1 d-grid">
+      <div class="col-12 col-md-1 d-grid align-self-end">
         <button class="btn btn-primary" (click)="load(1)">{{ 'auditLogs.filters.goButton' | t }}</button>
       </div>
     </div>
@@ -71,4 +75,4 @@
       </div>
     </div>
   </app-panel>
-</div>
+</main>

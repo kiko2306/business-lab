@@ -1,4 +1,4 @@
-<div class="container-fluid py-4">
+<main class="container-fluid py-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
       <h1 class="h3 mb-1">{{ 'recovery.title' | t }}</h1>
@@ -28,15 +28,17 @@
       <p class="text-body-secondary small">{{ 'recovery.resetPassword.description' | t }}</p>
       <div class="row g-2">
         <div class="col-12 col-md-4">
-          <input class="form-control" [placeholder]="'recovery.resetPassword.usernamePlaceholder' | t" [(ngModel)]="username" />
+          <label class="form-label small mb-1" for="recovery-username">{{ 'recovery.resetPassword.usernameLabel' | t }}</label>
+          <input id="recovery-username" class="form-control" [placeholder]="'recovery.resetPassword.usernamePlaceholder' | t" [(ngModel)]="username" />
         </div>
         <div class="col-12 col-md-4">
-          <input class="form-control" type="password" [placeholder]="'recovery.resetPassword.passwordPlaceholder' | t" [(ngModel)]="password" />
+          <label class="form-label small mb-1" for="recovery-password">{{ 'recovery.resetPassword.passwordLabel' | t }}</label>
+          <input id="recovery-password" class="form-control" type="password" [placeholder]="'recovery.resetPassword.passwordPlaceholder' | t" [(ngModel)]="password" autocomplete="new-password" />
         </div>
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-4 align-self-end">
           <button class="btn btn-danger w-100" [disabled]="!enabled" (click)="resetPassword()">{{ 'recovery.resetPassword.submitButton' | t }}</button>
         </div>
       </div>
     </div>
   </div>
-</div>
+</main>

@@ -133,3 +133,36 @@
     flex: 0 0 auto;
   }
 }
+
+/* Off-screen until focused rather than display:none — a hidden element is not
+   focusable, and a skip link that cannot be tabbed to is not a skip link. */
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: -4rem;
+  z-index: 1080;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  background: var(--bs-primary);
+  color: #fff;
+  font-weight: 600;
+  transition: top 0.12s ease;
+}
+
+.skip-link:focus-visible {
+  top: 0.6rem;
+  outline: 2px solid var(--bs-emphasis-color);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skip-link {
+    transition: none;
+  }
+}
+
+/* The skip target takes focus programmatically; it is not an interactive
+   control, so it draws no ring of its own. */
+.app-shell__content:focus {
+  outline: none;
+}

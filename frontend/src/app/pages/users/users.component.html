@@ -1,4 +1,4 @@
-<div class="container-fluid py-4">
+<main class="container-fluid py-4">
   <div class="mb-4">
     <h1 class="h3 mb-1">{{ 'users.title' | t }}</h1>
     <p class="text-body-secondary mb-0">
@@ -13,13 +13,15 @@
     </div>
     <form class="row g-3 align-items-start" [formGroup]="createForm" (ngSubmit)="createUser()">
       <div class="col-12 col-md-6">
-        <input class="form-control" [placeholder]="'users.form.usernamePlaceholder' | t" formControlName="username" autocomplete="off" />
+        <label class="form-label small mb-1" for="new-user-username">{{ 'users.form.usernameLabel' | t }}</label>
+        <input id="new-user-username" class="form-control" [placeholder]="'users.form.usernamePlaceholder' | t" formControlName="username" autocomplete="off" />
         <div class="form-text text-danger" *ngIf="createForm.controls.username.touched && createForm.controls.username.invalid">
           {{ 'users.form.usernameError' | t }}
         </div>
       </div>
       <div class="col-12 col-md-6">
-        <input class="form-control" type="email" [placeholder]="'users.form.emailPlaceholder' | t" formControlName="email" autocomplete="off" />
+        <label class="form-label small mb-1" for="new-user-email">{{ 'users.form.emailLabel' | t }}</label>
+        <input id="new-user-email" class="form-control" type="email" [placeholder]="'users.form.emailPlaceholder' | t" formControlName="email" autocomplete="off" />
         <div class="form-text" *ngIf="createForm.controls.email.valid || !createForm.controls.email.touched">
           {{ 'users.form.emailHint' | t }}
         </div>
@@ -300,4 +302,4 @@
       </table>
     </div>
   </app-panel>
-</div>
+</main>

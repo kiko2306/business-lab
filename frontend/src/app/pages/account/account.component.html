@@ -1,4 +1,4 @@
-<div class="container-fluid py-4">
+<main class="container-fluid py-4">
   <div class="mb-4">
     <h1 class="h3 mb-1">{{ 'account.title' | t }}</h1>
     <p class="text-body-secondary mb-0">{{ 'account.subtitle.main' | t }}<span *ngIf="canManageBans">{{ 'account.subtitle.bansSuffix' | t }}</span>.</p>
@@ -30,7 +30,9 @@
           <p class="text-body-secondary small">{{ 'account.disable.description' | t }}</p>
           <form [formGroup]="disableForm" (ngSubmit)="disable()" class="row g-2 align-items-center">
             <div class="col-12 col-sm-5">
+              <label class="form-label small mb-1" for="disable-code">{{ 'account.disable.codeLabel' | t }}</label>
               <input
+                id="disable-code"
                 class="form-control"
                 formControlName="code"
                 inputmode="numeric"
@@ -41,7 +43,9 @@
             </div>
             <div class="col-auto text-body-secondary">{{ 'account.disable.orLabel' | t }}</div>
             <div class="col-12 col-sm-5">
+              <label class="form-label small mb-1" for="disable-password">{{ 'account.disable.passwordLabel' | t }}</label>
               <input
+                id="disable-password"
                 class="form-control"
                 type="password"
                 formControlName="password"
@@ -124,4 +128,4 @@
   </app-panel>
 
   <app-crowdsec-bans *ngIf="canManageBans"></app-crowdsec-bans>
-</div>
+</main>

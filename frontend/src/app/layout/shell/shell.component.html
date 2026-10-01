@@ -1,4 +1,8 @@
 <div class="app-shell">
+  <!-- The header repeats 11 nav links plus language, theme and logout on every
+       route; without this, reaching the page by keyboard means tabbing through
+       all of them after every navigation (WCAG 2.4.1). -->
+  <a class="skip-link" href="#main-content">{{ 'shell.skipToContent' | t }}</a>
   <header class="app-header border-bottom sticky-top">
     <div class="container-fluid py-2">
       <div class="app-header__bar">
@@ -57,7 +61,11 @@
     </div>
   </header>
 
-  <router-outlet></router-outlet>
+  <!-- The routed page renders as a sibling of the outlet, so this wrapper
+       contains it and gives the skip link something to focus. -->
+  <div id="main-content" tabindex="-1" class="app-shell__content">
+    <router-outlet></router-outlet>
+  </div>
 
   <footer class="app-footer text-body-secondary">
     <div class="container-fluid py-3">

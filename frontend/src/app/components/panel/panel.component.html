@@ -1,5 +1,9 @@
 <section class="card panel" [class.panel--open]="!collapsed" [attr.id]="anchor">
   <div class="panel__head">
+    <!-- A heading, not a styled span: panels are a page's structure, and
+         heading navigation is how a screen-reader user moves through one.
+         Every in-panel heading is an h3, so this level keeps them in order. -->
+    <h2 class="panel__heading">
     <button
       type="button"
       class="panel__toggle"
@@ -15,6 +19,7 @@
         <span class="panel__subtitle" *ngIf="subtitle">{{ subtitle }}</span>
       </span>
     </button>
+    </h2>
     <div class="panel__actions" *ngIf="!collapsed">
       <ng-content select="[panel-actions]"></ng-content>
     </div>

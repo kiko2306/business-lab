@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.160.0] — 2026-10-01
+
+### Accessibility
+
+- Named every form control, gave panels real headings, added a skip link and a per-route document title (plan.md §801)
+
 ## [0.159.2] — 2026-10-01
 
 ### Changed
