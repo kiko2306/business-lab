@@ -77,20 +77,35 @@ export class SettingsService {
       .pipe(retry({ count: 1, delay: 400 }));
   }
 
+  // These four, and the mail trio below, show their own inline feedback on
+  // error (backupTargetFeedback / mailFeedback) rather than a toast — without
+  // the flag, a failure showed that inline message *and* the interceptor's
+  // generic toast stacked on top (plan.md §796, the §794.1 double-toast fix's
+  // deferred toast+inline sibling).
   getBackupTarget(): Observable<BackupTargetSettings> {
-    return this.http.get<BackupTargetSettings>(`${API_BASE_URL}/settings/backup-target`);
+    return this.http.get<BackupTargetSettings>(`${API_BASE_URL}/settings/backup-target`, {
+      context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+    });
   }
 
   saveBackupTarget(input: BackupTargetInput): Observable<BackupTargetSaveResponse> {
-    return this.http.put<BackupTargetSaveResponse>(`${API_BASE_URL}/settings/backup-target`, input);
+    return this.http.put<BackupTargetSaveResponse>(`${API_BASE_URL}/settings/backup-target`, input, {
+      context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+    });
   }
 
   testBackupTarget(): Observable<BackupTargetTestResponse> {
-    return this.http.post<BackupTargetTestResponse>(`${API_BASE_URL}/settings/backup-target/test`, {});
+    return this.http.post<BackupTargetTestResponse>(
+      `${API_BASE_URL}/settings/backup-target/test`,
+      {},
+      { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
   }
 
   getKopiaStatus(): Observable<KopiaStatus> {
-    return this.http.get<KopiaStatus>(`${API_BASE_URL}/settings/backup-target/kopia-status`);
+    return this.http.get<KopiaStatus>(`${API_BASE_URL}/settings/backup-target/kopia-status`, {
+      context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+    });
   }
 
   loadAiKeys(): Observable<AiKeysSettings> {
@@ -127,15 +142,23 @@ export class SettingsService {
   }
 
   getMailSettings(): Observable<MailSettings> {
-    return this.http.get<MailSettings>(`${API_BASE_URL}/settings/mail`);
+    return this.http.get<MailSettings>(`${API_BASE_URL}/settings/mail`, {
+      context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+    });
   }
 
   saveMailSettings(input: MailSettingsInput): Observable<{ message: string }> {
-    return this.http.put<{ message: string }>(`${API_BASE_URL}/settings/mail`, input);
+    return this.http.put<{ message: string }>(`${API_BASE_URL}/settings/mail`, input, {
+      context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+    });
   }
 
   testMailSettings(): Observable<MailTestResponse> {
-    return this.http.post<MailTestResponse>(`${API_BASE_URL}/settings/mail/test`, {});
+    return this.http.post<MailTestResponse>(
+      `${API_BASE_URL}/settings/mail/test`,
+      {},
+      { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
   }
 
   saveExposureSettings(input: ExposureSettingsInput): Observable<{ message: string }> {

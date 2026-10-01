@@ -35602,3 +35602,41 @@ same `docker-compose.test.yml` REPO_ROOT-missing failure that showed two stacked
 cards in §794.1's screenshot now shows exactly one.
 
 Frontend 205 tests (177 + 28 new), build clean. Version bump: see CHANGELOG.
+
+## 796. §795's deferred toast+inline sibling, fixed
+
+§795 scoped itself to the two-toast bug only and named this one separately:
+Settings' and Backups' destination-save forms, and Account's TOTP enrolment,
+show their own inline error but never set `SKIP_GLOBAL_ERROR_HANDLING`, so a
+failure there showed that inline message *and* the interceptor's generic
+toast stacked on top of it.
+
+Found the exact scope by diffing which `settings.service.ts`/
+`operations.service.ts` methods already carry the flag against which don't —
+every load/save/test method in `settings.service.ts` already had it except
+seven: `getBackupTarget`/`saveBackupTarget`/`testBackupTarget`/
+`getKopiaStatus` (Backups' destination form) and `getMailSettings`/
+`saveMailSettings`/`testMailSettings` (Settings' mail form). In
+`operations.service.ts`, the four TOTP methods (`getTotpStatus`/`setupTotp`/
+`activateTotp`/`disableTotp`, Account's enrolment flow) were the only ones
+missing it. Confirmed each has exactly one caller with its own inline
+handling before adding the flag, same check as §795 — except `getMailSettings`,
+which has two: Settings' own inline `mailFeedback`, and Users page's
+`mailConfigured` check, which already fails silently by design (no toast at
+all). Adding the flag fixes both: the toast+inline duplicate on Settings, and
+an unintended stray toast on what Users treats as a soft failure.
+
+`getKopiaStatus` has no inline message of its own — it's the restart-wait
+poll's status check, already wrapped in its own `catchError` fallback — but a
+request-level failure still reached the interceptor before that `catchError`
+ran, so it would have kept toasting on every poll tick while Kopia restarts.
+Flagged it along with its three siblings rather than leave that case
+unfixed, since it shares the same `settings/backup-target*` family.
+
+Test-first: new `settings.service.spec.ts` (26 cases, one per method —
+`settings.service.ts` had no test file at all) and four new cases added to
+`operations.service.spec.ts`, both asserting `SKIP_GLOBAL_ERROR_HANDLING` via
+`HttpTestingController`, same table-driven shape as §795. All 11 new/affected
+cases failed for the right reason before the fix, pass after.
+
+Frontend 235 tests, build clean. Version bump: see CHANGELOG.

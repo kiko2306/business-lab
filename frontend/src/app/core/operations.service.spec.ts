@@ -67,6 +67,10 @@ describe('OperationsService request contexts skip the global error toast', () =>
     { name: 'updateUserCapabilities', url: `${API_BASE_URL}/users/1/capabilities`, call: () => service.updateUserCapabilities(1, []).subscribe() },
     { name: 'updateUserPassword', url: `${API_BASE_URL}/users/1/password`, call: () => service.updateUserPassword(1, 'x').subscribe() },
     { name: 'deleteUser', url: `${API_BASE_URL}/users/1`, call: () => service.deleteUser(1).subscribe() },
+    { name: 'getTotpStatus', url: `${API_BASE_URL}/auth/totp/status`, call: () => service.getTotpStatus().subscribe() },
+    { name: 'setupTotp', url: `${API_BASE_URL}/auth/totp/setup`, call: () => service.setupTotp().subscribe() },
+    { name: 'activateTotp', url: `${API_BASE_URL}/auth/totp/activate`, call: () => service.activateTotp('123456').subscribe() },
+    { name: 'disableTotp', url: `${API_BASE_URL}/auth/totp/disable`, call: () => service.disableTotp({ code: '123456' }).subscribe() },
   ];
 
   const blobResponse = new Set(['downloadAuditCsv', 'downloadBackup', 'downloadAppBackup']);

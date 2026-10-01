@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.158.3] — 2026-10-01
+
+### Error handling
+
+- Stop a toast from stacking on the inline error Settings', Backups' destination, and Account's TOTP forms already show
+
 ## [0.158.2] — 2026-10-01
 
 ### Error handling

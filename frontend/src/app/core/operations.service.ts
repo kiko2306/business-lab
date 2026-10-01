@@ -379,21 +379,36 @@ export class OperationsService {
   // login-time second factor lives on AuthService instead (it runs without a
   // session). ---
 
+  // Account's own TOTP flow shows its own inline errorMessage, not a toast —
+  // without the flag, a failure showed that inline message and the
+  // interceptor's generic toast stacked on top (plan.md §796).
   getTotpStatus(): Observable<TotpStatus> {
-    return this.http.get<TotpStatus>(`${API_BASE_URL}/auth/totp/status`);
+    return this.http.get<TotpStatus>(`${API_BASE_URL}/auth/totp/status`, {
+      context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+    });
   }
 
   setupTotp(): Observable<TotpSetupResponse> {
-    return this.http.post<TotpSetupResponse>(`${API_BASE_URL}/auth/totp/setup`, {});
+    return this.http.post<TotpSetupResponse>(
+      `${API_BASE_URL}/auth/totp/setup`,
+      {},
+      { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
   }
 
   activateTotp(code: string): Observable<TotpActivateResponse> {
-    return this.http.post<TotpActivateResponse>(`${API_BASE_URL}/auth/totp/activate`, { code });
+    return this.http.post<TotpActivateResponse>(
+      `${API_BASE_URL}/auth/totp/activate`,
+      { code },
+      { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
   }
 
   /** The backend takes a current 6-digit code XOR the account password. */
   disableTotp(proof: { code: string } | { password: string }): Observable<{ enabled: false }> {
-    return this.http.post<{ enabled: false }>(`${API_BASE_URL}/auth/totp/disable`, proof);
+    return this.http.post<{ enabled: false }>(`${API_BASE_URL}/auth/totp/disable`, proof, {
+      context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+    });
   }
 
   resetAdminPassword(username: string, password: string): Observable<{ message: string }> {
