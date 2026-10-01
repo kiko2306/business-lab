@@ -35812,3 +35812,41 @@ Deliberately not done: the matching read side. `SELECT value FROM settings WHERE
 is spread as widely, but it has no atomicity bug and the per-module readers do real work
 around it (defaults, validation, caching, the `aiSettings` legacy-key fallback), so a shared
 reader would be a bigger change with nothing to fix.
+
+## 800. The app settings panel stops showing image digests and host ports
+
+Two bits of noise in each app's Settings modal, both reported from a real screenshot of
+nginx-proxy-manager's panel.
+
+**The digest.** The "Installed:" badge printed the self-update's pin verbatim —
+`jc21/nginx-proxy-manager:latest@sha256:4393e642e233e5efd5adeb7f10918d4aaea71c9ed875b94…`,
+and a second one for `mysql:8.0@sha256:…`. That is ~71 characters per image of something no
+human acts on, and it pushed the badge row into a horizontal scrollbar.
+`installedVersion()` now splits each ref at `@` and keeps the image and tag. The exact
+digest is unchanged in `docker-compose.override.yml`, which is what actually pins the build.
+
+**The port fields.** The CONFIGURATION section offered `NPM_HTTP_PORT`, `NPM_HTTPS_PORT` and
+`NPM_ADMIN_PORT` as inputs — two of them read-only with "Changing it breaks every published
+hostname" underneath. Host ports are allocated by `start.sh` against `docs/ports.md`, so
+there is nothing for a human to decide here: every `*_PORT` field is now left out of the
+panel entirely (`visibleEnvFields`, computed when the config loads rather than filtered in
+the template, so change detection doesn't redo it every tick).
+
+The client also stops *submitting* port values. A save writes only the keys it is given
+(`saveServiceEnv` merges into the existing `.env`), so leaving ports out keeps whatever the
+allocator wrote — and it means an unrelated save can no longer be rejected with
+`Port NNNN is already in use by another service` over a field the user can't see. With no
+port rendered, the conflict warning, the "Use <port>" button and the read-only fixed-port
+input had nothing left to attach to and are gone, along with their two i18n keys;
+`missingRequiredCount()` now counts visible fields only, for the same reason — a "1 required
+setting missing" banner pointing at an invisible field is a dead end. The backend is
+untouched: `assertPortsAvailable` and the locked-port refusal in `saveServiceEnv` are the
+control, and the panel was only ever presentation (that split is noted in the code and still
+holds).
+
+The "Port 80 / Port 443 / Port 10270" badges in the About row stay — they are how someone
+reaches a LAN-only app, and read-only facts rather than an invitation to edit. That was the
+one ambiguity in the request and was settled before coding.
+
+An app whose only settings were ports (nginx-proxy-manager) now shows "No settings for this
+app" with the Save button disabled, which is accurate: there is nothing there a person sets.

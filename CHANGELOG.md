@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.159.2] — 2026-10-01
+
+### Changed
+
+- App settings panels no longer show image digests or host-port fields — ports are allocated automatically, so a save leaves them untouched
+
 ## [0.159.1] — 2026-10-01
 
 ### Changed

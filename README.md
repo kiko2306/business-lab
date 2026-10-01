@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.159.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.159.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,6 +212,13 @@ it is done — not ticked off and left behind. Section references point at
 Done one page at a time, test first, each its own commit and version bump. A finished
 item is deleted.
 
+- [ ] **Beta-test that a config save leaves allocated ports alone (plan.md §800)** —
+      the Settings panel no longer shows or submits `*_PORT` fields. On `beta`,
+      open an app that has both a port and a real setting (Vaultwarden, ntfy),
+      change the real setting, save, then confirm on the host that the app's
+      `apps/<name>/.env` still has its original port line, and that the app
+      restarts and is reachable on that same port. Check nginx-proxy-manager's
+      panel reads "No settings for this app" rather than showing an empty form.
 - [ ] **Beta-test the single settings writer (plan.md §799)** — every save
       into the `settings` table now goes through one batched upsert, so a
       mistake would hit every settings form at once. On `beta`, save and

@@ -5,7 +5,7 @@ import { ConfirmService } from '../../core/confirm.service';
 import { OperationsService } from '../../core/operations.service';
 import { ServiceStateService } from '../../core/service-state.service';
 import { ToastService } from '../../core/toast.service';
-import { AppBackupEntry, ServiceEnvStatus, ServiceStatus } from '../../core/models';
+import { AppBackupEntry, ServiceEnvField, ServiceEnvStatus, ServiceStatus } from '../../core/models';
 
 const service = (name: string, state: ServiceStatus['state'], extra: Partial<ServiceStatus> = {}): ServiceStatus => ({
   name,
@@ -248,12 +248,22 @@ describe('ServiceCardComponent installedVersion', () => {
     component = fixture.componentInstance;
   });
 
-  it('prefers the self-update digest pin when there is one', () => {
+  it('prefers the self-update digest pin when there is one, without the digest itself', () => {
+    // The sha256 is 71 characters of noise to a human reading the panel; the
+    // image and tag are what identifies what is installed.
     component.service = service('itflow', 'running', {
       pinnedImages: ['itfloworg/itflow:latest@sha256:abc'],
       versionPinned: [],
     });
-    expect(component['installedVersion']()).toBe('itfloworg/itflow:latest@sha256:abc');
+    expect(component['installedVersion']()).toBe('itfloworg/itflow:latest');
+  });
+
+  it('strips the digest from every image of a multi-image app', () => {
+    component.service = service('nginx-proxy-manager', 'running', {
+      pinnedImages: ['jc21/nginx-proxy-manager:latest@sha256:4393e6', 'mysql:8.0@sha256:7dcddc'],
+      versionPinned: [],
+    });
+    expect(component['installedVersion']()).toBe('jc21/nginx-proxy-manager:latest, mysql:8.0');
   });
 
   it('falls back to the base compose tag when nothing is digest-pinned yet', () => {
@@ -731,5 +741,84 @@ describe('ServiceCardComponent stop confirmation', () => {
   it('leaves live announcements to the page, not each of ~36 row badges', () => {
     use({ exposedHostname: 'paperless.example.com' });
     expect((fixture.nativeElement as HTMLElement).querySelector('[aria-live]')).toBeNull();
+  });
+});
+
+// Host ports are allocated by start.sh, not chosen by a human, so the config
+// panel neither shows them nor submits them.
+describe('ServiceCardComponent port fields', () => {
+  let fixture: ComponentFixture<ServiceCardComponent>;
+  let component: ServiceCardComponent;
+  let el: HTMLElement;
+
+  const field = (key: string, extra: Partial<ServiceEnvField> = {}): ServiceEnvField => ({
+    key,
+    required: false,
+    secret: false,
+    isSet: true,
+    boolean: false,
+    hidden: false,
+    managed: false,
+    managedValue: null,
+    value: 'set-value',
+    defaultValue: 'default-value',
+    suggestedValue: null,
+    isPort: false,
+    locked: false,
+    lockedReason: null,
+    portInUse: false,
+    suggestedPort: null,
+    ...extra,
+  });
+
+  const open = async (fields: ServiceEnvField[]) => {
+    const operations = jasmine.createSpyObj('OperationsService', ['getServiceEnv', 'listAppBackups']);
+    operations.listAppBackups.and.returnValue(of({ items: [] }));
+    operations.getServiceEnv.and.returnValue(of({ fields } as unknown as ServiceEnvStatus));
+    await TestBed.configureTestingModule({
+      imports: [ServiceCardComponent],
+      providers: [
+        { provide: OperationsService, useValue: operations },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+        { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ServiceCardComponent);
+    component = fixture.componentInstance;
+    component.service = service('nginx-proxy-manager', 'running');
+    component.allServices = [component.service];
+    el = fixture.nativeElement;
+    fixture.detectChanges();
+    (el.querySelector('.service-row-actions button:last-child') as HTMLButtonElement).click();
+    fixture.detectChanges();
+  };
+
+  it('renders no port field, locked or not, and keeps the others', async () => {
+    await open([
+      field('NPM_HTTP_PORT', { isPort: true, locked: true, lockedReason: 'Fixed' }),
+      field('NPM_ADMIN_PORT', { isPort: true }),
+      field('ADMIN_EMAIL'),
+    ]);
+
+    const labels = Array.from(el.querySelectorAll('.settings-section .form-label')).map((l) =>
+      l.textContent?.trim()
+    );
+    expect(labels).toEqual(['Admin email']);
+  });
+
+  it('never submits a port value, so an unrelated save leaves the allocated port alone', async () => {
+    await open([field('NPM_ADMIN_PORT', { isPort: true }), field('ADMIN_EMAIL')]);
+
+    expect(Object.keys(component['envValues'])).toEqual(['ADMIN_EMAIL']);
+  });
+
+  it('offers no save button when ports were the only settings', async () => {
+    await open([field('NPM_HTTP_PORT', { isPort: true, locked: true }), field('NPM_ADMIN_PORT', { isPort: true })]);
+
+    const save = Array.from(el.querySelectorAll('.settings-section button')).find((b) =>
+      b.textContent?.includes('Save configuration')
+    ) as HTMLButtonElement | undefined;
+    expect(save?.disabled ?? true).toBeTrue();
   });
 });

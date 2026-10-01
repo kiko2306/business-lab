@@ -98,6 +98,10 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   protected envLoading = false;
   protected envSaving = false;
   protected env: ServiceEnvStatus | null = null;
+  // What the config panel actually renders: every field that isn't a hidden
+  // generated secret or a host port. Computed on load rather than in the
+  // template, so change detection doesn't re-filter on every tick.
+  protected visibleEnvFields: ServiceEnvField[] = [];
   protected envValues: Record<string, string> = {};
 
 
@@ -143,13 +147,18 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   @ViewChild('startupLogBody') private startupLogBody?: ElementRef<HTMLElement>;
 
   /**
-   * What's actually installed: the last self-update's pinned image ref
-   * (exact digest) when there is one, else the version baked into the app's
-   * own compose file, else just "latest" (never pulled by a self-update).
+   * What's actually installed: the last self-update's pinned image ref when
+   * there is one, else the version baked into the app's own compose file,
+   * else just "latest" (never pulled by a self-update).
+   *
+   * The `@sha256:…` half of a pin is dropped: it is 71 characters that push
+   * the rest of the row off the panel and say nothing a human acts on — the
+   * image and tag are what identifies the build. The exact digest is still in
+   * docker-compose.override.yml for anything that needs it.
    */
   protected installedVersion(): string {
     if (this.service.pinnedImages?.length) {
-      return this.service.pinnedImages.join(', ');
+      return this.service.pinnedImages.map((image) => image.split('@')[0]).join(', ');
     }
     if (this.service.versionPinned?.length) {
       return this.service.versionPinned.join(', ');
@@ -545,24 +554,24 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       .subscribe({
         next: (env) => {
           this.env = env;
+          this.visibleEnvFields = env.fields.filter((field) => !field.hidden && !field.isPort);
           this.envValues = {};
           for (const field of env.fields) {
             // Hidden secrets are generated server-side on save; managed keys
-            // follow the exposure hostname; locked keys are fixed protocol
-            // ports the backend refuses to write. The client submits none of
-            // them — the read-only inputs render straight from the field, not
-            // from envValues.
-            if (field.hidden || field.managed || field.locked) {
+            // follow the exposure hostname; host ports are allocated by
+            // start.sh, not chosen here, so the panel neither shows nor
+            // submits one — leaving a port out of the save keeps whatever the
+            // allocator put in .env, since a save only writes the keys it is
+            // given. The client submits none of them.
+            if (field.hidden || field.managed || field.isPort) {
               continue;
             }
             if (field.boolean) {
               this.envValues[field.key] = field.value ?? field.suggestedValue ?? field.defaultValue ?? 'false';
             } else if (!field.secret) {
               // Prefill with the current value, else a suggestion (generated
-              // secret / global timezone), else the compose default for port
-              // fields so a clashing default surfaces its conflict right away.
-              this.envValues[field.key] =
-                field.value ?? field.suggestedValue ?? (field.isPort ? field.defaultValue : null) ?? '';
+              // secret / global timezone).
+              this.envValues[field.key] = field.value ?? field.suggestedValue ?? '';
             } else if (field.suggestedValue) {
               this.envValues[field.key] = field.suggestedValue;
             }
@@ -572,8 +581,9 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       });
   }
 
+  /** Counts only what the panel renders — a warning about a field nobody can see is a dead end. */
   missingRequiredCount(): number {
-    return this.env?.fields.filter((field) => field.required && !field.isSet).length ?? 0;
+    return this.visibleEnvFields.filter((field) => field.required && !field.isSet).length;
   }
 
   /**
@@ -584,29 +594,6 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
    */
   protected managedFieldValue(field: ServiceEnvField): string {
     return field.managedValue ?? field.value ?? field.defaultValue ?? '—';
-  }
-
-  /**
-   * A port field still shows a conflict while its value is unchanged from the
-   * one the backend flagged as in use — once the user edits it (or takes the
-   * suggested free port) the warning clears; the backend re-checks on save.
-   */
-  protected portConflict(field: ServiceEnvField): boolean {
-    if (!field.portInUse) {
-      return false;
-    }
-    const flaggedValue = field.value ?? field.defaultValue ?? '';
-    return (this.envValues[field.key] ?? '') === flaggedValue;
-  }
-
-  protected hasPortConflict(): boolean {
-    return this.env?.fields.some((field) => this.portConflict(field)) ?? false;
-  }
-
-  protected useSuggestedPort(field: ServiceEnvField): void {
-    if (field.suggestedPort != null) {
-      this.envValues[field.key] = String(field.suggestedPort);
-    }
   }
 
   saveEnv(): void {
