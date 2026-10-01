@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
-import { TPipe, numberLocale } from '../i18n';
+import { TPipe, currency, numberLocale } from '../i18n';
 
 export interface HourlyDatum {
   hour: number;
@@ -68,7 +68,7 @@ export class HourlyChartComponent {
   }
 
   format(total: number): string {
-    return new Intl.NumberFormat(numberLocale, { style: 'currency', currency: 'EUR' }).format(total);
+    return new Intl.NumberFormat(numberLocale, { style: 'currency', currency }).format(total);
   }
 
   label(d: HourlyDatum): string {

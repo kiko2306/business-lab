@@ -7,10 +7,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Not uppercase: Portuguese runs ~20% longer than English before uppercase
+   adds its own width, and these labels sit in a three-up row on a phone —
+   "A aguardar pagamento" fits where "A AGUARDAR PAGAMENTO" wrapped. The hero
+   carries the hierarchy now, so the label does not need the extra signal. */
 .stat-label {
   font-size: 0.8125rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .stat-card {

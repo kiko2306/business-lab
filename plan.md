@@ -36311,3 +36311,42 @@ device for this surface. Keyed on the pointer rather than the width, so a wall s
 a mouse keeps the compact row.
 
 39 Tally specs; the dashboard's 265 and both builds still pass with the shared theme change.
+
+### 806.4 — polish (item 5), and a correction to §806.2
+
+**The agent version is off the owner's page.** It was the loudest colour on an otherwise-healthy
+screen — a red `<code>` under the shop name, about something a non-technical reader cannot act
+on and that nothing explained. It already lives on the Shops list, with a tooltip, for the
+person who can act on it. Teaching an owner to ignore red is worse than not showing it.
+
+**One currency constant.** `'EUR'` was hard-coded at ten template call sites and in both chart
+components; it is now `currency` in `i18n.ts`, so a client outside the euro is one edit.
+`tablesInState()` was dead — no template referenced it — and is gone with its now-unused import.
+
+**The stat labels lost their uppercase.** 0.8125rem, uppercase, +0.04em tracking is a width
+penalty paid twice in Portuguese, and the three-up row on a phone is narrower than the old
+two-up grid: "A aguardar pagamento" fits where "A AGUARDAR PAGAMENTO" wrapped. Weight carries
+the label now that the hero carries the hierarchy.
+
+**Not done, deliberately.** The critique called `.auth-page`, `.auth-card`, `.auth-kicker` and
+`--app-shadow-service-card` dead rules in `theme.css`. They are dead *in Tally* and live in the
+dashboard, and the copy is whole by design — CI diffs the two files byte for byte
+(`sync-app-theme.sh`, §633). Deleting them would break the dashboard and the diff check both.
+Nothing to do; the observation was right about the symptom and wrong about the cause. The
+`.card` shadow at tile density is the same story: it is the shared world's treatment, and
+folding six counters away already removed most of what made it heavy.
+
+**Correction to §806.2: the `mm/dd/yyyy` picker is not fixable from the page.** The `htmlLang`
+change is right and does what it should — Angular's `date` and `currency` pipes now render
+European throughout, verified in both languages. But the confirmation round showed the native
+`<input type="date">` still displaying `10/03/2026` with `document.documentElement.lang` set to
+`pt-PT` and Playwright's context locale set to `pt-PT`. Chromium formats that control from the
+**browser's own UI language**, which a page cannot set. On a phone in Portugal it reads
+`03/10/2026`; in a test browser running English it does not. So this is an environment fact, not
+a defect — the claim in §806.2 that the locale fix resolves the picker is wrong and this
+supersedes it.
+
+Confirmation round (stub API, real Chromium): hero 56px desktop / 40px phone; Portuguese reads
+"4 582,18 €" and "▲ 412,18 € acima de sábado passado"; `(pointer: coarse)` lifts Refresh and the
+day picker from 31px to **44px** on a touch viewport and leaves them at 31px on the desktop one;
+no horizontal overflow at 390 or 1440 in either theme. 40 specs green.

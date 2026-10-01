@@ -7,7 +7,7 @@ import { BarChartComponent, BarDatum } from '../charts/bar-chart.component';
 import { HourlyChartComponent } from '../charts/hourly-chart.component';
 import { TPipe, numberLocale, t } from '../i18n';
 import { Comparison, comparableTotal, comparisonDate, describeComparison } from './comparison';
-import { AgentPackage, Overview, ShopTable, SoldItemsView, Store, TablesView } from '../models';
+import { AgentPackage, Overview, SoldItemsView, Store, TablesView } from '../models';
 
 type Tab = 'tables' | 'items';
 
@@ -214,10 +214,6 @@ export class ShopComponent implements OnInit, OnDestroy {
       .map((i) => ({ label: i.description, value: i.quantity }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
-  }
-
-  tablesInState(state: ShopTable['state']): ShopTable[] {
-    return (this.tables?.tables ?? []).filter((t) => t.state === state);
   }
 
   private fail(err: HttpErrorResponse): void {

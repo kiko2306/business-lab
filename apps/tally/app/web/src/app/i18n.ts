@@ -40,6 +40,13 @@ export const numberLocale = lang === 'pt-PT' ? 'pt-PT' : 'en-IE';
 /** What `<html lang>` and `LOCALE_ID` are set to; see numberLocale. */
 export const htmlLang = numberLocale;
 
+/**
+ * Every figure in this app is money in one currency. Tally deploys per client,
+ * all of them in Portugal today — this is the one place that changes when one
+ * of them is not, rather than twelve template call sites and two charts.
+ */
+export const currency = 'EUR';
+
 export function setLang(next: Lang): void {
   try {
     localStorage.setItem(STORAGE_KEY, next);

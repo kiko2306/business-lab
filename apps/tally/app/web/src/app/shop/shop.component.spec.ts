@@ -258,3 +258,38 @@ describe('ShopComponent before the first sale', () => {
     expect(picker.getAttribute('min')).toBeTruthy();
   });
 });
+
+describe('ShopComponent polish', () => {
+  let element: HTMLElement;
+
+  beforeEach(async () => {
+    const api = jasmine.createSpyObj('ApiService', ['listStores', 'agentPackage', 'overview', 'tables', 'soldItems']);
+    api.listStores.and.returnValue(
+      of([{ id: 'abc', name: 'Pastelaria Central', isActive: true, agentVersion: '1.3.0' }]) as never
+    );
+    api.agentPackage.and.returnValue(of({ version: '1.4.0' }) as never);
+    api.overview.and.returnValue(of(overview()) as never);
+    api.tables.and.returnValue(of({ free: 8, tables: [] }) as never);
+    api.soldItems.and.returnValue(of({ items: [], totalQuantity: 0, totalValue: 0 }) as never);
+
+    await TestBed.configureTestingModule({
+      imports: [ShopComponent],
+      providers: [
+        provideRouter([]),
+        { provide: ApiService, useValue: api },
+        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: new Map([['id', 'abc']]) } } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(ShopComponent);
+    element = fixture.nativeElement;
+    fixture.detectChanges();
+  });
+
+  // The agent version was the loudest colour on an otherwise-healthy screen,
+  // on a non-technical reader's page, about something they cannot act on. It
+  // lives on the Shops list, with a tooltip, for the person who can.
+  it('keeps the agent version off the owner’s page', () => {
+    expect(element.textContent).not.toContain('1.3.0');
+    expect(element.querySelector('.text-danger')).toBeNull();
+  });
+});

@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
-import { numberLocale, t } from '../i18n';
+import { currency, numberLocale, t } from '../i18n';
 
 export interface BarDatum {
   label: string;
@@ -69,7 +69,7 @@ export class BarChartComponent {
 
   format(value: number): string {
     return this.unit === 'currency'
-      ? new Intl.NumberFormat(numberLocale, { style: 'currency', currency: 'EUR' }).format(value)
+      ? new Intl.NumberFormat(numberLocale, { style: 'currency', currency }).format(value)
       : new Intl.NumberFormat(numberLocale).format(value);
   }
 }
