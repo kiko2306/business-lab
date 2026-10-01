@@ -24,7 +24,7 @@ export interface HourlyDatum {
   imports: [CommonModule, TPipe],
   template: `
     @if (!data.length) {
-      <p class="text-secondary small mb-0">{{ 'No takings yet today.' | t }}</p>
+      <p class="text-body-secondary small mb-0">{{ 'No takings yet today.' | t }}</p>
     } @else {
       <div class="hourly">
         @for (d of data; track d.hour) {
@@ -39,7 +39,7 @@ export interface HourlyDatum {
           </div>
         }
       </div>
-      <p class="small text-secondary mt-2 mb-0">
+      <p class="small text-body-secondary mt-2 mb-0">
         {{ 'Peak {v} at {h}:00' | t: { v: format(peak), h: pad(peakHour) } }}
       </p>
     }

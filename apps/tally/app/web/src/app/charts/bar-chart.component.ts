@@ -26,7 +26,7 @@ export interface BarDatum {
   imports: [CommonModule],
   template: `
     @if (!data.length) {
-      <p class="text-secondary small mb-0">{{ emptyText }}</p>
+      <p class="text-body-secondary small mb-0">{{ emptyText }}</p>
     } @else {
       <div class="bar-chart">
         @for (d of data; track d.label) {

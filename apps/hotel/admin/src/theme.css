@@ -22,6 +22,22 @@
   --app-shadow-k: 0.3;
   /* A token, not inline in service-card.component.css, which is at its size budget. */
   --app-shadow-service-card: 0 3px 8px rgba(2, 6, 23, 0.07), 0 18px 34px -18px rgba(2, 6, 23, 0.18);
+
+  /* Bootstrap's stock link blue is #0d6efd, which on this canvas measures
+     4.19:1 — under the 4.5:1 floor for body text, and links here are small
+     (measured in a real Chromium against Tally's shop view, plan.md §806.3).
+     Its own hover shade is already dark enough. */
+  --bs-link-color: #0a58ca;
+  --bs-link-color-rgb: 10, 88, 202;
+  --bs-link-hover-color: #084298;
+  --bs-link-hover-color-rgb: 8, 66, 152;
+
+  /* Bootstrap's stock light border is #dee2e6, which against this canvas is
+     about 1.1:1 — with the shadow scaled to 0.3 as well, a card had almost no
+     edge. slate-300 keeps the palette and gives the surface a boundary that
+     survives a bright room. */
+  --bs-border-color: #cbd5e1;
+  --bs-border-color-translucent: rgba(15, 23, 42, 0.12);
 }
 
 [data-bs-theme='dark'] {
@@ -52,6 +68,14 @@
   --bs-secondary-bg: #334155;
   --bs-border-color: #334155;
   --bs-border-color-translucent: rgba(255, 255, 255, 0.1);
+  /* Our :root link override would otherwise win here by source order —
+     dark keeps Bootstrap's own lighter link, which measures 5.98:1 on this
+     canvas. */
+  --bs-link-color: #6ea8fe;
+  --bs-link-color-rgb: 110, 168, 254;
+  --bs-link-hover-color: #8bb9fe;
+  --bs-link-hover-color-rgb: 139, 185, 254;
+
   --bs-card-bg: #26303f;
   --bs-card-cap-bg: #26303f;
   --bs-card-border-color: #334155;
@@ -76,6 +100,9 @@ a {
 
 .card {
   border-radius: 1rem;
+  /* Bootstrap redeclares --bs-card-border-color *inside* .card, so pointing
+     the :root copy at the palette does nothing — set the colour here. */
+  border-color: var(--bs-border-color);
   /* A close contact shadow plus a soft wide one — cards sit above the page
      rather than being drawn flat on it. Alpha is scaled by
      `--app-shadow-k` so light mode is subtler. */

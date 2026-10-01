@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.162.1] — 2026-10-01
+
+### Fixed
+
+- Light-mode links now meet the 4.5:1 contrast floor, in the dashboard theme and the four apps that share it (plan.md §806.3)
+
 ## [0.162.0] — 2026-10-01
 
 ### Fixed

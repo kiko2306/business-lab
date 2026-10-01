@@ -40,3 +40,30 @@ body {
     justify-self: start;
   }
 }
+
+/* Bootstrap does not recolour outline buttons per colour mode: the label stays
+   #6c757d, which measures 3.12:1 on this canvas in dark and 4.33:1 in light —
+   both under 4.5:1, on controls a shop reads in daylight (plan.md §806).
+   The theme's own secondary ink is already the right colour in each mode. */
+.btn-outline-secondary {
+  --bs-btn-color: var(--bs-secondary-color);
+  --bs-btn-border-color: var(--bs-border-color);
+}
+
+/* Touch gets targets a thumb can hit; a mouse keeps the compact row. Keyed on
+   the pointer, not the width: this app is read on a phone in a shop and on a
+   wall screen, and only one of those is coarse. */
+@media (pointer: coarse) {
+  .btn-sm,
+  .form-control-sm,
+  .form-select-sm {
+    min-height: 44px;
+  }
+
+  /* Inline text links sit in flowing text, so they get reach rather than a box. */
+  a.small {
+    display: inline-block;
+    padding-block: 0.5rem;
+  }
+}
+

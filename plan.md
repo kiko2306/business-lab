@@ -36273,3 +36273,41 @@ are meaningful at zero. A closed day is excluded: an archive day with no sales g
 none.
 
 37 specs.
+
+### 806.3 — the contrast sweep (item 4)
+
+The finding Assessment A missed and the browser measured: `.text-secondary` resolves to
+`#6c757d` in **both** colour modes, because Bootstrap 5.3 reads it from `--bs-secondary-rgb`
+while the theme only overrides `--bs-body-secondary`. Measured in the browser that renders it:
+**2.84:1** on the dark card, **3.12:1** on the dark canvas, **4.33:1** on the light canvas —
+41 occurrences across the two templates and both chart components, every stat-card label among
+them, on a screen read in a shop in daylight.
+
+The fix is one class: `.text-secondary` → `.text-body-secondary`, which routes through the
+token the theme already sets correctly per mode. `.btn-outline-secondary` needed its own line
+in Tally's styles (Bootstrap does not recolour outline buttons per colour mode, so Refresh and
+the theme toggle carried the same 3.12:1).
+
+**The test is the interesting part.** `contrast.spec.ts` renders the shop view in Karma's real
+Chromium, walks every text-bearing element, reads `getComputedStyle`, resolves the painted
+background by walking up past transparent ancestors, and computes the WCAG ratio — in both
+colour modes. It fails with the offending strings and their ratios ("Taken today — 2.84:1"),
+so the next regression names itself. Measuring the rendered result beats asserting the
+stylesheet, which is what let this survive in the first place: the stylesheet *does* define the
+right colour, and the templates asked for a different one.
+
+That test then caught a second thing on the way out: links at **4.19:1** on the light canvas
+(`#0d6efd` on `#f4f7fb`). This one is not Tally's — it is the shared theme's, so it was fixed in
+`frontend/src/styles.css` and synced to all four apps rather than diverged in Tally, per the
+"one product family" decision. First attempt put `--bs-link-color` on `:root` alone, which
+broke dark mode to 2.27:1: `[data-bs-theme='dark']` and `:root` have equal specificity, so
+source order handed our light value to dark as well. The dark block now re-states Bootstrap's
+lighter link (5.98:1) explicitly.
+
+Touch targets, from the same pass: `(pointer: coarse)` gives `.btn-sm`, `.form-control-sm` and
+`.form-select-sm` a 44px floor and inline text links vertical padding. Tally had no
+coarse-pointer rule at all, and its smallest control measured 26×31 on a phone — the primary
+device for this surface. Keyed on the pointer rather than the width, so a wall screen driven by
+a mouse keeps the compact row.
+
+39 Tally specs; the dashboard's 265 and both builds still pass with the shared theme change.
