@@ -26,8 +26,19 @@ function detect(): Lang {
 
 export const lang: Lang = detect();
 
-/** For `Intl` calls in code; the templates get theirs from LOCALE_ID. */
+/**
+ * For `Intl` calls in code; the templates get theirs from LOCALE_ID, and the
+ * document gets it from `htmlLang` — all three must agree.
+ *
+ * en-IE, never plain `en` or `en-US`: a native `<input type="date">` renders in
+ * the document's locale, so US English put `mm/dd/yyyy` in the picker two lines
+ * under a `dd/MM/yyyy` business date, in a Portuguese shop (plan.md §806).
+ * en-IE is English with European dates and the euro.
+ */
 export const numberLocale = lang === 'pt-PT' ? 'pt-PT' : 'en-IE';
+
+/** What `<html lang>` and `LOCALE_ID` are set to; see numberLocale. */
+export const htmlLang = numberLocale;
 
 export function setLang(next: Lang): void {
   try {
@@ -55,6 +66,8 @@ const PT: Record<string, string> = {
   'Loading…': 'A carregar…',
   'No shops yet. Add one above, then issue it an enrolment code to connect its agent.':
     'Ainda não há lojas. Adicione uma acima e emita-lhe um código de registo para ligar o respetivo agente.',
+  'No shops yet. An administrator adds them and grants you access.':
+    'Ainda não há lojas. Um administrador adiciona-as e dá-lhe acesso.',
   'Shop': 'Loja',
   'Status': 'Estado',
   'Agent': 'Agente',
@@ -120,6 +133,8 @@ const PT: Record<string, string> = {
     'O agente não está ligado, por isso não há valores em direto para mostrar. Não se mostra nada em vez de apresentar os últimos valores conhecidos como se fossem atuais. Volta a ligar-se sozinho assim que a máquina e a rede da loja estiverem de volta.',
   'Invoiced': 'Faturado',
   'Taken today': 'Faturado hoje',
+  'Nothing rung up yet today. Figures appear as sales go through.':
+    'Ainda nada registado hoje. Os valores aparecem à medida que há vendas.',
   'Day counters': 'Contadores do dia',
   '{amount} more than last {weekday}': '{amount} acima de {weekday} passado',
   '{amount} less than last {weekday}': '{amount} abaixo de {weekday} passado',

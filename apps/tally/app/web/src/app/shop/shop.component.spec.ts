@@ -121,3 +121,140 @@ describe('ShopComponent', () => {
     expect(element.querySelector('.hero-value')).not.toBeNull();
   });
 });
+
+// The Tables tab's drill-down was `<tr role="button">`: not focusable, no key
+// handler, no expanded state, and `role="button"` overrode `role="row"` so the
+// six cells stopped being announced against their headers (plan.md §806).
+describe('ShopComponent table drill-down', () => {
+  let fixture: ComponentFixture<ShopComponent>;
+  let element: HTMLElement;
+
+  beforeEach(async () => {
+    const api = jasmine.createSpyObj('ApiService', ['listStores', 'agentPackage', 'overview', 'tables', 'soldItems']);
+    api.listStores.and.returnValue(of([]));
+    api.agentPackage.and.returnValue(of(null) as never);
+    api.overview.and.returnValue(of(overview()) as never);
+    api.soldItems.and.returnValue(of({ items: [] }) as never);
+    api.tables.and.returnValue(
+      of({
+        free: 8,
+        tables: [
+          {
+            table: 7,
+            state: 'occupied',
+            staff: 'Ana',
+            guests: 2,
+            openedAt: '2026-10-03T12:00:00Z',
+            total: 48.6,
+            lines: [{ quantity: 2, description: 'Café', total: 1.6 }],
+          },
+        ],
+      }) as never
+    );
+
+    await TestBed.configureTestingModule({
+      imports: [ShopComponent],
+      providers: [
+        provideRouter([]),
+        { provide: ApiService, useValue: api },
+        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: new Map([['id', 'abc']]) } } },
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ShopComponent);
+    element = fixture.nativeElement;
+    fixture.detectChanges();
+  });
+
+  it('leaves the row a row', () => {
+    const row = element.querySelector('tbody tr') as HTMLElement;
+    expect(row.getAttribute('role')).toBeNull();
+  });
+
+  it('opens from a real button that reports its state', () => {
+    const toggle = element.querySelector('tbody tr button') as HTMLButtonElement;
+    expect(toggle).not.toBeNull();
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(toggle.getAttribute('aria-controls')).toBe('table-7-lines');
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(element.querySelector('#table-7-lines')).not.toBeNull();
+  });
+
+  it('labels the columns of the line-items table it opens', () => {
+    (element.querySelector('tbody tr button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const headers = Array.from(element.querySelectorAll('#table-7-lines th')).map((h) => h.getAttribute('scope'));
+    expect(headers.length).toBe(3);
+    expect(headers.every((s) => s === 'col')).toBeTrue();
+  });
+
+  it('renders no empty tab slot on a closed day', () => {
+    const empty = Array.from(element.querySelectorAll('.nav-tabs .nav-item')).filter(
+      (li) => !li.querySelector('button')
+    );
+    expect(empty.length).toBe(0);
+  });
+});
+
+// A day that has not started yet used to render eleven zeroes and four
+// differently-worded empty strings, which reads as broken rather than early
+// (plan.md §806). One sentence replaces the figures until the first sale.
+describe('ShopComponent before the first sale', () => {
+  let fixture: ComponentFixture<ShopComponent>;
+  let element: HTMLElement;
+
+  const build = async (today: Overview) => {
+    const api = jasmine.createSpyObj('ApiService', ['listStores', 'agentPackage', 'overview', 'tables', 'soldItems']);
+    api.listStores.and.returnValue(of([]));
+    api.agentPackage.and.returnValue(of(null) as never);
+    api.overview.and.returnValue(of(today) as never);
+    api.tables.and.returnValue(of({ free: 12, tables: [] }) as never);
+    api.soldItems.and.returnValue(of({ items: [], totalQuantity: 0, totalValue: 0 }) as never);
+
+    await TestBed.configureTestingModule({
+      imports: [ShopComponent],
+      providers: [
+        provideRouter([]),
+        { provide: ApiService, useValue: api },
+        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: new Map([['id', 'abc']]) } } },
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ShopComponent);
+    element = fixture.nativeElement;
+    fixture.detectChanges();
+  };
+
+  const quietDay = () =>
+    overview({ totals: { invoiced: 0, open: 0 }, hourly: [], stats: undefined, clients: { present: 0 } });
+
+  it('says the day has not started rather than showing a wall of zeroes', async () => {
+    await build(quietDay());
+    expect(element.textContent).toContain('Nothing rung up yet today');
+    expect(element.querySelector('.hero-value')).toBeNull();
+  });
+
+  it('still shows what is meaningful at zero', async () => {
+    await build(quietDay());
+    expect(element.textContent).toContain('Tables in use');
+  });
+
+  it('shows the figures as soon as there is one sale', async () => {
+    await build(overview({ totals: { invoiced: 12.5, open: 0 }, hourly: [{ hour: 9, total: 12.5 }] }));
+    expect(element.textContent).not.toContain('Nothing rung up yet today');
+    expect(element.querySelector('.hero-value')).not.toBeNull();
+  });
+
+  it('does not claim a quiet day on a closed one', async () => {
+    await build(overview({ archive: true, totals: { invoiced: 0, open: 0 }, hourly: [] }));
+    expect(element.textContent).not.toContain('Nothing rung up yet today');
+  });
+
+  it('caps the day picker to real trading days', async () => {
+    await build(overview());
+    const picker = element.querySelector('input[type="date"]') as HTMLInputElement;
+    expect(picker.getAttribute('max')).toBe('2026-10-03');
+    expect(picker.getAttribute('min')).toBeTruthy();
+  });
+});

@@ -28,6 +28,7 @@
         class="form-control form-control-sm"
         [value]="date || runningDate || ''"
         [max]="runningDate ?? ''"
+        [min]="earliestDate"
         (change)="pickDate($any($event.target).value)" />
     </label>
     @if (date) {
@@ -51,6 +52,35 @@
 } @else if (loading && !overview) {
   <p class="text-secondary">{{ 'Loading…' | t }}</p>
 } @else if (overview) {
+  @if (beforeFirstSale) {
+    <!-- One sentence instead of eleven zeroes and four empty strings. -->
+    <div class="card stat-card mb-4">
+      <div class="card-body">
+        <p class="mb-0">{{ 'Nothing rung up yet today. Figures appear as sales go through.' | t }}</p>
+      </div>
+    </div>
+    <div class="row g-3 mb-4">
+      <div class="col-6">
+        <div class="card stat-card h-100">
+          <div class="card-body">
+            <p class="stat-label text-secondary mb-1">{{ 'Tables in use' | t }}</p>
+            <p class="stat-value mb-0">
+              {{ overview.tables.occupied }}<span class="fs-6 text-secondary">
+                / {{ overview.tables.occupied + overview.tables.free + overview.tables.awaitingPayment }}</span>
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="card stat-card h-100">
+          <div class="card-body">
+            <p class="stat-label text-secondary mb-1">{{ 'Guests in' | t }}</p>
+            <p class="stat-value mb-0">{{ overview.clients.present }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  } @else {
   <!-- The answer, then everything else. This page used to open with eleven
        identically-weighted tiles, so the figure the owner came for was one
        cell in a grid (plan.md §806). -->
@@ -174,6 +204,8 @@
     </div>
   }
 
+  }
+
   <div class="card stat-card mb-4">
     <div class="card-body">
       <h3 class="h6 mb-3">{{ 'Takings by hour' | t }}</h3>
@@ -194,13 +226,13 @@
   </div>
 
   <ul class="nav nav-tabs mb-3">
-    <li class="nav-item">
-      @if (!viewingArchive) {
+    @if (!viewingArchive) {
+      <li class="nav-item">
         <button class="nav-link" [class.active]="tab === 'tables'" type="button" (click)="setTab('tables')">
           {{ 'Tables' | t }}
         </button>
-      }
-    </li>
+      </li>
+    }
     <li class="nav-item">
       <button class="nav-link" [class.active]="tab === 'items'" type="button" (click)="setTab('items')">
         {{ 'Items sold' | t }}
@@ -228,8 +260,17 @@
           </thead>
           <tbody>
             @for (t of tables.tables; track t.table) {
-              <tr role="button" (click)="toggleTable(t.table)">
-                <td [attr.data-label]="'Table' | t">{{ t.table }}</td>
+              <tr>
+                <td [attr.data-label]="'Table' | t">
+                  <!-- A control, not a clickable row: `role="button"` on the
+                       <tr> stopped the cells being announced against their
+                       headers, and a row is not focusable. -->
+                  <button type="button" class="btn btn-link p-0 table-toggle" (click)="toggleTable(t.table)"
+                          [attr.aria-expanded]="openTable === t.table"
+                          [attr.aria-controls]="'table-' + t.table + '-lines'">
+                    {{ t.table }}
+                  </button>
+                </td>
                 <td [attr.data-label]="'State' | t">
                   <!-- Badge carries a word, not just a colour: state must not be
                        conveyed by colour alone. -->
@@ -245,12 +286,19 @@
                 <td [attr.data-label]="'Total' | t" class="text-end num">{{ t.total | currency: 'EUR' }}</td>
               </tr>
               @if (openTable === t.table) {
-                <tr>
+                <tr [attr.id]="'table-' + t.table + '-lines'">
                   <td colspan="6" class="bg-body-tertiary">
                     @if (!t.lines.length) {
                       <p class="small text-secondary mb-0">{{ 'Nothing ordered yet.' | t }}</p>
                     } @else {
                       <table class="table table-sm mb-0">
+                        <thead class="visually-hidden">
+                          <tr>
+                            <th scope="col">{{ 'Quantity' | t }}</th>
+                            <th scope="col">{{ 'Item' | t }}</th>
+                            <th scope="col">{{ 'Total' | t }}</th>
+                          </tr>
+                        </thead>
                         <tbody>
                           @for (line of t.lines; track line.description) {
                             <tr>
@@ -284,6 +332,11 @@
       <!-- The table stays below the chart: it is the exact-values view, and
            the accessibility pass wants one present rather than colour and
            length being the only way to read the data. -->
+      @if (!soldItems.items.length) {
+        <!-- The chart above has an empty state; the table used to render a
+             header row over nothing. -->
+        <p class="text-secondary mb-0">{{ 'Nothing sold yet.' | t }}</p>
+      } @else {
       <div class="table-responsive table-stack-wrap">
         <table class="table table-stack align-middle">
           <thead>
@@ -314,6 +367,7 @@
           </tbody>
         </table>
       </div>
+      }
     }
   }
 }

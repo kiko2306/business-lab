@@ -1,4 +1,5 @@
 import { registerLocaleData } from '@angular/common';
+import localeEnIE from '@angular/common/locales/en-IE';
 import localePt from '@angular/common/locales/pt-PT';
 import { LOCALE_ID } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
@@ -6,17 +7,18 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { AppComponent } from './app/app.component';
 import { routes } from './app/app.routes';
-import { lang } from './app/i18n';
+import { htmlLang } from './app/i18n';
 
 // Dates and currency follow the same language as the words; see i18n.ts.
 registerLocaleData(localePt);
-document.documentElement.lang = lang;
+registerLocaleData(localeEnIE);
+document.documentElement.lang = htmlLang;
 
 bootstrapApplication(AppComponent, {
   providers: [
     provideHttpClient(),
     provideRouter(routes),
-    { provide: LOCALE_ID, useValue: lang === 'pt-PT' ? 'pt-PT' : 'en-US' },
+    { provide: LOCALE_ID, useValue: htmlLang },
   ],
 }).catch((err) => console.error(err));
 

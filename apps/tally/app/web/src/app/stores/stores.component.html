@@ -1,10 +1,11 @@
 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
-  <h2 class="h4 mb-0">{{ 'Shops' | t }}</h2>
+  <h1 class="h4 mb-0">{{ 'Shops' | t }}</h1>
   @if (isAdmin) {
   <form class="d-flex gap-2" (ngSubmit)="create()">
     <input
       class="form-control"
       name="newName"
+      [attr.aria-label]="'New shop name' | t"
       [placeholder]="'New shop name' | t"
       [(ngModel)]="newName"
       [disabled]="creating"
@@ -36,9 +37,15 @@
 
 @if (loading) {
   <p class="text-secondary">{{ 'Loading…' | t }}</p>
-} @else if (!stores.length) {
+} @else if (!error && !stores.length) {
+  <!-- `!error` matters: a failed request used to render this beside the error,
+       so a transport failure read as "your shops are gone". -->
   <div class="alert alert-info mb-0">
-    {{ 'No shops yet. Add one above, then issue it an enrolment code to connect its agent.' | t }}
+    @if (isAdmin) {
+      {{ 'No shops yet. Add one above, then issue it an enrolment code to connect its agent.' | t }}
+    } @else {
+      {{ 'No shops yet. An administrator adds them and grants you access.' | t }}
+    }
   </div>
 } @else {
   <div class="table-responsive table-stack-wrap">
@@ -140,7 +147,8 @@
                       <input
                         class="form-control form-control-sm"
                         name="newIdentity"
-                        [placeholder]="'Authelia username' | t"
+                        [attr.aria-label]="'Authelia username' | t"
+          [placeholder]="'Authelia username' | t"
                         [(ngModel)]="newIdentity" />
                       <button class="btn btn-sm btn-primary text-nowrap" type="submit" [disabled]="!newIdentity.trim()">
                         {{ 'Grant' | t }}

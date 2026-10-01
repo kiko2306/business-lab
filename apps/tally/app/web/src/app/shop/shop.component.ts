@@ -80,6 +80,29 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.openTable = this.openTable === table ? null : table;
   }
 
+  /**
+   * A running day that has not started: no takings, nothing on the hourly
+   * track. Eleven zero tiles and four differently-worded empty strings read as
+   * "broken" at 07:40, not as "early" (plan.md §806), so the figures wait for
+   * the first sale and one sentence stands in. Tables and guests are left
+   * showing, because they are meaningful at zero.
+   */
+  get beforeFirstSale(): boolean {
+    const o = this.overview;
+    return !!o && !o.archive && o.totals.invoiced === 0 && o.totals.open === 0 && !(o.hourly ?? []).length;
+  }
+
+  /**
+   * The earliest day the picker offers. Wintouch keeps its archive, but a date
+   * from before this shop existed costs a relay to a Windows machine to come
+   * back empty, so the floor is a year back from the running day.
+   */
+  get earliestDate(): string {
+    const from = this.runningDate ? new Date(`${this.runningDate}T00:00:00Z`) : new Date();
+    from.setUTCFullYear(from.getUTCFullYear() - 1);
+    return from.toISOString().slice(0, 10);
+  }
+
   /** A closed day: the live-only panels and the Tables tab have nothing to say about it. */
   get viewingArchive(): boolean {
     return !!this.date;

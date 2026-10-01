@@ -36230,3 +36230,46 @@ Verified in a browser as well: built, served against a stub API, screenshotted a
 of the critique's findings first-hand: the native date input shows `10/03/2026` (US order) two
 lines under `Business day 03/10/2026`, and the secondary labels are visibly dim. Both are items
 3 and 4 below.
+
+### 806.2 — harden (item 3)
+
+The defects the critique found around the figures, now that the figures read properly.
+
+**The drill-down was a lie to assistive tech.** `<tr role="button" (click)=…>` had no
+`tabindex`, no key handler and no expanded state, and `role="button"` overrode `role="row"`,
+so the six cells stopped being announced against their `<th>` headers. "What is on table 7"
+— the Tables tab's only interaction — was unreachable by keyboard. The row is a row again;
+the table number is a real `<button>` with `aria-expanded` and `aria-controls` pointing at
+the detail row's id. The nested line-items table inside it, the one table of four with no
+headers at all, got a visually-hidden `<thead>`.
+
+**A failed request claimed the shops were gone.** Measured in the browser during the critique:
+`StoresComponent.fail()` sets `error` but never touches `stores`, so `@else if (!stores.length)`
+fired alongside the error and the page read "Request failed (404)" *and* "No shops yet. Add one
+above". The empty branch is now `!error && !stores.length` — and its copy was telling a
+non-admin to use an add form that lives inside `@if (isAdmin)`, so a viewer now reads "An
+administrator adds them and grants you access" instead of being pointed at a control that is
+not on their page.
+
+**The date picker spoke American.** `LOCALE_ID` was `en-US` and `<html lang>` was `en`, so the
+native `<input type="date">` rendered `10/03/2026` two lines under `Business day 03/10/2026` —
+visible in the critique's own screenshot, in a Portuguese shop. Both now come from one exported
+`htmlLang`, which is `en-IE` for English: European dates, euro currency. A spec asserts the
+three locales agree and that none of them is US English, because this is the kind of thing that
+regresses silently.
+
+Also: the picker gained a `min` (a year back from the running day — a date from before the shop
+existed costs a relay to a Windows machine to come back empty); the Items-sold table gained the
+empty state its chart already had; the empty `<li>` that rendered a phantom tab slot on a closed
+day is gone; both pages gained an `<h1>`, having started at `h2` with the only `h1` being a
+Bootstrap utility class on the navbar anchor.
+
+**The zero-state.** At 07:40 the page rendered eleven zeroes and four separately-worded empty
+strings — "No takings yet today." / "Nothing taken yet." / "No payments yet." / "No tables open.
+12 free." — which reads as broken, not as early, on the first look of the owner's day. A running
+day with no takings and nothing on the hourly track now shows one sentence, "Nothing rung up yet
+today. Figures appear as sales go through.", and keeps only Tables in use and Guests in, which
+are meaningful at zero. A closed day is excluded: an archive day with no sales genuinely had
+none.
+
+37 specs.
