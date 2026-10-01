@@ -35380,3 +35380,63 @@ expanded "Accounts" list, a populated "Log entries" table, a real running
 service row, etc. were never actually rendered) — noted, not treated as a
 gap to close without being asked; the test stack would need seeded data to
 show any of it.
+
+## 792. The real-time status channel was never actually reaching the browser
+
+Picked up §790's own closing note — seed the disposable test stack so Apps'
+service rows, a populated Users list, etc. could finally be screenshotted.
+Expanding "All apps" for the first time (every prior screenshot left it
+collapsed) surfaced something much bigger than a seeding gap: it never
+stopped showing "Loading services…", and Home's status headline never
+stopped reading as if `total` were 0, no matter how long either page sat
+open.
+
+**Root cause, two independent bugs, each masking proof of the other:**
+
+1. `realtime.ts`'s WebSocket server listens at `/ws/services` — not under
+   `/api/`. `frontend/nginx.conf` only has upgrade-aware proxy locations for
+   `/api` and `/api/`; `/ws/services` matched neither, fell through to the
+   SPA catch-all (`try_files … /index.html`), and got back a plain 200
+   instead of a 101. Confirmed live via the browser's own console: `Error
+   during WebSocket handshake: Unexpected response code: 200`.
+2. `ServiceStateService` falls back to SSE on a WebSocket failure, and that
+   fallback *did* connect (200 OK on `/services/stream`) — but nginx buffers
+   a proxied response by default, and the backend's own `sendEvent` writes
+   (a few hundred bytes of JSON) never filled that buffer. The browser
+   received nothing, `EventSource.onerror` never fired (nothing had actually
+   failed, from nginx's perspective), so the code's own next fallback —
+   15-second polling — never engaged either. Both transports silently did
+   nothing forever, and the only way anyone would ever see live data was the
+   manual "Refresh status" button, which calls a plain `GET` directly and was
+   never affected.
+
+This is `frontend/nginx.conf` — the file the comment at its own call site
+already describes as "the same nginx config production ships" — not a
+test-stack artifact. Whatever masked it in practice (a stale habit of
+clicking Refresh, a short enough session that nobody waited past it) wasn't
+investigated; the fix doesn't depend on knowing why it went unnoticed.
+
+**Fixes, one per bug:**
+- `realtime.ts`'s `sseHandler` now sends `X-Accel-Buffering: no` —
+  nginx's own documented per-response opt-out, scoped to this one endpoint
+  rather than disabling buffering for the whole `/api/` location (which also
+  carries ordinary JSON responses that have no reason to skip it).
+- `nginx.conf` gained a `location /ws/` block, proxying to
+  `http://backend:3000/ws/` with the same upgrade headers `/api/` already
+  uses — copied, not reinvented.
+
+Test-first: `realtime.test.ts` (no prior test file for this module existed)
+calls `sseHandler` against a mocked `Response` and asserts the header is
+set — the only part of this bug a unit test can reach; nginx's own buffering
+behavior isn't unit-testable from here. Verified live, both fixes together,
+on the same `docker-compose.test.yml` harness: the browser's WebSocket
+actually opens and streams frames seconds apart (watched the raw frames),
+Apps goes from "All 0 apps are fine" to "All 44 apps are fine" with a
+**Connected** badge and a real last-refresh time, "All apps" expands into
+real category groups and real service rows (initials avatar, `checking`
+badge, Start/Stop/Settings — service-card's actual rendering, seen live for
+the first time), and Home's status headline does the same. Backend 1296
+tests + typecheck, frontend 175 tests, both clean.
+
+Original task — seed Users/Backups/Content and audit those populated
+states — not done yet; this finding took the session first. Still open.

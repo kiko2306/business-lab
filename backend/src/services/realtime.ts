@@ -130,6 +130,12 @@ export async function sseHandler(req: Request, res: Response): Promise<Response 
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
+    // nginx buffers a proxied response by default, so a stream of small
+    // writes can sit in that buffer indefinitely instead of reaching the
+    // browser — found live (plan.md §792): the frontend's WebSocket fallback
+    // to this endpoint connected (200 OK) but never received a single event.
+    // This is nginx's own documented per-response opt-out.
+    'X-Accel-Buffering': 'no',
   });
   res.flushHeaders?.();
 

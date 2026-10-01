@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.157.4** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.158.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,6 +212,16 @@ it is done — not ticked off and left behind. Section references point at
 Done one page at a time, test first, each its own commit and version bump. A finished
 item is deleted.
 
+- [ ] **Beta-test the WebSocket/SSE fix for live service status (plan.md §792)** —
+      on `beta`, open Apps and expand "All apps": confirm it shows real rows (not
+      a permanent "Loading services…") and a **Connected** badge, not **sse** or
+      **polling**, within a second or two of opening the page. Open the browser's
+      Network tab and confirm `wss://<host>/ws/services` shows `101 Switching
+      Protocols`, not a plain 200. Check Home's status headline updates live too
+      (stop an app from another tab/device and watch it flip without a manual
+      refresh). This was never actually working through nginx before — confirm
+      it now does on the real tunnel/NPM path, not just the direct container
+      path the test stack exercises.
 - [ ] **Beta-test Home's new badges (plan.md §788)** — on `beta`, with a
       successful app-data backup on record, confirm the Backups tile shows
       its age ("Backed up Nd ago" / "Backed up today"), and that the Updates
