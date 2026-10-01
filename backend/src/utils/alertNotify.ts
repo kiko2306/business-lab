@@ -16,6 +16,7 @@
 import { query } from './database';
 import { getPublishedUpstreamPort } from '../config/services';
 import { getHostGatewayIp } from './network';
+import { setSetting } from './settingsStore';
 
 export const DEFAULT_ALERT_TOPIC = 'homelab-alerts';
 
@@ -78,15 +79,6 @@ async function readSetting(key: string): Promise<string | null> {
   }
 }
 
-async function writeSetting(key: string, value: string): Promise<void> {
-  await query(
-    `INSERT INTO settings (key, value, updated_at)
-     VALUES ($1, $2, NOW())
-     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-    [key, value]
-  );
-}
-
 export async function getAlertNotifyConfig(): Promise<AlertNotifyConfig> {
   const rows = await Promise.all(
     ALERT_CATEGORIES.flatMap((category) => [readSetting(categoryTopicKey(category)), readSetting(CATEGORY_ENABLED_KEY[category])])
@@ -105,7 +97,7 @@ export async function getAlertNotifyConfig(): Promise<AlertNotifyConfig> {
 }
 
 export async function setAlertCategoryEnabled(category: AlertSource, value: boolean): Promise<void> {
-  await writeSetting(CATEGORY_ENABLED_KEY[category], value ? 'true' : 'false');
+  await setSetting(CATEGORY_ENABLED_KEY[category], value ? 'true' : 'false');
 }
 
 /**
@@ -119,7 +111,7 @@ export async function setAlertCategoryTopic(category: AlertSource, topic: string
     await query('DELETE FROM settings WHERE key = $1', [categoryTopicKey(category)]);
     return;
   }
-  await writeSetting(categoryTopicKey(category), topic);
+  await setSetting(categoryTopicKey(category), topic);
 }
 
 /**
@@ -137,7 +129,7 @@ export async function ensureAlertCategoryTopics(): Promise<void> {
   for (const category of ALERT_CATEGORIES) {
     const existing = await readSetting(categoryTopicKey(category));
     if (!isValidAlertTopic(existing)) {
-      await writeSetting(categoryTopicKey(category), seed);
+      await setSetting(categoryTopicKey(category), seed);
     }
   }
 }

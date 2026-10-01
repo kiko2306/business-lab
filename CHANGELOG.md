@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.159.1] — 2026-10-01
+
+### Changed
+
+- Every write to the settings table goes through one batched upsert, so a multi-key save (exposure, mail, backup target, backup schedule) can no longer land half-applied
+
 ## [0.159.0] — 2026-10-01
 
 ### Performance

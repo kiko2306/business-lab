@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import { execFile, ExecFileOptions } from 'child_process';
 import { query } from '../utils/database';
+import { setSettings } from '../utils/settingsStore';
 
 export const BACKUP_DIR = path.join(process.cwd(), 'backups');
 
@@ -214,13 +215,7 @@ export async function saveBackupScheduleConfig(config: {
     [BACKUP_SCHEDULE_SETTINGS_KEYS.runAtTime]: config.runAtTime,
     [BACKUP_SCHEDULE_SETTINGS_KEYS.retentionCount]: String(config.retentionCount),
   };
-  for (const [key, value] of Object.entries(values)) {
-    await query(
-      `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
-       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-      [key, value]
-    );
-  }
+  await setSettings(values);
 }
 
 /**
@@ -252,13 +247,7 @@ export async function recordBackupScheduleRun(outcome: BackupRunOutcome, at: Dat
     values[BACKUP_SCHEDULE_SETTINGS_KEYS.lastSuccessAt] = iso;
   }
 
-  for (const [key, value] of Object.entries(values)) {
-    await query(
-      `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
-       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-      [key, value]
-    );
-  }
+  await setSettings(values);
 }
 
 // ---------------------------------------------------------------------------

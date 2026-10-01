@@ -111,7 +111,7 @@ describe('reconcileExposureDrift', () => {
     await reconcileExposureDrift();
     const write = db.query.mock.calls.find(([sql]) => sql.includes('INSERT INTO settings'));
     expect(write).toBeDefined();
-    expect(write![1][0]).toBe(EXPOSURE_RECONCILE_LAST_RUN_KEY);
+    expect(write![1][0]).toEqual([EXPOSURE_RECONCILE_LAST_RUN_KEY]);
   });
 
   it('never touches secondary keys directly', async () => {

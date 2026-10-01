@@ -20,7 +20,6 @@
  * service is exposed or global exposure config is missing.
  */
 
-import { query } from '../utils/database';
 import { writeAuditLog } from '../utils/audit';
 import { SERVICES } from '../config/services';
 import { getExposureConfig } from '../utils/exposureSettings';
@@ -31,6 +30,7 @@ import { syncAutheliaAccessControlSafe } from './autheliaAccessControl';
 import { syncAutheliaOidcClientsSafe } from './autheliaOidcClients';
 import { ensureCriticalServiceMonitors } from './uptimeKumaCriticalMonitors';
 import logger from '../utils/logger';
+import { setSetting } from '../utils/settingsStore';
 
 // Exposure drifts only when NPM/Cloudflare is hand-edited or a token rotates,
 // so a gentle cadence is plenty; each pass is one Cloudflare + one NPM
@@ -128,11 +128,7 @@ export async function reconcileExposureDrift(): Promise<ExposureReconcileSummary
     await ensureCriticalServiceMonitors('uptime-kuma');
   }
 
-  await query(
-    `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
-     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-    [EXPOSURE_RECONCILE_LAST_RUN_KEY, new Date().toISOString()]
-  ).catch(() => {});
+  await setSetting(EXPOSURE_RECONCILE_LAST_RUN_KEY, new Date().toISOString()).catch(() => {});
 
   if (summary.failed.length) {
     logger.warn('Exposure reconciliation: some exposures are unhealthy', { ...summary });

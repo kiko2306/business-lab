@@ -1,5 +1,6 @@
 import { Request } from 'express';
 import { query } from './database';
+import { setSetting } from './settingsStore';
 
 export const RECOVERY_MODE_KEY = 'recovery_mode_enabled';
 const CACHE_TTL_MS = 10000;
@@ -18,12 +19,7 @@ export async function isRecoveryModeEnabled(): Promise<boolean> {
 }
 
 export async function setRecoveryMode(enabled: boolean): Promise<void> {
-  await query(
-    `INSERT INTO settings (key, value, updated_at)
-     VALUES ($1, $2, NOW())
-     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-    [RECOVERY_MODE_KEY, enabled ? 'true' : 'false']
-  );
+  await setSetting(RECOVERY_MODE_KEY, enabled ? 'true' : 'false');
   cacheValue = enabled;
   cacheExpiresAt = Date.now() + CACHE_TTL_MS;
 }

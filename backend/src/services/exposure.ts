@@ -29,6 +29,7 @@ import { ensureIngressRoute, removeIngressRoute } from './cloudflareTunnelClient
 import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
 import { ExposureGlobalConfig, ExposureProvisionResult, ServiceExposureRow } from '../types';
+import { setSettings } from '../utils/settingsStore';
 
 // Every exposed service is forwarded to over plain HTTP on the host's
 // published port — TLS is terminated by NPM/Cloudflare, not the origin.
@@ -657,11 +658,10 @@ async function ensureNpmAdminBootstrapped(): Promise<void> {
   }
   if (!bootstrapped) return;
 
-  await query(
-    `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW()), ($3, $4, NOW())
-     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-    [EXPOSURE_SETTINGS_KEYS.npmEmail, bootstrapped.email, EXPOSURE_SETTINGS_KEYS.npmPassword, bootstrapped.password]
-  );
+  await setSettings({
+    [EXPOSURE_SETTINGS_KEYS.npmEmail]: bootstrapped.email,
+    [EXPOSURE_SETTINGS_KEYS.npmPassword]: bootstrapped.password,
+  });
   logger.info('Rotated Nginx Proxy Manager off its default admin credentials');
 }
 

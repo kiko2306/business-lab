@@ -5,6 +5,7 @@ import { query } from '../utils/database';
 import { schemas, validateBody } from '../middleware/validation';
 import { requireCapability } from '../middleware/requireCapability';
 import { sleep } from '../utils/wait';
+import { setSettings } from '../utils/settingsStore';
 
 const router = Router();
 
@@ -196,23 +197,11 @@ router.put('/thresholds', requireCapability('settings:manage'), validateBody(sch
   const { diskPercent, memoryPercent, loadPerCpu } = req.body;
 
   try {
-    await Promise.all([
-      query(
-        `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
-         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-        ['health_disk_threshold', String(diskPercent)]
-      ),
-      query(
-        `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
-         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-        ['health_memory_threshold', String(memoryPercent)]
-      ),
-      query(
-        `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
-         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-        ['health_load_threshold', String(loadPerCpu)]
-      ),
-    ]);
+    await setSettings({
+      health_disk_threshold: String(diskPercent),
+      health_memory_threshold: String(memoryPercent),
+      health_load_threshold: String(loadPerCpu),
+    });
     return res.json({ message: 'Health thresholds updated.' });
   } catch {
     return res.status(500).json({ error: 'Unable to update thresholds.' });

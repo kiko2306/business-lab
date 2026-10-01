@@ -17,6 +17,7 @@
  */
 
 import { query } from './database';
+import { setSetting } from './settingsStore';
 
 export type AiProviderId = 'anthropic' | 'google' | 'groq';
 
@@ -84,12 +85,7 @@ export async function getAiApiKey(provider: AiProviderId): Promise<string | null
 }
 
 export async function setAiApiKey(provider: AiProviderId, key: string): Promise<void> {
-  await query(
-    `INSERT INTO settings (key, value, updated_at)
-     VALUES ($1, $2, NOW())
-     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-    [keySettingKey(provider), key]
-  );
+  await setSetting(keySettingKey(provider), key);
 }
 
 /** First/last few characters only — enough to tell which key is stored. */
@@ -138,12 +134,7 @@ export async function getFeatureProvider(feature: AiFeature): Promise<AiProvider
 }
 
 export async function setFeatureProvider(feature: AiFeature, provider: AiProviderId): Promise<void> {
-  await query(
-    `INSERT INTO settings (key, value, updated_at)
-     VALUES ($1, $2, NOW())
-     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-    [featureProviderSettingKey(feature), provider]
-  );
+  await setSetting(featureProviderSettingKey(feature), provider);
 }
 
 /** The feature's active provider and its key, or `null` if that provider has no key stored. */

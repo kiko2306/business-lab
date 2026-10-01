@@ -151,7 +151,10 @@ describe('provisionServiceIfEnabled', () => {
 
     expect(mockedQuery).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO settings'),
-      ['exposure_npm_email', 'admin@example.com', 'exposure_npm_password', 'rotated-secret']
+      [
+        ['exposure_npm_email', 'exposure_npm_password'],
+        ['admin@example.com', 'rotated-secret'],
+      ]
     );
     expect(result.attempted).toBe(true);
     expect(mockedEnsureProxyHost).toHaveBeenCalled();

@@ -100,7 +100,7 @@ describe('ensureAiApiKeyMigration', () => {
       .mockResolvedValueOnce({ rows: [{ value: 'sk-ant-legacy' }] } as never) // legacy row
       .mockResolvedValueOnce({ rows: [] } as never); // the INSERT via setAiApiKey
     await ensureAiApiKeyMigration();
-    expect(mockedQuery).toHaveBeenLastCalledWith(expect.any(String), ['ai_api_key_anthropic', 'sk-ant-legacy']);
+    expect(mockedQuery).toHaveBeenLastCalledWith(expect.any(String), [['ai_api_key_anthropic'], ['sk-ant-legacy']]);
   });
 
   it('is a no-op once ai_api_key_anthropic already exists', async () => {
@@ -122,6 +122,6 @@ describe('setAiApiKey', () => {
   it('upserts under the provider-specific settings key', async () => {
     mockedQuery.mockResolvedValue({ rows: [] } as never);
     await setAiApiKey('google', 'AIza-test');
-    expect(mockedQuery).toHaveBeenCalledWith(expect.any(String), ['ai_api_key_google', 'AIza-test']);
+    expect(mockedQuery).toHaveBeenCalledWith(expect.any(String), [['ai_api_key_google'], ['AIza-test']]);
   });
 });

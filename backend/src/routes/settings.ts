@@ -51,6 +51,7 @@ import { CrowdsecUnavailableError, listCrowdsecBans, unbanCrowdsecIp } from '../
 import { runAlertTest } from '../services/alertTest';
 import { testNpmConnection } from '../services/npmClient';
 import { testCloudflareTunnelAccess, countTokenZones } from '../services/cloudflareTunnelClient';
+import { setSetting, setSettings } from '../utils/settingsStore';
 import {
   AI_FEATURES,
   AI_PROVIDERS,
@@ -186,13 +187,7 @@ router.put(
   validateBody(schemas.cloudflareAccountModel),
   async (req: Request, res: Response) => {
     try {
-      await query(
-        `INSERT INTO settings (key, value, updated_at)
-         VALUES ($1, $2, NOW())
-         ON CONFLICT (key)
-         DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-        [CLOUDFLARE_ACCOUNT_MODEL_KEY, req.body.model]
-      );
+      await setSetting(CLOUDFLARE_ACCOUNT_MODEL_KEY, req.body.model);
       await writeAuditLog({
         userId: req.user?.id ?? null,
         action: 'settings_change',
@@ -210,13 +205,7 @@ router.put('/cloudflare-token', validateBody(schemas.cloudflareTokenUpdate), asy
   const token = req.body.token;
 
   try {
-    await query(
-      `INSERT INTO settings (key, value, updated_at)
-       VALUES ($1, $2, NOW())
-       ON CONFLICT (key)
-       DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-      [CLOUDFLARE_TOKEN_KEY, token]
-    );
+    await setSetting(CLOUDFLARE_TOKEN_KEY, token);
     await writeAuditLog({
       userId: req.user?.id ?? null,
       action: 'settings_change',
@@ -443,15 +432,7 @@ router.put('/exposure', validateBody(schemas.exposureGlobalSettings), async (req
   }
 
   try {
-    for (const [key, value] of Object.entries(values)) {
-      await query(
-        `INSERT INTO settings (key, value, updated_at)
-         VALUES ($1, $2, NOW())
-         ON CONFLICT (key)
-         DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-        [key, value]
-      );
-    }
+    await setSettings(values);
 
     await writeAuditLog({
       userId: req.user?.id ?? null,
@@ -572,15 +553,7 @@ router.put('/mail', validateBody(schemas.mailSettings), async (req: Request, res
   if (req.body.imapPassword) values[MAIL_SETTINGS_KEYS.imapPassword] = req.body.imapPassword;
 
   try {
-    for (const [key, value] of Object.entries(values)) {
-      await query(
-        `INSERT INTO settings (key, value, updated_at)
-         VALUES ($1, $2, NOW())
-         ON CONFLICT (key)
-         DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-        [key, value]
-      );
-    }
+    await setSettings(values);
 
     await writeAuditLog({
       userId: req.user?.id ?? null,
@@ -672,15 +645,7 @@ router.put('/backup-target', validateBody(schemas.backupTarget), async (req: Req
   if (req.body.password) values[BACKUP_TARGET_KEYS.password] = req.body.password;
 
   try {
-    for (const [key, value] of Object.entries(values)) {
-      await query(
-        `INSERT INTO settings (key, value, updated_at)
-         VALUES ($1, $2, NOW())
-         ON CONFLICT (key)
-         DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-        [key, value]
-      );
-    }
+    await setSettings(values);
 
     await writeAuditLog({
       userId: req.user?.id ?? null,

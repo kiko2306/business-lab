@@ -35769,3 +35769,46 @@ with no staleness, since the streams were already on a 15 s cadence. Also left a
 `exposureReconciler`'s per-service `getServiceStatus()` loop. It sleeps between services
 deliberately and starts/provisions things as it goes, so a cycle built once at the top
 would be answering with facts from before its own changes.
+
+## 799. One writer for the `settings` table: 20 copies of the same upsert, and three non-atomic saves
+
+The second half of §798's scan. `INSERT INTO settings … ON CONFLICT (key) DO UPDATE` was
+written out in 20 places across routes, services and utils, three of them as
+
+```ts
+for (const [key, value] of Object.entries(values)) {
+  await query(`INSERT INTO settings …`, [key, value]);
+}
+```
+
+in `routes/settings.ts` (exposure, mail, backup-target) and two more of the same shape in
+`services/backup.ts` (the schedule config and its run record). Those loops are the actual
+defect behind the duplication: they are not in a transaction, so a failure partway through
+left the config **half-written** while the route answered 500 — the dashboard then showed
+the old value for the keys that hadn't landed and the new value for the ones that had, and
+the box was running on neither. With credentials in the same object (NPM password, SMTP
+password, backup-target password) a half-save is the kind that needs a human to work out
+what the box actually has.
+
+`utils/settingsStore.ts` is now the only writer: `setSettings(values)` does one multi-row
+upsert, which cannot land half-applied, and `setSetting(key, value)` is the one-key case.
+`undefined` stores NULL, which is what `query(…, [key, value])` already did with a missing
+request-body field, so no caller's behaviour moves. Every one of the 20 sites calls it; the
+`writeSetting` alias in `alertNotify.ts` became a pointless wrapper and is gone, and
+`routes/health.ts`'s three-way `Promise.all` and `routes/backup.ts`'s per-entry restore loop
+are each a single call now — the restore in particular is better off atomic, since a partial
+one leaves settings mixed between two different backups.
+
+Verified against a real Postgres rather than only type-checked, in a rolled-back
+transaction: the `UNNEST($1::text[], $2::text[])` form inserts, updates on conflict, and
+preserves NULL. The driver half was checked separately, because this is the path every
+stored password takes — `pg`'s `prepareValue` was asked to serialise an array containing
+`p$$w,rd{"}`, `back\slash` and a null, and the literal it produced was fed to psql: all four
+values came back byte-identical. A duplicate key inside one statement would be an error
+(`ON CONFLICT DO UPDATE command cannot affect row a second time`), but the input is a
+`Record`, so duplicates can't arise.
+
+Deliberately not done: the matching read side. `SELECT value FROM settings WHERE key = $1`
+is spread as widely, but it has no atomicity bug and the per-module readers do real work
+around it (defaults, validation, caching, the `aiSettings` legacy-key fallback), so a shared
+reader would be a bigger change with nothing to fix.

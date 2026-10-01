@@ -117,8 +117,8 @@ describe('ensureAlertCategoryTopics (§609 migration off the removed shared defa
         const key = (params as string[])[0];
         return { rows: key in rows ? [{ value: rows[key] }] : [] } as never;
       }
-      const [key, value] = params as string[];
-      written.push([key, value]);
+      const [keys, values] = params as [string[], string[]];
+      keys.forEach((key, index) => written.push([key, values[index]]));
       return { rows: [] } as never;
     });
 
@@ -139,8 +139,8 @@ describe('ensureAlertCategoryTopics (§609 migration off the removed shared defa
     mockedQuery.mockImplementation(async (sql: unknown, params: unknown) => {
       const text = sql as string;
       if (text.startsWith('SELECT')) return { rows: [] } as never;
-      const [key, value] = params as string[];
-      written.push([key, value]);
+      const [keys, values] = params as [string[], string[]];
+      keys.forEach((key, index) => written.push([key, values[index]]));
       return { rows: [] } as never;
     });
 

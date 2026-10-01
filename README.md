@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.159.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.159.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,6 +212,17 @@ it is done — not ticked off and left behind. Section references point at
 Done one page at a time, test first, each its own commit and version bump. A finished
 item is deleted.
 
+- [ ] **Beta-test the single settings writer (plan.md §799)** — every save
+      into the `settings` table now goes through one batched upsert, so a
+      mistake would hit every settings form at once. On `beta`, save and
+      re-open each of: Settings → exposure (base domain / NPM email, leaving
+      the password blank — confirm the stored password still works, i.e. the
+      "Test" button still passes), Settings → mail (then "Test"), Backups →
+      destination, Backups → schedule, Settings → Cloudflare token, the AI API
+      keys panel, the health thresholds, the timezone and the update branch.
+      Each should come back with exactly what was typed and nothing else
+      reset. Then restore a backup and confirm the settings it carried came
+      back (Backups → restore, then re-check the exposure panel).
 - [ ] **Beta-test the rebuilt status poll (plan.md §798)** — the whole status
       payload now comes from one `docker ps -a` and one `service_exposure`
       read, so a mistake here shows up as *every* app reading wrong at once.

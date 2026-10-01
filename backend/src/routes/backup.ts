@@ -3,7 +3,6 @@ import { dumpAllAppDatabases } from '../services/appDumps';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import { query } from '../utils/database';
 import { writeAuditLog } from '../utils/audit';
 import { schemas, validateBody, validateParams } from '../middleware/validation';
 import logger from '../utils/logger';
@@ -25,6 +24,7 @@ import { restoreAppFromSnapshot } from '../services/snapshotRestore';
 import { runAppDataBackup } from '../services/backupScheduler';
 import { getBackupProgress } from '../services/backupProgress';
 import { readAppEnvValue } from '../services/appEnv';
+import { setSettings } from '../utils/settingsStore';
 
 const router = Router();
 
@@ -297,16 +297,14 @@ router.post('/restore', validateBody(schemas.backupRestore), async (req: Request
     const settingsRaw = await fs.readFile(settingsPath, 'utf8').catch(() => '[]');
     const settings = JSON.parse(settingsRaw);
     if (Array.isArray(settings)) {
+      const restored: Record<string, string> = {};
       for (const entry of settings) {
         if (typeof entry.key !== 'string' || !/^[a-z0-9_]+$/.test(entry.key)) {
           continue;
         }
-        await query(
-          `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
-           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-          [entry.key, String(entry.value ?? '').slice(0, 4096)]
-        );
+        restored[entry.key] = String(entry.value ?? '').slice(0, 4096);
       }
+      await setSettings(restored);
     }
 
     await writeAuditLog({ userId, action: 'backup_restore', resource: fileName, result: 'success' });

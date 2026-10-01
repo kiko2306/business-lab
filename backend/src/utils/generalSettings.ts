@@ -1,5 +1,6 @@
 import { query } from './database';
 import { getExposureConfig } from './exposureSettings';
+import { setSetting } from './settingsStore';
 
 export const TIMEZONE_SETTING_KEY = 'app_timezone';
 export const DASHBOARD_URL_SETTING_KEY = 'dashboard_url';
@@ -49,12 +50,7 @@ export async function getAppTimezone(): Promise<string> {
 }
 
 export async function setAppTimezone(tz: string): Promise<void> {
-  await query(
-    `INSERT INTO settings (key, value, updated_at)
-     VALUES ($1, $2, NOW())
-     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-    [TIMEZONE_SETTING_KEY, tz]
-  );
+  await setSetting(TIMEZONE_SETTING_KEY, tz);
 }
 
 /** A plausible git branch/ref name — no shell metacharacters, no `..`, since it's interpolated into a `git` argv. */
@@ -75,12 +71,7 @@ export async function getUpdateBranch(): Promise<string> {
 }
 
 export async function setUpdateBranch(branch: string): Promise<void> {
-  await query(
-    `INSERT INTO settings (key, value, updated_at)
-     VALUES ($1, $2, NOW())
-     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-    [UPDATE_BRANCH_SETTING_KEY, branch.trim()]
-  );
+  await setSetting(UPDATE_BRANCH_SETTING_KEY, branch.trim());
 }
 
 /** A syntactically valid absolute http(s) URL with no path/query. */
@@ -109,12 +100,7 @@ export async function getStoredDashboardUrl(): Promise<string> {
 }
 
 export async function setDashboardUrl(url: string): Promise<void> {
-  await query(
-    `INSERT INTO settings (key, value, updated_at)
-     VALUES ($1, $2, NOW())
-     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-    [DASHBOARD_URL_SETTING_KEY, url.trim().replace(/\/+$/, '')]
-  );
+  await setSetting(DASHBOARD_URL_SETTING_KEY, url.trim().replace(/\/+$/, ''));
 }
 
 /**
