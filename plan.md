@@ -36132,3 +36132,62 @@ error text tells the user the exact action.
 
 The hand restart above was a diagnostic, not the fix (CLAUDE.md): the fix is that the next
 time docker does this, the Apps page says so instead of showing green.
+
+## 806. Tally's first design pass: the plan from `/impeccable critique` (24/40)
+
+`/impeccable critique apps/tally/app/web/src/app/shop/shop.component.html` scored the shop day
+view **24/40 — Acceptable**, run as two isolated assessments (design review; detector plus a
+real Chromium build). Snapshot:
+`.impeccable/critique/2026-10-01T14-03-22Z__app-web-src-app-shop-shop-component-html-61e2baf1.md`.
+
+The verdict worth keeping: **the vocabulary is authored for this reader, the reading experience
+is a generic admin tile grid.** The Wintouch measure set, the running-day/closed-day model and
+the three-layer offline contract are specific to a shop owner reading till figures. The page
+that carries them answers "how much have we taken today?" as the first of **eleven
+identically-weighted tiles** — same `.stat-value`, same card, same label — so it has eleven
+answers and no answer, and never compares the day to anything.
+
+Decisions taken with the user before any code:
+
+- **Hero first.** The P0 (focal figure) and the comparison P1 land together; they are one idea.
+- **One product family.** Tally keeps the dashboard's generated theme (`sync-app-theme.sh`)
+  on purpose, so the two read as one product. Only what is dead or wrong in the copy gets
+  fixed — not the shared palette.
+- **Everything in scope**: the five priority issues plus the ~15 minor observations.
+
+The order, one commit each (1 and 2 together):
+
+1. **Hero figure** — one card above everything: *Faturado hoje* at `clamp(2.5rem, 9vw,
+   3.5rem)`, full width on phone, `Previsto` as its subline. Open tabs / Tables / Guests as a
+   three-up row beneath at current size; the six Wintouch counters into a collapsed
+   `Contadores do dia` section with a real `<h3>` at ~70 % weight.
+2. **The comparison** — "€412 more than last Saturday", in words, arrow as reinforcement. No
+   API work: `shopRoutes` is a pure relay and already takes `?date=`, so this is a second
+   client-side `overview` call for the same weekday a week earlier. Two open questions to
+   settle while building: what the sentence says when last week's same weekday has no data,
+   and whether a running day compares `Faturado` or `Previsto`.
+3. **harden** — the table drill-down becomes a real `<button>` with `aria-expanded` /
+   `aria-controls` (the row stays a row, which `role="button"` currently destroys); the Shops
+   empty branch stops firing on a transport error and stops naming an admin-only control; the
+   two placeholder-only inputs get names; an `<h1>` appears; the Items table gets an empty
+   branch; `min`/`max` on the date input; the `mm/dd/yyyy` picker locale; the phantom `<li>`
+   on a closed day; the four separately-worded zero-state strings collapse into one.
+4. **audit** — the contrast sweep. `.text-secondary` measures **2.84:1** on the dark card and
+   **4.33:1** on the light canvas at 14px, across ~35 occurrences including every stat-card
+   label, because Bootstrap 5.3 resolves it from `--bs-secondary-rgb` and the theme only
+   overrides `--bs-body-secondary`. Plus `.btn-outline-secondary` labels, the 2.85:1
+   `.bar-fill`-on-track, and 44px targets under `(pointer: coarse)` — Tally has no coarse-pointer
+   rule at all, and its smallest control measures 26×31.
+5. **polish** — reads this critique's snapshot as its backlog and closes it: the dead `.auth-*`
+   rules and `--app-shadow-service-card` that the theme sync copies in, `tablesInState()`, the
+   hard-coded `'EUR'`, the uppercase `.stat-label` tracking under Portuguese length, and the
+   card shadow at eleven-tile density.
+
+**On testing.** `apps/tally/app/web` has a `test` script but no spec files and no Karma/Jasmine
+devDependencies, and CI runs only Tally's **api** job — so there is no working test harness for
+the web app today, and four of the five items above are web-side. Rather than write four
+untested commits, the first piece of work is the harness itself: Karma + Jasmine wired the way
+the dashboard's is, run in the existing `business-lab-frontend-test` image (node + headless
+Chrome already installed), with a CI job beside the api one. If that install proves heavy, the
+fallback is a bounded Playwright round per commit plus a README beta item, and this section gets
+an addendum saying so.

@@ -212,6 +212,28 @@ it is done — not ticked off and left behind. Section references point at
 Done one page at a time, test first, each its own commit and version bump. A finished
 item is deleted.
 
+- [ ] **Tally: a test harness for the web app (plan.md §806)** — `apps/tally/app/web`
+      has a `test` script, no spec files and no Karma/Jasmine devDependencies, and
+      CI runs only Tally's api job. Wire Karma + Jasmine the way the dashboard's
+      is, run it in the existing `business-lab-frontend-test` image (node +
+      headless Chrome already there), and add a CI job beside the api one. This
+      is what makes the four web-side items below testable.
+- [ ] **Tally: the hero figure and the comparison (plan.md §806, items 1-2)** —
+      on `beta`, open a shop's day view on a phone: today's takings must be the
+      largest thing on the page, readable at arm's length, with "€X more/less
+      than last <weekday>" under it. Check a day where last week's same weekday
+      has no data, and a closed (archive) day, and confirm the sentence degrades
+      rather than lying. Confirm the six Wintouch counters are collapsed by
+      default and that opening them is one tap.
+- [ ] **Tally: keyboard and screen-reader pass (plan.md §806, item 3)** — on
+      `beta`, Tab to a table row in the Tables tab and open it with Enter/Space;
+      it must expand, announce its state, and return focus sensibly. Confirm the
+      Shops page shows "Request failed" alone when the API is unreachable (stop
+      the tally container) rather than also claiming there are no shops.
+- [ ] **Tally: contrast and touch targets (plan.md §806, item 4)** — on `beta`,
+      in both light and dark, confirm every stat-card label is readable on a
+      phone in daylight, and that Refresh, the theme toggle, the language select
+      and the date input are all at least 44px tall on a touch device.
 - [ ] **Beta-test the lost-publish detection (plan.md §805)** — on `beta`,
       simulate what happened to Authelia: `docker network disconnect
       authelia_default authelia-authelia-1` on the host, then watch the Apps
