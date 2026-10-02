@@ -41,48 +41,6 @@ body {
   }
 }
 
-/* Bootstrap does not recolour outline buttons per colour mode: the label stays
-   #6c757d, which measures 3.12:1 on this canvas in dark and 4.33:1 in light —
-   both under 4.5:1, on controls a shop reads in daylight (plan.md §806).
-   The theme's own secondary ink is already the right colour in each mode. */
-.btn-outline-secondary {
-  --bs-btn-color: var(--bs-secondary-color);
-  --bs-btn-border-color: var(--bs-border-color);
-}
-
-/* The same is true of outline-primary and outline-danger: Bootstrap keeps
-   #0d6efd / #dc3545 labels in dark, which measure ~3.2:1 on the card (the Open
-   and Delete buttons on the Shops page). Dark gets Bootstrap's own lighter
-   emphasis shades, which are already in the palette. */
-/* Light mode too: #0d6efd on the #f4f7fb canvas is 4.19:1 and #dc3545 on a
-   light card 4.30:1 — "Running day" and "Revoke agent" (plan.md §806.8). The
-   dark rules below override these by specificity. */
-.btn-outline-primary {
-  --bs-btn-color: #0a58ca;
-  --bs-btn-border-color: #0a58ca;
-}
-
-.btn-outline-danger {
-  --bs-btn-color: #b02a37;
-  --bs-btn-border-color: #b02a37;
-}
-
-[data-bs-theme='dark'] .btn-outline-primary {
-  --bs-btn-color: var(--bs-primary-text-emphasis);
-  --bs-btn-border-color: var(--bs-primary-text-emphasis);
-  --bs-btn-hover-color: #000;
-  --bs-btn-hover-bg: var(--bs-primary-text-emphasis);
-  --bs-btn-hover-border-color: var(--bs-primary-text-emphasis);
-}
-
-[data-bs-theme='dark'] .btn-outline-danger {
-  --bs-btn-color: var(--bs-danger-text-emphasis);
-  --bs-btn-border-color: var(--bs-danger-text-emphasis);
-  --bs-btn-hover-color: #000;
-  --bs-btn-hover-bg: var(--bs-danger-text-emphasis);
-  --bs-btn-hover-border-color: var(--bs-danger-text-emphasis);
-}
-
 /* Touch gets targets a thumb can hit; a mouse keeps the compact row. Keyed on
    the pointer, not the width: this app is read on a phone in a shop and on a
    wall screen, and only one of those is coarse. */

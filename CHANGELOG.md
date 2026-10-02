@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.162.4] — 2026-10-02
+
+### Fixed
+
+- Outline buttons and red/green/yellow text meet the 4.5:1 contrast floor in both light and dark (warning text in light was 1.5:1), in the shared theme (plan.md §807)
+
 ## [0.162.3] — 2026-10-02
 
 ### Fixed

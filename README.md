@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.162.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.162.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -245,11 +245,14 @@ item is deleted.
       is still there. "Forecast" reads "Taken plus open tabs" and Open tabs reads
       "Not paid yet". A closed day with no sales says "No takings that day", not
       "yet"/"today".
-- [ ] **Dashboard: outline buttons in dark mode (plan.md §806.6)** — Bootstrap does
-      not recolour `.btn-outline-primary`/`-danger` per colour mode, so their
-      labels measure ~3.2:1 on the card in dark. Fixed in Tally's own styles; the
-      dashboard almost certainly has the same defect. Measure it with the same
-      computed-contrast spec before touching the shared theme (four-app blast radius).
+- [ ] **Beta-test the shared theme's semantic colours (plan.md §807)** — on `beta`,
+      look at the dashboard in both light and dark: the Start/Stop/Settings
+      buttons on Apps, the red failure text on Backups and Settings, the green
+      "OK" states, and any outline button must all be clearly readable — the
+      light-mode warning (yellow) text especially, which was 1.5:1 before. Hover an
+      outline button and confirm its label stays readable on the filled hover.
+      The hotel apps (admin, check-in, pulse) share this theme; open one in
+      each mode and confirm nothing reads washed out or too dark.
 - [ ] **Tally: touch targets, titles and the tables-in-use count (plan.md §806.6)** —
       on `beta`, on a phone: the day-counters heading, a table's number and the
       back link must each be easy to hit (44px); the tab title reads "<shop> ·

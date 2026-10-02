@@ -23,6 +23,19 @@
   /* A token, not inline in service-card.component.css, which is at its size budget. */
   --app-shadow-service-card: 0 3px 8px rgba(2, 6, 23, 0.07), 0 18px 34px -18px rgba(2, 6, 23, 0.18);
 
+  /* Ink for Bootstrap's semantic text and outline-button colours. Bootstrap keeps
+     one value per hue in both colour modes, so on this canvas they measure
+     ~4.2:1 in light and ~3.2:1 in dark (and warning yellow 1.5:1 in light) —
+     measured by theme-contrast.spec.ts across the 100+ places the dashboard
+     uses them (plan.md §806.9). Each is >= 5.4:1 on every surface it paints. */
+  --app-ink-primary: #0a58ca;
+  --app-ink-success: #146c43;
+  --app-ink-danger: #b02a37;
+  --app-ink-warning: #7a5a00;
+  --app-ink-secondary: #5c636a;
+  /* Text on a filled ink (an outline button's hover). */
+  --app-ink-on: #ffffff;
+
   /* Bootstrap's stock link blue is #0d6efd, which on this canvas measures
      4.19:1 — under the 4.5:1 floor for body text, and links here are small
      (measured in a real Chromium against Tally's shop view, plan.md §806.3).
@@ -53,6 +66,13 @@
   --app-surface-raised: #26303f;
   --app-shadow-k: 1;
   --app-shadow-service-card: 0 3px 8px rgba(2, 6, 23, 0.22), 0 18px 34px -18px rgba(2, 6, 23, 0.6);
+
+  --app-ink-primary: #6ea8fe;
+  --app-ink-success: #75b798;
+  --app-ink-danger: #ea868f;
+  --app-ink-warning: #ffda6a;
+  --app-ink-secondary: #cbd5e1;
+  --app-ink-on: #0f172a;
 
   --bs-body-bg: #1e293b;
   --bs-body-color: #e2e8f0;
@@ -96,6 +116,34 @@ body {
 
 a {
   text-decoration: none;
+}
+
+/* The semantic colours, from the ink tokens above rather than Bootstrap's fixed
+   per-hue value. !important because Bootstrap's own utilities are. */
+.text-primary { color: var(--app-ink-primary) !important; }
+.text-success { color: var(--app-ink-success) !important; }
+.text-danger { color: var(--app-ink-danger) !important; }
+.text-warning { color: var(--app-ink-warning) !important; }
+
+.btn-outline-primary { --app-ink: var(--app-ink-primary); }
+.btn-outline-secondary { --app-ink: var(--app-ink-secondary); }
+.btn-outline-danger { --app-ink: var(--app-ink-danger); }
+.btn-outline-warning { --app-ink: var(--app-ink-warning); }
+
+.btn-outline-primary,
+.btn-outline-secondary,
+.btn-outline-danger,
+.btn-outline-warning {
+  --bs-btn-color: var(--app-ink);
+  --bs-btn-border-color: var(--app-ink);
+  --bs-btn-hover-color: var(--app-ink-on);
+  --bs-btn-hover-bg: var(--app-ink);
+  --bs-btn-hover-border-color: var(--app-ink);
+  --bs-btn-active-color: var(--app-ink-on);
+  --bs-btn-active-bg: var(--app-ink);
+  --bs-btn-active-border-color: var(--app-ink);
+  --bs-btn-disabled-color: var(--app-ink);
+  --bs-btn-disabled-border-color: var(--app-ink);
 }
 
 .card {

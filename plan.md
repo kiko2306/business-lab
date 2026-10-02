@@ -36543,3 +36543,44 @@ stripped its list semantics; the counters toggle has `aria-controls`.
 
 **Not done.** Single-shop owners landing on the admin table (a product call — a redirect also
 makes "← All shops" loop), the first hour's card-wide bar, and remembering the counters fold.
+
+## 807. The dashboard's semantic colours: measured, and the shared theme fixed (this is §806.9)
+
+The README item left by §806.6 — "the dashboard almost certainly has the same dark-mode outline-
+button defect; measure it before touching the shared theme". Measured first, as agreed.
+
+`theme-contrast.spec.ts` renders the classes the dashboard actually uses (counted from
+`src/app`: 48× `text-danger`, 32× `btn-outline-secondary`, 14× `text-success`, 12×
+`btn-outline-primary`, 9× `btn-outline-danger`, 3× `text-warning`, 2× `btn-outline-warning`) on
+both surfaces it paints, in both colour modes, and computes the WCAG ratio of the computed colour
+over the resolved painted background. The result was worse than "almost certainly":
+
+| | light canvas | dark canvas |
+|---|---|---|
+| outline-secondary | 4.36 | 3.12 |
+| outline-primary / text-primary | 4.19 | 3.25 |
+| outline-danger | 4.21 | 3.23 |
+| text-danger | 4.21 | 3.23 |
+| text-success | 4.22 | 3.23 |
+| outline-warning / text-warning | **1.52** | passes |
+
+Bootstrap keeps one value per hue in both colour modes. Every one of those is under 4.5:1 on the
+canvas in at least one mode, and **warning in light is 1.5:1 — effectively invisible** (five
+uses). The same classes pass in Tally only because Tally had overridden three of them app-side in
+§806.3/§806.6; the dashboard and the three hotel apps that share the theme had nothing.
+
+**The fix is in the shared theme, where the cause is.** Five ink tokens per mode
+(`--app-ink-primary/-success/-danger/-warning/-secondary`, plus `--app-ink-on` for text on a
+filled ink), each measured ≥ 5.4:1 on every surface it paints; `.text-*` and the four
+`.btn-outline-*` read from them, hover and active fill with the ink and put `--app-ink-on` on it.
+Overriding Bootstrap's `--bs-danger-rgb` instead would have been shorter and wrong: those drive
+solid buttons and badges too, so white-on-red would have gotten *worse* in dark. Dark inks are
+Bootstrap's own emphasis shades (`#6ea8fe`, `#75b798`, `#ea868f`, `#ffda6a`) plus slate-300;
+light inks are the darker shades (`#0a58ca`, `#146c43`, `#b02a37`, `#7a5a00`).
+
+Synced to Tally and the three hotel apps by `sync-app-theme.sh`; Tally's now-redundant app-side
+copies are deleted. 269 dashboard specs (4 new), 103 Tally, and both builds pass.
+
+**Not measured, and therefore not claimed:** solid `btn-primary`/`btn-danger` and `text-bg-*`
+badges (white on a saturated fill — Tally's scan put them at 4.50–4.69:1, at the line, none
+under), and the hotel apps' own markup, which uses the theme but has no test harness of its own.
