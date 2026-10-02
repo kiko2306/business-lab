@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.0] — 2026-10-02
+
+### Changed
+
+- Users: the account list opens by default and each person is one line — roles read as words with an Edit roles button, instead of eleven checkboxes per admin
+
 ## [0.162.9] — 2026-10-02
 
 ### Changed

@@ -39,3 +39,40 @@ describe('PanelComponent', () => {
     expect(heading.querySelector('.panel__body')).toBeNull();
   });
 });
+
+// plan.md §813: Users opened as two closed cards on the one page whose job is
+// "who has access". A panel can opt in to starting open; a person's own
+// choice, either way, still wins.
+describe('PanelComponent defaultOpen', () => {
+  let fixture: ComponentFixture<PanelComponent>;
+  const toggle = () => fixture.nativeElement.querySelector('button.panel__toggle') as HTMLButtonElement;
+
+  beforeEach(async () => {
+    localStorage.clear();
+    await TestBed.configureTestingModule({ imports: [PanelComponent] }).compileComponents();
+    fixture = TestBed.createComponent(PanelComponent);
+    fixture.componentRef.setInput('key', 'users:list');
+    fixture.componentRef.setInput('title', 'Accounts');
+    fixture.componentRef.setInput('defaultOpen', true);
+    fixture.detectChanges();
+  });
+
+  afterEach(() => localStorage.clear());
+
+  it('starts open when nobody has chosen', () => {
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('still lets the person close it, and remembers that over the default', () => {
+    toggle().click();
+    fixture.detectChanges();
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+
+    const again = TestBed.createComponent(PanelComponent);
+    again.componentRef.setInput('key', 'users:list');
+    again.componentRef.setInput('title', 'Accounts');
+    again.componentRef.setInput('defaultOpen', true);
+    again.detectChanges();
+    expect((again.nativeElement.querySelector('button.panel__toggle') as HTMLElement).getAttribute('aria-expanded')).toBe('false');
+  });
+});

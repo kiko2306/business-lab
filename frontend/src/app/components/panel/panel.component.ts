@@ -29,14 +29,16 @@ export class PanelComponent {
   @Input() subtitle?: string;
   /** Optional `id` on the card, for in-page `#anchor` links. */
   @Input() anchor?: string;
+  /** Start open when the person has not chosen, for the one panel a page exists for (plan.md §813). */
+  @Input() defaultOpen = false;
 
   protected readonly collapse = inject(SectionCollapseService);
 
   get collapsed(): boolean {
-    return this.collapse.isCollapsed(this.key);
+    return this.collapse.isCollapsed(this.key, !this.defaultOpen);
   }
 
   toggle(): void {
-    this.collapse.toggle(this.key);
+    this.collapse.toggle(this.key, !this.defaultOpen);
   }
 }

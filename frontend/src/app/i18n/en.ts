@@ -376,6 +376,8 @@ export const en: Record<string, string> = {
   'users.saveFeaturesButton': 'Save features',
   'users.resendInviteButton': 'Resend invite',
   'users.resendInvite.sending': 'Sending…',
+  'users.editRolesButton': 'Edit roles',
+  'users.featuresCount': '{{picked}} of {{total}} features',
   'users.editAccessButton': 'Edit access',
   'users.resetPasswordButton': 'Reset password',
   'users.deleteButton': 'Delete',

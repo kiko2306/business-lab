@@ -179,14 +179,15 @@ describe('page form controls carry an accessible name', () => {
     }).compileComponents();
     const fixture = TestBed.createComponent(UsersComponent);
     fixture.detectChanges();
-    // Panels start collapsed, so the user list is not in the DOM until opened.
-    for (const toggle of Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.panel__toggle'))) {
+    // The user list starts open now (plan.md §813); only the add-user form is collapsed.
+    for (const toggle of Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.panel__toggle[aria-expanded="false"]'))) {
       (toggle as HTMLButtonElement).click();
     }
     fixture.detectChanges();
     const users = fixture.componentInstance as unknown as {
       startPasswordReset(id: number): void;
       startAccessEdit(user: unknown): void;
+      startRolesEdit(user: unknown): void;
       items: unknown[];
     };
     users.startPasswordReset(7);
@@ -198,6 +199,11 @@ describe('page form controls carry an accessible name', () => {
     users.startAccessEdit(users.items[0]);
     fixture.detectChanges();
     expect(element.querySelectorAll('input[type="search"]').length).toBeGreaterThan(1);
+    expect(unnamedControls(element)).toEqual([]);
+
+    users.startRolesEdit(users.items[0]);
+    fixture.detectChanges();
+    expect(element.querySelector('.roles-editor input[type="checkbox"]')).not.toBeNull();
     expect(unnamedControls(element)).toEqual([]);
   });
 

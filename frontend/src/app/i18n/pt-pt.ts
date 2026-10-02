@@ -376,6 +376,8 @@ export const ptPT: Record<string, string> = {
   'users.saveFeaturesButton': 'Guardar funcionalidades',
   'users.resendInviteButton': 'Reenviar convite',
   'users.resendInvite.sending': 'A enviar…',
+  'users.editRolesButton': 'Editar funções',
+  'users.featuresCount': '{{picked}} de {{total}} funcionalidades',
   'users.editAccessButton': 'Editar acesso',
   'users.resetPasswordButton': 'Repor palavra-passe',
   'users.deleteButton': 'Eliminar',

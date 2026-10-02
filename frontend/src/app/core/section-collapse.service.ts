@@ -23,8 +23,8 @@ export class SectionCollapseService {
    * back to collapsed (`true`) — a page opens as a list of titled panels the
    * user expands on demand rather than a wall of data.
    */
-  isCollapsed(key: string): boolean {
-    return this.state.get(key) ?? true;
+  isCollapsed(key: string, collapsedByDefault = true): boolean {
+    return this.state.get(key) ?? collapsedByDefault;
   }
 
   /** Expand `key` (a no-op when it already is), e.g. to land a link inside a panel. */
@@ -34,8 +34,8 @@ export class SectionCollapseService {
     this.persist();
   }
 
-  toggle(key: string): void {
-    this.state.set(key, !this.isCollapsed(key));
+  toggle(key: string, collapsedByDefault = true): void {
+    this.state.set(key, !this.isCollapsed(key, collapsedByDefault));
     this.persist();
   }
 

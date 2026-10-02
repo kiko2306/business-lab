@@ -52,7 +52,7 @@ describe('Users page says what an action does', () => {
     const fixture = TestBed.createComponent(UsersComponent);
     fixture.detectChanges();
     element = fixture.nativeElement as HTMLElement;
-    element.querySelectorAll<HTMLButtonElement>('.panel__toggle').forEach((toggle) => toggle.click());
+    element.querySelectorAll<HTMLButtonElement>('.panel__toggle[aria-expanded="false"]').forEach((toggle) => toggle.click());
     fixture.detectChanges();
     component = fixture.componentInstance as unknown as typeof component;
     detect = () => fixture.detectChanges();

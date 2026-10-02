@@ -114,7 +114,7 @@
     </form>
   </app-panel>
 
-  <app-panel key="users:list" [title]="'users.list.title' | t" [subtitle]="'users.list.subtitle' | t">
+  <app-panel key="users:list" [defaultOpen]="true" [title]="'users.list.title' | t" [subtitle]="'users.list.subtitle' | t">
     <div class="table-responsive table-stack-wrap">
       <table class="table table-sm table-stack align-middle mb-0">
         <thead>
@@ -142,53 +142,13 @@
                 </div>
               </td>
               <td [attr.data-label]="'users.table.roles' | t">
-                <div class="d-flex flex-wrap gap-2 align-items-center">
-                  <div class="form-check form-check-inline m-0" *ngFor="let role of allRoles">
-                    <input
-                      class="form-check-input"
-                      type="checkbox"
-                      [id]="'role-' + user.id + '-' + role"
-                      [(ngModel)]="roleDraft[user.id][role]"
-                      [ngModelOptions]="{ standalone: true }"
-                      [disabled]="user.id === currentUserId"
-                    />
-                    <label class="form-check-label small" [for]="'role-' + user.id + '-' + role">{{ ('users.role.' + role) | t }}</label>
-                  </div>
-                  <button
-                    class="btn btn-sm btn-primary"
-                    *ngIf="rolesDirty(user) && user.id !== currentUserId"
-                    [disabled]="savingRolesId === user.id"
-                    (click)="saveRoles(user)"
-                  >
-                    {{ (savingRolesId === user.id ? 'common.saving' : 'users.saveRolesButton') | t }}
-                  </button>
+                <div class="d-flex flex-wrap gap-1">
+                  <span class="badge text-bg-secondary" *ngFor="let role of user.roles">{{ ('users.role.' + role) | t }}</span>
                 </div>
-                <div class="form-text" *ngIf="user.id === currentUserId">{{ 'users.cannotChangeOwnRoles' | t }}</div>
-
-                <div class="mt-2" *ngIf="showFeatures(user)">
-                  <span class="form-label small fw-semibold d-block mb-1">{{ 'users.form.featuresLabel' | t }}</span>
-                  <div class="d-flex flex-wrap gap-2 align-items-center">
-                    <div class="form-check form-check-inline m-0" *ngFor="let cap of allCapabilities">
-                      <input
-                        class="form-check-input"
-                        type="checkbox"
-                        [id]="'cap-' + user.id + '-' + cap"
-                        [(ngModel)]="capDraft[user.id][cap]"
-                        [ngModelOptions]="{ standalone: true }"
-                        [disabled]="user.id === currentUserId"
-                      />
-                      <label class="form-check-label small" [for]="'cap-' + user.id + '-' + cap">{{ ('users.capability.' + cap) | t }}</label>
-                    </div>
-                    <button
-                      class="btn btn-sm btn-primary"
-                      *ngIf="capsDirty(user) && user.id !== currentUserId"
-                      [disabled]="savingCapsId === user.id"
-                      (click)="saveCaps(user)"
-                    >
-                      {{ (savingCapsId === user.id ? 'common.saving' : 'users.saveFeaturesButton') | t }}
-                    </button>
-                  </div>
+                <div class="form-text mt-1" *ngIf="showFeatures(user)">
+                  {{ 'users.featuresCount' | t:{ picked: user.capabilities?.length ?? 0, total: allCapabilities.length } }}
                 </div>
+                <div class="form-text mt-1" *ngIf="user.id === currentUserId">{{ 'users.cannotChangeOwnRoles' | t }}</div>
               </td>
               <td [attr.data-label]="'users.table.created' | t">{{ user.created_at | date:'dd/MM/yyyy':undefined:translate.locale() }}</td>
               <td [attr.data-label]="'users.table.actions' | t" class="text-end">
@@ -201,6 +161,7 @@
                   >
                     {{ (resendingId === user.id ? 'users.resendInvite.sending' : 'users.resendInviteButton') | t }}
                   </button>
+                  <button class="btn btn-outline-secondary edit-roles" *ngIf="user.id !== currentUserId" (click)="startRolesEdit(user)">{{ 'users.editRolesButton' | t }}</button>
                   <button class="btn btn-outline-secondary" (click)="startAccessEdit(user)">{{ 'users.editAccessButton' | t }}</button>
                   <button class="btn btn-outline-secondary" *ngIf="user.active !== false" (click)="startPasswordReset(user.id)">{{ 'users.resetPasswordButton' | t }}</button>
                   <button
@@ -211,6 +172,57 @@
                   >
                     {{ 'users.deleteButton' | t }}
                   </button>
+                </div>
+              </td>
+            </tr>
+            <tr class="roles-editor" *ngIf="rolesEditId === user.id">
+              <td colspan="5">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                  <div class="form-check form-check-inline m-0" *ngFor="let role of allRoles">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      [id]="'role-' + user.id + '-' + role"
+                      [(ngModel)]="roleDraft[user.id][role]"
+                      [ngModelOptions]="{ standalone: true }"
+                    />
+                    <label class="form-check-label small" [for]="'role-' + user.id + '-' + role">{{ ('users.role.' + role) | t }}</label>
+                  </div>
+                  <button
+                    class="btn btn-sm btn-primary"
+                    *ngIf="rolesDirty(user)"
+                    [disabled]="savingRolesId === user.id"
+                    (click)="saveRoles(user)"
+                  >
+                    {{ (savingRolesId === user.id ? 'common.saving' : 'users.saveRolesButton') | t }}
+                  </button>
+                </div>
+
+                <div class="mt-2" *ngIf="showFeatures(user)">
+                  <span class="form-label small fw-semibold d-block mb-1">{{ 'users.form.featuresLabel' | t }}</span>
+                  <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <div class="form-check form-check-inline m-0" *ngFor="let cap of allCapabilities">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        [id]="'cap-' + user.id + '-' + cap"
+                        [(ngModel)]="capDraft[user.id][cap]"
+                        [ngModelOptions]="{ standalone: true }"
+                      />
+                      <label class="form-check-label small" [for]="'cap-' + user.id + '-' + cap">{{ ('users.capability.' + cap) | t }}</label>
+                    </div>
+                    <button
+                      class="btn btn-sm btn-primary"
+                      *ngIf="capsDirty(user)"
+                      [disabled]="savingCapsId === user.id"
+                      (click)="saveCaps(user)"
+                    >
+                      {{ (savingCapsId === user.id ? 'common.saving' : 'users.saveFeaturesButton') | t }}
+                    </button>
+                  </div>
+                </div>
+                <div class="mt-2">
+                  <button class="btn btn-sm btn-outline-secondary roles-cancel" (click)="cancelRolesEdit(user)">{{ 'common.cancel' | t }}</button>
                 </div>
               </td>
             </tr>

@@ -89,6 +89,11 @@ export class UsersComponent implements OnInit {
   protected roleDraft: Record<number, Record<Role, boolean>> = {};
   protected savingRolesId: number | null = null;
 
+  // Which row's roles-and-features editor is open (one at a time). The row
+  // itself shows roles as words: eight feature checkboxes per admin made a
+  // person eleven checkboxes tall (plan.md §813).
+  protected rolesEditId: number | null = null;
+
   // Per-user Features edit state — populated for admin rows only (§152b).
   protected capDraft: Record<number, Record<Capability, boolean>> = {};
   protected savingCapsId: number | null = null;
@@ -158,6 +163,19 @@ export class UsersComponent implements OnInit {
 
   protected newRolesValid(): boolean {
     return this.selected(this.newRoles).length > 0;
+  }
+
+  protected startRolesEdit(user: AdminUser): void {
+    this.rolesEditId = user.id;
+  }
+
+  /** Close the editor and drop whatever was ticked but not saved. */
+  protected cancelRolesEdit(user: AdminUser): void {
+    this.rolesEditId = null;
+    this.roleDraft[user.id] = this.toRecord(user.roles);
+    if (this.showFeatures(user)) {
+      this.capDraft[user.id] = capsRecord(user.capabilities);
+    }
   }
 
   protected rolesDirty(user: AdminUser): boolean {
@@ -327,6 +345,7 @@ export class UsersComponent implements OnInit {
       .subscribe({
         next: () => {
           this.toast.success(this.translate.t('users.toast.rolesUpdated', { username: user.username }));
+          this.rolesEditId = null;
           this.load();
         },
         error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('users.errors.updateRoles'))),
@@ -346,6 +365,7 @@ export class UsersComponent implements OnInit {
       .subscribe({
         next: () => {
           this.toast.success(this.translate.t('users.toast.featuresUpdated', { username: user.username }));
+          this.rolesEditId = null;
           this.load();
         },
         error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('users.errors.updateFeatures'))),

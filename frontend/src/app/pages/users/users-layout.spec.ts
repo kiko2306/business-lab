@@ -49,7 +49,7 @@ async function mountUsersAt(width: number): Promise<{ frame: HTMLIFrameElement; 
   fixture.detectChanges();
   const host = fixture.nativeElement as HTMLElement;
   // Panels start collapsed, so the table is not in the DOM until they are opened.
-  host.querySelectorAll<HTMLButtonElement>('.panel__toggle').forEach((toggle) => toggle.click());
+  host.querySelectorAll<HTMLButtonElement>('.panel__toggle[aria-expanded="false"]').forEach((toggle) => toggle.click());
   (fixture.componentInstance as unknown as { startPasswordReset(id: number): void }).startPasswordReset(2);
   fixture.detectChanges();
 

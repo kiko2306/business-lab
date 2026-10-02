@@ -36919,3 +36919,28 @@ already looking at does the same job without another dialog; and a "send a reset
 place of a typed password (the critique's question), which is a real change to the flow and not a
 copy fix, so it stays a question for the owner. 291 specs, build clean; pt-PT strings added for
 all four.
+
+## 817. Users: the page opens on the people, one line each (§813 fix 4, P1)
+
+Two things made the page hide its own point. It opened as two closed cards; and once the list was
+open, an admin's row carried 3 role and 8 feature checkboxes, so each person was eleven checkboxes
+tall and "who is this and what can they do" was the least visible thing in it.
+
+- **`app-panel` gains `[defaultOpen]`**, and `SectionCollapseService.isCollapsed/toggle` take the
+  default as a parameter. Only the Accounts panel uses it. The app-wide rule — panels start
+  collapsed, a deliberate choice stated in the service — is untouched; an explicit open/close by
+  the person still wins either way (spec: close it, remount, it stays closed). **Rejected:**
+  flipping the global default, and a per-page "open the first panel" hack.
+- **A row is one line.** Roles are words (badges), an admin shows "2 of 8 features", and the
+  checkboxes live in a roles-and-features row opened by **Edit roles**, the same pattern access and
+  password already use. Save and Cancel are there; saving or cancelling closes it and Cancel drops
+  the unsaved ticks. There is no Edit roles on your own row (it could only ever be disabled), and
+  "You can't change your own roles" stays beside the badges.
+
+The existing specs that clicked every `.panel__toggle` to open the page would now have *closed* the
+list, so they open only the collapsed ones. The a11y spec now opens the roles editor too (§811's
+rule: a spec that does not open an editor cannot check it). 299 specs, build clean.
+
+**Not done, deliberately:** merging Edit roles and Edit access into one "Edit" panel, and a
+per-person card with app icons — both are bigger redesigns than the critique's P1 asked for, and
+the row is already scannable. Left as the §813 question, with presets (fix 5).
