@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.3] — 2026-10-02
+
+### Fixed
+
+- Account: a wrong 2FA code is shown beside its field, announced to screen readers, in your own language and saying what to try, instead of a silent banner at the top of the page
+
 ## [0.163.2] — 2026-10-02
 
 ### Changed

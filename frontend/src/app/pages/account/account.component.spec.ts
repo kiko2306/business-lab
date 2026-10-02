@@ -1,7 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
+import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
+import { TranslateService } from '../../i18n/translate.service';
 import { AccountComponent } from './account.component';
 import { OperationsService } from '../../core/operations.service';
 import { ToastService } from '../../core/toast.service';
@@ -115,17 +117,100 @@ describe('AccountComponent', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('aaaaa-11111');
   });
 
-  it('keeps the enrolling view and surfaces the error when the code is rejected', () => {
+  // plan.md §819: the failure used to be a banner at the top of the page with
+  // no role, the server's English sentence even in pt-PT, and a wrong disable
+  // code answered "Provide a current 6-digit code…" — which reads as "you gave
+  // nothing". It now sits under the field that failed, announced, in the
+  // person's language, saying what to try.
+  const rejected = () => throwError(() => new HttpErrorResponse({ status: 400, error: { error: 'That code is not valid.' } }));
+  const text = () => (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+  it('puts a rejected enrol code beside the field, announced, with no page banner', async () => {
     operations.setupTotp.and.returnValue(of(setupResponse));
-    operations.activateTotp.and.returnValue(throwError(() => new Error('That code was not accepted.')));
+    operations.activateTotp.and.callFake(rejected);
     fixture.detectChanges();
+    openPanel();
     component.beginSetup();
+    fixture.detectChanges();
 
     component['activateForm'].setValue({ code: '000000' });
     component.activate();
+    fixture.detectChanges();
 
+    const host = fixture.nativeElement as HTMLElement;
+    const error = host.querySelector('#activate-code-error') as HTMLElement;
     expect(component['view']).toBe('enrolling');
-    expect(component['errorMessage']).toBe('That code was not accepted.');
+    expect(error.getAttribute('role')).toBe('alert');
+    expect(error.textContent).toContain('changes every 30 seconds');
+    expect(error.textContent).toContain('clock');
+    expect(text()).not.toContain('That code is not valid.');
+    expect(host.querySelector('.alert-danger')).toBeNull();
+    expect(host.querySelector('#activate-code')?.getAttribute('aria-describedby')).toContain('activate-code-error');
+
+    // Focus goes to the field so the next attempt is a keystroke away.
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(document.activeElement?.id).toBe('activate-code');
+  });
+
+  it('says it in Portuguese for a pt-PT reader, never the server\'s English', () => {
+    TestBed.inject(TranslateService).setLocale('pt-PT');
+    operations.setupTotp.and.returnValue(of(setupResponse));
+    operations.activateTotp.and.callFake(rejected);
+    fixture.detectChanges();
+    openPanel();
+    component.beginSetup();
+    fixture.detectChanges();
+
+    component['activateForm'].setValue({ code: '000000' });
+    component.activate();
+    fixture.detectChanges();
+
+    const error = (fixture.nativeElement as HTMLElement).querySelector('#activate-code-error') as HTMLElement;
+    expect(error.textContent).toContain('telemóvel');
+    expect(text()).not.toContain('That code is not valid.');
+    TestBed.inject(TranslateService).setLocale('en');
+  });
+
+  it('tells a server failure from a wrong code', () => {
+    operations.setupTotp.and.returnValue(of(setupResponse));
+    operations.activateTotp.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+    fixture.detectChanges();
+    openPanel();
+    component.beginSetup();
+    fixture.detectChanges();
+
+    component['activateForm'].setValue({ code: '000000' });
+    component.activate();
+    fixture.detectChanges();
+
+    const error = (fixture.nativeElement as HTMLElement).querySelector('#activate-code-error') as HTMLElement;
+    expect(error.textContent).toContain('couldn');
+    expect(error.textContent).not.toContain('changes every 30 seconds');
+  });
+
+  it('puts a wrong disable code beside its field and says what to use', async () => {
+    operations.getTotpStatus.and.returnValue(of(enabledStatus));
+    operations.disableTotp.and.callFake(rejected);
+    fixture.detectChanges();
+    openPanel();
+
+    component['disableForm'].setValue({ code: '000000' });
+    await component.disable();
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const error = host.querySelector('#disable-code-error') as HTMLElement;
+    expect(error.getAttribute('role')).toBe('alert');
+    expect(error.textContent).toContain('recovery codes');
+    expect(error.textContent).not.toContain('Provide a current');
+    expect(host.querySelector('.alert-danger')).toBeNull();
+  });
+
+  it('announces a page-level error such as a failed load', () => {
+    operations.getTotpStatus.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('.alert-danger')?.getAttribute('role')).toBe('alert');
   });
 
   it('shows the disable form and the enrolled date when 2FA is on', () => {
@@ -150,7 +235,7 @@ describe('AccountComponent', () => {
 
     expect(confirm.ask).not.toHaveBeenCalled();
     expect(operations.disableTotp).not.toHaveBeenCalled();
-    expect(component['errorMessage']).toContain('recovery code');
+    expect(component['disableError']).toContain('recovery code');
   });
 
   it('offers no password field when turning 2FA off', () => {

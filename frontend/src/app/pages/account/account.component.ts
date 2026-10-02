@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { HttpErrorResponse } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { TotpStatus } from '../../core/models';
@@ -50,6 +51,12 @@ export class AccountComponent implements OnInit {
   // Shown exactly once, straight after activate. The backend never returns
   // these again, so leaving this view without saving them is the user's loss.
   protected recoveryCodes: string[] = [];
+
+  // Failures of a code sit under the field that failed (announced through
+  // appFieldError), not in the page banner `errorMessage`, which is for the
+  // page as a whole: a failed load, a failed setup (plan.md §819).
+  protected activateError = '';
+  protected disableError = '';
 
   protected readonly activateForm = this.formBuilder.nonNullable.group({
     code: ['', [Validators.required, Validators.minLength(6), Validators.maxLength(6)]],
@@ -100,6 +107,18 @@ export class AccountComponent implements OnInit {
       });
   }
 
+  /** A 400 means the code was wrong; anything else is the server's trouble, not theirs. */
+  private codeFailure(error: unknown, rejectedKey: string, failedKey: string): string {
+    return error instanceof HttpErrorResponse && error.status === 400
+      ? this.translate.t(rejectedKey)
+      : extractErrorMessage(error, this.translate.t(failedKey));
+  }
+
+  /** Puts the cursor back in the field after a failure, once Angular has drawn the error. */
+  private refocus(id: string): void {
+    setTimeout(() => document.getElementById(id)?.focus());
+  }
+
   cancelSetup(): void {
     // The pending secret is left on the server; the next setup call replaces
     // it, and it's inert until activated.
@@ -107,6 +126,7 @@ export class AccountComponent implements OnInit {
     this.secret = '';
     this.activateForm.reset();
     this.errorMessage = '';
+    this.activateError = '';
     this.view = 'status';
   }
 
@@ -117,6 +137,7 @@ export class AccountComponent implements OnInit {
     }
 
     this.errorMessage = '';
+    this.activateError = '';
     this.busy = true;
     this.operations
       .activateTotp(this.activateForm.getRawValue().code.trim())
@@ -129,7 +150,10 @@ export class AccountComponent implements OnInit {
           this.view = 'recovery-codes';
           this.toast.success(this.translate.t('account.toast.enabled'));
         },
-        error: (error) => (this.errorMessage = extractErrorMessage(error, this.translate.t('account.errors.codeRejected'))),
+        error: (error) => {
+          this.activateError = this.codeFailure(error, 'account.errors.codeRejected', 'account.errors.activateFailed');
+          this.refocus('activate-code');
+        },
       });
   }
 
@@ -163,8 +187,10 @@ export class AccountComponent implements OnInit {
 
   async disable(): Promise<void> {
     const code = this.disableForm.getRawValue().code.trim();
+    this.disableError = '';
     if (!code) {
-      this.errorMessage = this.translate.t('account.errors.enterCode');
+      this.disableError = this.translate.t('account.errors.enterCode');
+      this.refocus('disable-code');
       return;
     }
 
@@ -179,7 +205,6 @@ export class AccountComponent implements OnInit {
       return;
     }
 
-    this.errorMessage = '';
     this.busy = true;
     this.operations
       .disableTotp({ code })
@@ -190,8 +215,10 @@ export class AccountComponent implements OnInit {
           this.toast.success(this.translate.t('account.toast.disabled'));
           this.loadStatus();
         },
-        error: (error) =>
-          (this.errorMessage = extractErrorMessage(error, this.translate.t('account.errors.disable'))),
+        error: (error) => {
+          this.disableError = this.codeFailure(error, 'account.errors.disableRejected', 'account.errors.disable');
+          this.refocus('disable-code');
+        },
       });
   }
 }

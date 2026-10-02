@@ -37041,3 +37041,30 @@ of that, and the host-side recovery in `docs/two-factor.md` is unchanged. **Reje
 password *and* code (the stricter option offered) — it makes disabling impossible for someone with
 neither phone nor recovery codes while adding no protection a code does not already give.
 Backend 1331 tests, frontend 309 specs, build clean.
+
+## 821. Account: a wrong code is said beside the field, and in the right language (§819 fix 2, P1)
+
+The failure was a banner at the top of the page: no `role`, off-screen at the button on a phone,
+and the *server's* English sentence even in pt-PT. After §820 it would also have been the
+sentence "Provide a current 6-digit code or your account password", which a wrong code earned and
+which reads as "you gave nothing".
+
+- **Where.** Two new fields, `activateError` and `disableError`, rendered through the existing
+  `appFieldError` directive under the input that failed — it supplies `role="alert"`,
+  `aria-invalid` and `aria-describedby`, which the critique had already found done right on the
+  activate field's *format* error. The page banner (`errorMessage`) now carries `role="alert"` and
+  is left for what is the page's, not a field's: a failed load or setup. After a failure the
+  cursor goes back into the field, so the next attempt is a keystroke.
+- **What it says, and in whose language.** A 400 means the code was wrong, so the page shows its
+  *own* translated sentence and ignores the server's text: for enrol, "use the code your app shows
+  right now (it changes every 30 seconds), and if it keeps failing set your phone's clock to
+  update automatically" — wrong clock is the usual cause nobody mentions; for disable, "use the
+  6-digit code from your phone, or one of your recovery codes". Anything else (500, network) says
+  "we couldn't check the code, try again" rather than blaming the code. **Rejected:** translating
+  the backend (it has no locale; the page does) and leaving the server sentence as a fallback for
+  400s, which is exactly the leak.
+
+Specs: a 400 shows the message beside the field, announced, described by it, with no banner and
+none of the server's English, and focus lands in the field; the same in pt-PT; a 500 reads
+differently from a 400; a failed load's banner is `role="alert"`. 313 frontend specs, build clean,
+browser E2E passes. The old spec that asserted the banner text was replaced, not loosened.

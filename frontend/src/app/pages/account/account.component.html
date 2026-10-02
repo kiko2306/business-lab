@@ -4,7 +4,7 @@
     <p class="text-body-secondary mb-0">{{ 'account.subtitle.main' | t }}<span *ngIf="canManageBans">{{ 'account.subtitle.bansSuffix' | t }}</span>.</p>
   </div>
 
-  <div *ngIf="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
+  <div *ngIf="errorMessage" class="alert alert-danger" role="alert">{{ errorMessage }}</div>
 
   <app-panel
     key="account:2fa"
@@ -40,6 +40,7 @@
                 autocapitalize="none"
                 spellcheck="false"
               />
+              <div class="text-danger small mt-1" appFieldError="disable-code" *ngIf="disableError">{{ disableError }}</div>
             </div>
             <div class="col-12 col-sm-auto">
               <button class="btn btn-outline-danger" type="submit" [disabled]="busy">
@@ -82,9 +83,9 @@
           <div
             class="text-danger small mt-1"
             appFieldError="activate-code"
-            *ngIf="activateForm.controls.code.touched && activateForm.controls.code.invalid"
+            *ngIf="activateError || (activateForm.controls.code.touched && activateForm.controls.code.invalid)"
           >
-            {{ 'account.enrolling.codeError' | t }}
+            {{ activateError || ('account.enrolling.codeError' | t) }}
           </div>
           <div class="d-flex gap-2 mt-3">
             <button class="btn btn-primary" type="submit" [disabled]="busy || activateForm.invalid">
