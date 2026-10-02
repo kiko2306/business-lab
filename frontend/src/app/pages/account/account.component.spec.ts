@@ -8,6 +8,8 @@ import { AccountComponent } from './account.component';
 import { OperationsService } from '../../core/operations.service';
 import { ToastService } from '../../core/toast.service';
 import { ConfirmService } from '../../core/confirm.service';
+import { en } from '../../i18n/en';
+import { ptPT } from '../../i18n/pt-pt';
 import { TotpActivateResponse, TotpSetupResponse, TotpStatus } from '../../core/models';
 
 describe('AccountComponent', () => {
@@ -61,15 +63,54 @@ describe('AccountComponent', () => {
     component = fixture.componentInstance;
   });
 
-  // The 2FA content lives inside a collapsible <app-panel> that starts
-  // collapsed, so DOM assertions need the panel opened first.
+  // The 2FA content lives inside a collapsible <app-panel>. It starts open
+  // (plan.md §819), but a person can close it, so this clicks only if shut.
   function openPanel(): void {
     const toggle = (fixture.nativeElement as HTMLElement).querySelector(
       '.panel__toggle',
     ) as HTMLButtonElement | null;
-    toggle?.click();
+    if (toggle?.getAttribute('aria-expanded') !== 'true') {
+      toggle?.click();
+    }
     fixture.detectChanges();
   }
+
+  function closePanel(): void {
+    ((fixture.nativeElement as HTMLElement).querySelector('.panel__toggle') as HTMLButtonElement).click();
+    fixture.detectChanges();
+  }
+
+  // plan.md §819 fix 4: the page exists for this one panel, and its words
+  // are the app's own, not the protocol's.
+  describe('the two-factor panel on a fresh visit', () => {
+    it('is open without a click', () => {
+      fixture.detectChanges();
+
+      const button = (fixture.nativeElement as HTMLElement).querySelector('button.btn-primary');
+      expect(button?.textContent).toContain('Set up two-factor authentication');
+    });
+
+    it('still closes when the person closes it', () => {
+      fixture.detectChanges();
+      closePanel();
+
+      expect((fixture.nativeElement as HTMLElement).querySelector('button.btn-primary')).toBeNull();
+    });
+
+    for (const [name, dictionary] of [['English', en], ['Portuguese', ptPT]] as const) {
+      it(`uses no TOTP or enrolment jargon in the ${name} Account strings`, () => {
+        const jargon = Object.entries(dictionary).filter(
+          ([key, value]) => key.startsWith('account.') && /totp|enrol|inscri/i.test(value),
+        );
+        expect(jargon.map(([key]) => key)).toEqual([]);
+      });
+    }
+
+    it('does not name CrowdSec in the page subtitle', () => {
+      expect(en['account.subtitle.bansSuffix']).not.toMatch(/crowdsec/i);
+      expect(ptPT['account.subtitle.bansSuffix']).not.toMatch(/crowdsec/i);
+    });
+  });
 
   it('loads status on init and shows the "set up" state when 2FA is off', () => {
     fixture.detectChanges();

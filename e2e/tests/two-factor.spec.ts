@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { authenticator } from 'otplib';
 import { ADMIN, expandPanel } from './helpers';
 
-const PANEL = 'Two-factor authentication (TOTP)';
+const PANEL = 'Two-factor authentication';
 
 // A TOTP code that won't roll over mid-request. The backend accepts ±1 step,
 // but generating right on the boundary is still flaky, so wait for a fresh

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.5] — 2026-10-02
+
+### Account
+
+- Account: the two-factor panel is open on arrival, and the page says "two-factor" and "setup" instead of TOTP and enrolment
+
 ## [0.163.4] — 2026-10-02
 
 ### Changed

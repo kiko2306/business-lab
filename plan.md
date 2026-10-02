@@ -37090,3 +37090,20 @@ the dark theme reads as an error; and the prominent blue "I've saved them" with 
 
 The browser E2E needed two edits and caught both: it asserted the green alert's text, and clicked
 "I've saved them" while it is now held. 321 frontend specs, build clean, E2E passes.
+
+## 823. Account: the two-factor panel opens on arrival, in plain words (§819 fix 4, P2)
+
+[x] done. The page exists for one panel, and it was collapsed, titled "(TOTP)", with an error
+saying "enrolment" and a subtitle naming CrowdSec.
+
+- **Open by default.** `<app-panel [defaultOpen]="true">` (the input from §813). A person who
+  closes it keeps it closed, per `SectionCollapseService`.
+- **Words.** Panel title is "Two-factor authentication"; "Unable to start setup."; subtitle tail
+  is ", and blocked IP addresses". pt-PT likewise ("inscrição" dropped for "configuração").
+  The CrowdSec panel keeps its own name: it is the tool's name there.
+- **Test.** A spec scans every `account.*` string in both dictionaries for `totp|enrol|inscri`
+  and fails with the key names; the older specs' `openPanel()` now clicks only when shut.
+  E2E's `PANEL` constant lost "(TOTP)"; `expandPanel` already handles an open panel.
+  **Rejected:** hiding the key name `startEnrolment` — keys are not user-visible.
+- 326 frontend specs, build clean, E2E passes. `docs/two-factor.md` keeps "TOTP": it is an
+  operator doc about the protocol.
