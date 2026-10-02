@@ -36970,3 +36970,44 @@ builds pass).
 **Not claimed:** touch-target size (16px checkboxes, ≤31px buttons) — a layout change, not a colour
 one, and it touches density on every page; left as its own item. The hotel apps still have no
 harness, so the ring reaches them unmeasured.
+
+## 819. Critique round 2, Account page: 24/40, and three P1s in the 2FA flow
+
+Second run of §812, same method as §813 (dual-agent, real render of the whole TOTP journey at
+1280 and 390, dark and light, EN and pt-PT). **24/40**; detector 0 CLI findings. Snapshot in
+`.impeccable/critique/` (not committed). Nothing fixed yet.
+
+**Held up under measurement:** every text element AA, control edges 4.3–4.8:1 and the focus ring
+6.1–6.4:1 (§818's theme fix reaches this page), no overflow at 390 with the secret and ten recovery
+codes, no console errors beyond the expected 400s and the stack's missing CrowdSec 503.
+
+**Findings, in fix order.**
+1. **P1 — disabling 2FA is one click, no confirm, and the password alone is accepted**
+   (`routes/auth.ts:612-640`). A phished password removes the second factor; PRODUCT.md says a
+   destructive action is confirmed.
+2. **P1 — errors are detached and silent.** The in-panel danger alert (`html:7`) has no
+   `role="alert"` and sits at the top of the page, off-screen at the button on a phone. Backend
+   error strings reach the pt-PT UI in English, and "Provide a current 6-digit code or your account
+   password" is what a wrong code returns, which reads as "you gave nothing". The activate field's
+   own error is done right (`role=alert`, `aria-invalid`, `aria-describedby`) — that is the pattern.
+3. **P1 — the recovery-codes screen, shown once, is the quietest on the page.** "Shown only now" is
+   small muted text, a green alert and a toast say the same thing, and "I've saved them" is the
+   prominent blue button with nothing gating it.
+4. **P2 — the task is hidden and the words are jargon** (collapsed panel, "(TOTP)", "enrolment",
+   CrowdSec in the subtitle).
+5. **P2 — phone.** The QR cannot be scanned from the phone showing it (no `otpauth://` link, no
+   copy-key button); Download/Copy/Done are 31px and Set up/Activate/Cancel/Disable 38px; focus
+   falls to `<body>` after every view change; leaving mid-enrolment issues a new secret next visit,
+   so a scanned account silently stops working.
+6. **P2 — unnamed pieces:** the QR has no accessible name, the in-panel success alert no role, the
+   recovery list no `aria-label`.
+
+Minor: the toast covers the header for ~5s; date hard-coded `dd/MM/yyyy`; the "On"/"Off" badge;
+12px secret; the `123456` placeholder reads as a value in dark; `maxlength="6"` blocks pasting
+"123 456"; pink `<code>` colour on the codes breaks the meaning-only-colour rule.
+
+**Harness notes.** The test DB's admin already had 2FA on with an unknown secret from an earlier
+run, so Assessment B reset it with SQL between runs; the auth limiter (20 per 15 min, shared by
+login/refresh/TOTP) 429'd the first passes. Neither is a product finding. The page has no
+password-change section, contrary to what the brief assumed. Not verified: screen-reader output
+(the accessibility tree came back null), a real authenticator scan, the Banned IPs panel.

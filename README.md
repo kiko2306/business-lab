@@ -233,7 +233,15 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       the Users page (every button ≤31px, 87 checkboxes at 16px); a density change on every page,
       so decide a phone-only rule first (bigger hit area, not bigger look), test it on one page,
       then apply it through the shared theme.
-- [ ] **Critique: Account (2FA) (plan.md §812)** — `pages/account`; every user sees it; check enrol, recovery codes and disable on a phone.
+- [ ] **Account: fix the critique's findings (plan.md §819)** — in order, test first, one
+      commit and version bump each: (1) disabling 2FA asks for confirmation and never accepts
+      the password alone (backend `routes/auth.ts` plus the page); (2) errors sit beside the field
+      with `role="alert"`, the backend's wrong-code messages say what to do and arrive translated;
+      (3) the recovery-codes screen leads with "save these now", drops the duplicate alert, neutral
+      ink for the codes, and "Done" waits for a copy or download; (4) open the 2FA panel by
+      default and drop "TOTP"/"enrolment"; (5) phone: `otpauth://` link, copy-key, 44px targets,
+      focus moved after each step, an accessible name on the QR. On `beta`, after each: run the
+      full journey (set up, wrong code, activate, recovery codes, disable) on a phone.
 - [ ] **Critique: Sign-in flow (login, setup, recovery, set-password) (plan.md §812)** — `pages/login, setup, recovery, set-password`; public, first contact, phone-heavy; critique as one flow.
 - [ ] **Critique: Updates (plan.md §812)** — `pages/self-update`; the operator must trust it not to break the box: progress, failure and rollback wording.
 - [ ] **Critique: Utils (plan.md §812)** — `pages/utils`.
