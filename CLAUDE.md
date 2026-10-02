@@ -1,358 +1,123 @@
 # Homelab Management
 
-Angular dashboard + Node/Express (TypeScript) API + Postgres, all in Docker, that
-starts, stops, configures and exposes ~36 self-hosted apps living under `apps/`.
-The host runs Docker; the dashboard drives it.
+Angular dashboard + Node/Express (TypeScript) API + Postgres, all in Docker. Start, stop, configure, show ~36 self-host app live under `apps/`. Host run Docker. Dashboard drive it.
 
 ## Non-negotiable principles
 
-These come from `plan.md` §0 and constrain every change. If a design can't meet
-them, it doesn't ship until it can.
+These come from `plan.md` §0. Bind every change. Design no meet them? No ship until can.
 
-1. **No router changes.** No port forwarding, no static WAN IP/DDNS, no firewall
-   rules. All ingress is the Cloudflare Tunnel, or the overlay VPNs for peers.
-2. **No console configuration.** The only command a human runs on the host is
-   `./start.sh`. Everything else — credentials, exposure, per-app config,
-   secrets — is entered and applied through the dashboard UI. No hand-edited
-   YAML/env/conf, no `docker exec`, no `cscli` steps in a runbook.
-3. **Automate everything automatable.** If the system has enough information to
-   derive or generate a setting, it must do so with no user step. Prompt only
-   for what it genuinely cannot obtain (e.g. a third-party API token) — and then
-   in the UI, once.
+1. **No router changes.** No port forward, no static WAN IP/DDNS, no firewall rule. All ingress be Cloudflare Tunnel, or overlay VPN for peer.
+2. **No console configuration.** Only command human run on host be `./start.sh`. Everything else — credential, exposure, per-app config, secret — go in through dashboard UI. No hand-edit YAML/env/conf, no `docker exec`, no `cscli` step in runbook.
+3. **Automate everything automatable.** System have enough info to derive or make setting? Must do it, no user step. Ask only for what truly cannot get (e.g. third-party API token) — and then in UI, once.
 
-Fixing something by hand on the live host is a diagnostic, never a fix: it
-evaporates on the next fresh clone, since `apps/*/data/` is gitignored. Once it
-works by hand, delete it and make the code do it, then prove the code path.
+Fix thing by hand on live host be diagnostic, never fix: it vanish on next fresh clone, because `apps/*/data/` be gitignored. Once work by hand, delete it, make code do it, then prove code path.
 
 ## This host is a no-guarantees dev/test box
 
-The deployment this repo is developed against — `tx-home-utils.com` — carries
-**no uptime guarantee and no data-durability guarantee**. Services going down
-on it is fine. Data on it being changed or lost is fine. It exists to prove
-code paths against a real stack (principle 3 above), and anything on it is
-disposable. Do not build features, tests, or docs that assume state on this
-host survives, or that a service must stay running.
+Deployment this repo grow against — `tx-home-utils.com` — have **no uptime guarantee and no data-durability guarantee**. Service go down on it: fine. Data change or vanish: fine. It exist to prove code path against real stack (principle 3 above). Everything on it throwaway. No build feature, test, or doc that assume state on this host survive, or that service must stay run.
 
-Being internet-exposed is **not** what makes it dev/test. A production /
-per-client deployment is *also* internet-exposed — same Cloudflare Tunnel + NPM
-model — but is a **separate deployment** with its own domain and its own
-credentials/tokens, and there uptime and client data do matter. The difference
-is the promises, not the exposure.
+Internet-exposed be **not** what make it dev/test. Production / per-client deployment be *also* internet-exposed — same Cloudflare Tunnel + NPM model — but be **separate deployment** with own domain and own credential/token, and there uptime and client data do matter. Difference be promise, not exposure.
 
-The verification model is unchanged: this box is what `beta`'s README-listed
-tests run against — the user pulls `beta` onto it via the self-update panel
-and asks for it to be tested — before anything goes to `main`. That is
-exactly what a no-guarantees dev/test box is for.
+Verification model unchanged: this box be what `beta`'s README-listed test run against — user pull `beta` onto it via self-update panel and ask for test — before anything go to `main`. That exactly what no-guarantees dev/test box for.
 
 ## plan.md is the project's memory
 
-`plan.md` is the spec **and** the running session log. Numbered
-sections; new work is appended as a new `## NN. ...` section. Read the tail
-before starting — the last section usually says where things stand and what to
-pick up. Record what was tried and rejected, not just what landed. Do not
-rewrite an active section's history; append.
+`plan.md` be spec **and** run session log. Numbered section; new work append as new `## NN. ...` section. Read tail before start — last section usually say where thing stand and what to pick up. Record what tried and rejected, not just what land.
 
-A **fully-superseded** run of sections — one app or one investigation, closed,
-with its outcome captured in code/tests/docs — may be compacted in a bounded,
-reviewable pass: replace the run with one short section that keeps the durable
-facts, the **conclusion** of each rejected approach (not the blow-by-blow), and
-any still-open threads, titled `... (former §X–§Y, compacted <date>)`. Do this
-as its own `plan:` commit so the diff can be reviewed and reverted.
-
-A section that later sections or code still cite can be compacted only if
-every cited anchor survives as a labelled entry in the compacted section
-(`**§50.5** — <its conclusion>`), so each existing `§` citation still
-resolves by search and nothing outside `plan.md` has to change.
-`scripts/plan-citations.py` lists every citation that resolves nowhere: run
-it before and after, and the pass may add **no new** lines. §172 rejected an
-earlier form of this, which kept whole subsections and so saved little.
-Keeping only each anchor's conclusion is what makes it worth doing.
-
-It is read **a section at a time, never whole**. To read one, use
-`./scripts/plan-section.sh <N>` (or `<first> <last>` for a run) — it finds the
-section from `plan.md`'s own headings, so looking up §649 does not mean
-loading all 62 KB of `plan-index.md` to get one `sed` range out of it.
-`plan-index.md` is still the map to *browse* when you don't know the number:
-it lists every section with its `sed` range, and is regenerated with
-`./scripts/plan-index.sh` after appending or compacting. The record of what was
-tried and rejected is the half that keeps turning out to matter (§75.7) — a
-compaction keeps that, it just drops the iteration detail once the code is the
-source of truth. Nothing loads the file automatically anyway.
+It read **one section at time, never whole**. To read one, use `./scripts/plan-section.sh <N>` (or `<first> <last>` for run) — it find section from `plan.md` own heading, so look up §649 no mean load all 62 KB of `plan-index.md` to get one `sed` range out. `plan-index.md` still be map to *browse* when number unknown: it list every section with `sed` range, and regenerate with `./scripts/plan-index.sh` after append or squash. Record of what tried and rejected be half that keep matter (§75.7) — squash keep that, just drop iteration detail once code be truth source. Nothing load file automatic anyway.
 
 ## Commands
 
-**There is no Node on this host** — everything runs in containers. Use
-`./scripts/check.sh <backend|frontend> <test|typecheck|build>`, e.g.
-`./scripts/check.sh backend test` or `./scripts/check.sh frontend test`. It
-resolves the repo root itself, so it works even if the shell's cwd has
-drifted into `backend/` or `frontend/` — mounting `$PWD` directly breaks
-there, since some backend tests resolve paths up to the repo root, not just
-their own workspace. `frontend test` builds the `business-lab-frontend-test`
-image on first use if it's missing (Karma/Jasmine + headless Chrome doesn't
-run on plain `node:20` — no Chrome, and `node:20`'s Debian base is missing
-the shared libraries headless Chrome needs). `./scripts/smoke-tests.sh` runs
-on the host against an already-running backend.
+**No Node on this host** — everything run in container. Use `./scripts/check.sh <backend|frontend> <test|typecheck|build>`, e.g. `./scripts/check.sh backend test` or `./scripts/check.sh frontend test`. It find repo root itself, so work even if shell cwd drift into `backend/` or `frontend/` — mount `$PWD` direct break there, because some backend test resolve path up to repo root, not just own workspace. `frontend test` build `business-lab-frontend-test` image on first use if missing (Karma/Jasmine + headless Chrome no run on plain `node:20` — no Chrome, and `node:20` Debian base miss shared library headless Chrome need). `./scripts/smoke-tests.sh` run on host against already-run backend.
 
 Rebuild `business-lab-frontend-test` (`docker build -t business-lab-frontend-test -f
-frontend/Dockerfile.test frontend`) if `frontend/package-lock.json`'s
-`puppeteer` version changes (`Dockerfile.test` pins a matching Chrome
-download).
+frontend/Dockerfile.test frontend`) if `frontend/package-lock.json` `puppeteer` version change (`Dockerfile.test` pin match Chrome download).
 
-CI (`.github/workflows/ci.yml`) runs backend typecheck+test, frontend
-test:ci+build, `apps/price-compare/app` tests, and the browser E2E job
-(`scripts/e2e-tests.sh` — Playwright against the `docker-compose.test.yml`
-stack). The host-only smoke tests (`scripts/smoke-tests.sh`) are not in CI.
-Run the affected workspace's checks before saying a change is done; run
-`scripts/e2e-tests.sh` when a change touches auth, the shell/nav, the Users
-page or the 2FA flow.
+CI (`.github/workflows/ci.yml`) run backend typecheck+test, frontend test:ci+build, `apps/price-compare/app` test, and browser E2E job (`scripts/e2e-tests.sh` — Playwright against `docker-compose.test.yml` stack). Host-only smoke test (`scripts/smoke-tests.sh`) no in CI. Run affected workspace check before say change done; run `scripts/e2e-tests.sh` when change touch auth, shell/nav, Users page or 2FA flow.
 
 ## Commits go to `dev`; `dev` → `beta` → `main`
 
-The real branch flow has three stages: `dev` → `beta` → `main`. All work
-commits to the rolling `dev` branch — never straight to `beta` or `main`.
+Real branch flow have three stage: `dev` → `beta` → `main`. All work commit to rolling `dev` branch — never straight to `beta` or `main`.
 
-`dev` is always safe to commit and push to — that is what it is for. Every
-change and new feature goes there as it lands, once the affected workspace's
-checks (typecheck/test) pass; live-stack verification is **not** a gate for
-`dev`. Don't leave finished work sitting uncommitted, and don't batch several
-unrelated changes into one commit: one commit per coherent change, pushed as
-it lands. Alongside it, add to README's TODO exactly what still needs to be
-tested on `beta` before the change is trustworthy there (what to check, and
-how) — the same item gets deleted once that test passes, per the TODO
-convention below.
+`dev` always safe to commit and push to — that what it for. Every change and new feature go there as it land, once affected workspace check (typecheck/test) pass; live-stack verify be **not** gate for `dev`. No leave finished work sit uncommitted, and no batch several unrelated change into one commit: one commit per coherent change, push as it land. Beside it, add to README TODO exactly what still need test on `beta` before change trustworthy there (what to check, and how) — same item delete once that test pass, per TODO rule below.
 
-Merge `dev` into `beta` only when a commit actually gives the user something
-new to test there — it touches Docker/exposure/networking/backups, or
-otherwise completes a slice that is now reachable/usable end-to-end. A
-docs/plan-only fix, or a backend-only slice nothing yet exposes (e.g. an API
-endpoint built before the frontend or exposure that reaches it), stays on
-`dev` and waits — merge it into `beta` together with, or right after, the
-change that actually makes it reachable. This is a judgment call each time,
-not a fixed list of file paths.
+Merge `dev` into `beta` only when commit truly give user something new to test there — it touch Docker/exposure/network/backup, or else finish slice that now reachable/usable end-to-end. Doc/plan-only fix, or backend-only slice nothing yet expose (e.g. API endpoint build before frontend or exposure that reach it), stay on `dev` and wait — merge into `beta` together with, or right after, change that truly make it reachable. This be judgment call each time, not fixed list of file path.
 
-When a commit does clear that bar, merging is **only** a merge and push
-(fast-forward when possible) — no rebuild, no restart, no live-stack testing
-on your own initiative, and no need to ask permission first (the judgment
-call above is the only gate). The user pulls that code onto the running box
-themselves, via the dashboard's own self-update panel (Update page, tracking
-the `beta` branch) — that update is theirs to trigger, not yours. Every time
-a merge to `beta` lands, say so plainly and flag that the README's listed
-tests still need to be run there before `main`.
+When commit do clear that bar, merge be **only** merge and push (fast-forward when can) — no rebuild, no restart, no live-stack test on own idea, and no need ask permission first (judgment call above be only gate). User pull that code onto run box themself, via dashboard own self-update panel (Update page, track `beta` branch) — that update be theirs to trigger, not yours. Every time merge to `beta` land, say so plain and flag that README listed test still need run there before `main`.
 
-`beta` → `main` happens only when the user explicitly asks for `beta` to be
-tested and that test passes — that request-and-pass is the go-ahead, not a
-separate confirmation on top of it. Run exactly the checks the README items
-describe; if one fails, report what failed and do not merge. Never test
-`beta` or merge to `main` on your own initiative.
+`beta` → `main` happen only when user explicit ask for `beta` test and that test pass — that ask-and-pass be go-ahead, not separate confirm on top. Run exactly check README item describe; if one fail, report what fail and no merge. Never test `beta` or merge to `main` on own idea.
 
-Branch off `dev` as much as needed to keep something isolated
-mid-investigation (a spike, a throwaway experiment); merge back into `dev`,
-not `beta` or `main`, and delete the branch once it has served its purpose.
+Branch off `dev` as much as need to keep something isolated mid-hunt (spike, throwaway experiment); merge back into `dev`, not `beta` or `main`, and delete branch once it serve purpose.
 
-Check `git status` before committing — the repo is public, and `.env` files must
-never be in the diff.
+Check `git status` before commit — repo be public, and `.env` file must never be in diff.
 
 ## The working loop
 
-Every task runs through the same six steps, in order, every time:
+Every task run through same six step, in order, every time:
 
-1. **Read the README TODO list.** It is the source of what is open — not
-   memory, not the last thing discussed. Read it the cheap way:
-   `grep -n '^- \[ \] \*\*' README.md` lists every open item's headline in
-   ~40 lines, against ~30 KB for the section whole. Read an item's full text —
-   which is deliberately long, because "what to check and how" is the point —
-   only for the one being picked up.
-2. **Propose.** Name the task you would do next, or show a short list to choose
-   from. Do not pick one and start.
-3. **Implement** — that one task, **test first**: write the test that
-   describes the change, run it and watch it fail for the right reason, then
-   write the code and run it green. If the behaviour can't be exercised in the
-   container (host file ownership, live Authelia/NPM, the Windows agent), say
-   so before coding and either extract the logic so it can be tested or name
-   the README beta-test that carries the proof. A compose-only or docs-only
-   change has no unit-test surface; its README beta item is the test.
-4. **Update `plan.md` and `README.md`.** A new numbered `plan.md` section
-   saying what was done and why, the finished item **deleted** from the
-   README list, and `./scripts/plan-index.sh` re-run so the index covers the
-   new section. Scale the section to the work: a real investigation or
-   decision gets the full narrative, including what was tried and rejected —
-   that record is what makes the section worth reading later. A small,
-   mechanical item (a rename, a one-line config fix, something with no
-   dead ends behind it) gets a few lines: what changed and why, no more.
-   Padding a trivial item to look like an investigation is exactly the
-   token/session-time cost this convention should avoid. If the change
-   touches Docker/exposure/networking/backups, also add a README TODO item
-   naming exactly what must be tested on `beta` and how — delete it once that
-   test passes.
-5. **Commit and push to `dev` once the affected workspace's checks pass.**
-   `dev` has no live-stack gate; push as it lands. Then merge into `beta`
-   only if this commit actually gives the user something new to test there
-   (touches Docker/exposure/networking/backups, or completes a slice that is
-   now reachable/usable end-to-end) — a docs/plan-only fix or a backend-only
-   slice nothing yet exposes stays on `dev` and waits for the change that
-   makes it reachable. When it does clear that bar, merging is only a merge
-   and push, done without asking each time — no rebuild, no live-stack
-   testing here. Say plainly that the merge landed and that the README's
-   listed tests still need to be run on `beta` before `main`; if you held a
-   commit back from `beta`, say that too. `beta` → `main` is a separate step,
-   triggered only by the user explicitly asking for `beta` to be tested — do
-   that testing, and merge only on a pass; never on your own initiative.
-6. **Back to step 1.** Report, re-read the list, propose again — unless the
-   item just finished was part of a pre-approved batch (below), in which case
-   move to the next item in that batch without re-proposing.
+1. **Read the README TODO list.** It be source of what open — not memory, not last thing talked. Read cheap way: `grep -n '^- \[ \] \*\*' README.md` list every open item headline in ~40 line, against ~30 KB for whole section. Read item full text — deliberately long, because "what to check and how" be point — only for one being pick up.
+2. **Propose.** Name task you would do next, or show short list to choose from. No pick one and start.
+3. **Implement** — that one task, **test first**: write test that describe change, run it and watch it fail for right reason, then write code and run it green. If behaviour cannot exercise in container (host file ownership, live Authelia/NPM, Windows agent), say so before code and either pull logic out so it can test or name README beta-test that carry proof. Compose-only or doc-only change have no unit-test surface; its README beta item be test.
+4. **Update `plan.md` and `README.md`.** New numbered `plan.md` section say what done and why, finished item **deleted** from README list, and `./scripts/plan-index.sh` re-run so index cover new section. Scale section to work: real hunt or decision get full story, include what tried and rejected — that record be what make section worth read later. Small, mechanical item (rename, one-line config fix, something with no dead end behind) get few line: what change and why, no more. Pad trivial item to look like hunt be exactly token/session-time cost this rule should avoid. If change touch Docker/exposure/network/backup, also add README TODO item name exactly what must test on `beta` and how — delete it once that test pass.
+5. **Commit and push to `dev` once the affected workspace's checks pass.** `dev` have no live-stack gate; push as it land. Then merge into `beta` only if this commit truly give user something new to test there (touch Docker/exposure/network/backup, or finish slice that now reachable/usable end-to-end) — doc/plan-only fix or backend-only slice nothing yet expose stay on `dev` and wait for change that make it reachable. When it do clear that bar, merge be only merge and push, done without ask each time — no rebuild, no live-stack test here. Say plain that merge land and that README listed test still need run on `beta` before `main`; if you hold commit back from `beta`, say that too. `beta` → `main` be separate step, trigger only by user explicit ask for `beta` test — do that test, and merge only on pass; never on own idea.
+6. **Back to step 1.** Report, re-read list, propose again — unless item just finish be part of pre-approved batch (below), then move to next item in that batch with no re-propose.
 
-When work arrives as a list rather than a single task, insert a planning pass
-before step 2: append the plan to `plan.md`, add each piece to the README
-list, and then propose. That way intent survives a session that runs long or
-gets interrupted, and the order things get built in stays the user's call.
+When work arrive as list rather than single task, slip planning pass before step 2: append plan to `plan.md`, add each piece to README list, and then propose. That way intent survive session that run long or get cut off, and order thing build in stay user call.
 
-That proposal can ask for batch approval: naming several independent,
-already-planned items and asking to run all of them through steps 3-5 without
-stopping to re-propose each one. Each item still gets its own step 4 (sized
-per the rule above) and its own step 5 commit — batching removes the
-between-item pause, not the per-item record or the one-commit-per-change rule.
-Reserve it for items that are genuinely independent (no item's output feeds
-the next) and were already agreed to in the plan just proposed; stop the batch
-and re-propose the moment one item's outcome changes what a later one should
-do. Default to the un-batched loop — batch only when asked for, or when
-proposing a list of small, clearly independent items where re-asking after
-each one would be pure overhead.
+That proposal can ask for batch approval: name several independent, already-planned item and ask to run all through step 3-5 with no stop to re-propose each. Each item still get own step 4 (sized per rule above) and own step 5 commit — batch remove between-item pause, not per-item record or one-commit-per-change rule. Save it for item truly independent (no item output feed next) and already agreed in plan just proposed; stop batch and re-propose moment one item outcome change what later one should do. Default to un-batched loop — batch only when ask for, or when propose list of small, clear independent item where re-ask after each be pure overhead.
 
 ## TODOs live in README.md, and get deleted
 
-`README.md`'s TODO section is the **only** place open work is tracked. Not
-scattered `// TODO` comments, not a second list in `plan.md`, not a note in a
-doc page — if it is outstanding work, it is an item there.
+`README.md` TODO section be **only** place open work track. Not scattered `// TODO` comment, not second list in `plan.md`, not note in doc page — if it be outstanding work, it be item there.
 
-When an item is finished, **delete it**. Do not tick the box and leave it
-behind: a list of completed work is what `plan.md` and `git log` are for, and a
-README carrying both open and closed items stops being readable as a list of
-what is left. The same goes for an item that turns out to be wrong or no longer
-wanted — delete it, and say why in the commit message.
+When item finish, **delete it**. No tick box and leave behind: list of done work be what `plan.md` and `git log` for, and README carry both open and closed item stop being readable as list of what left. Same go for item that turn out wrong or no longer want — delete it, and say why in commit message.
 
-New work discovered mid-task goes in as a new item rather than being fixed in
-passing, unless it is genuinely part of the change at hand.
+New work found mid-task go in as new item rather than fix in passing, unless it truly part of change at hand.
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `backend/src/config/services.ts` | The service registry — allowlist of every manageable app. Adding an app starts here. |
-| `backend/src/services/` | Business logic: compose execution, exposure, backups, per-app config generation. |
-| `backend/src/routes/` | Express routes, thin. |
-| `frontend/src/app/` | Angular 18 standalone components, Bootstrap 5. |
+| `backend/src/config/services.ts` | Service registry — allowlist of every manageable app. Add app start here. |
+| `backend/src/services/` | Business logic: compose run, exposure, backup, per-app config make. |
+| `backend/src/routes/` | Express route, thin. |
+| `frontend/src/app/` | Angular 18 standalone component, Bootstrap 5. |
 | `apps/<name>/` | One compose project per app: `docker-compose.yml`, `.env.example`, gitignored `.env` + `data/`. |
-| `docs/` | Operator docs — `ports.md`, `app-credentials.md`, `first-run.md`, `licences.md` are kept current, not aspirational. `licences.md` gets a row per app **and per image** on every addition (see Conventions). |
+| `docs/` | Operator doc — `ports.md`, `app-credentials.md`, `first-run.md`, `licences.md` keep current, not dream. `licences.md` get row per app **and per image** on every add (see Conventions). |
 | `start.sh` | Host bootstrap: daemon config, port allocation, first run. |
-| `plan-index.md` | Generated map of `plan.md` — section titles and the `sed` range for each. |
+| `plan-index.md` | Made map of `plan.md` — section title and `sed` range for each. |
 
 ## Conventions
 
-- **Tests** live beside the code as `*.test.ts` (vitest, backend). Cover the
-  parsing/derivation logic; don't test Docker itself.
-- **Comments explain why, not what.** This codebase leans on them heavily — a
-  non-obvious port pin, a dependency ordering, a workaround for upstream
-  behaviour all get a sentence saying what breaks without it. Match that.
-- **Ports** follow `docs/ports.md`: core stack `10000`–`10099`, managed apps
-  `10100`+ alphabetically in tens. Below `10000` is deliberate and documented
-  (NPM `80`/`443`, Pi-hole `53`, Home Assistant `8123`) — the allocator only
-  manages compose defaults `>= 10000`.
-- **Adding an app**: `apps/<name>/` with compose + `.env.example`, an entry in
-  `services.ts`, a port per the scheme, and rows in `docs/ports.md`,
-  `docs/app-credentials.md` **and `docs/licences.md`**. The licence row is not
-  optional: every new app **and every base/sidecar image** in its compose file
-  gets its upstream licence checked against the resale model in that file
-  (software not sold; setup/maintenance/hardware sold; client operates the
-  box). Flag anything that is copyleft-on-network (AGPL), "fair-code" /
-  source-available (n8n's Sustainable Use License, RSAL/SSPL), or carries a
-  non-software ToS (WhatsApp). If a candidate app's licence fails that test, it
-  does not go in.
-- **Exposure is automatic (`plan.md` §331).** Every app `getExposability()`
-  allows (has an HTTP port, not `lanOnly`/`overlayOnly`) is exposed behind
-  Authelia — there is no per-app toggle and no `PUT …/exposure` route.
-  `ensureAutoExposure()` keeps each `service_exposure` row in step on every
-  start and in the ~6 h reconciler sweep; the `enabled` column is set from
-  exposability, never by a user. `lanOnly` (Samba) and `overlayOnly`
-  (nginx-proxy-manager) stay off the tunnel. The Cloudflare token + tunnel
-  provisioning config lives on the **Settings** page (`<app-network-settings>`).
-- **A running, publicly exposed app shows up on the Home Page.** The Home Page
-  is itself public at the bare domain (`plan.md` §111), so the dashboard owns
-  its service list: `backend/src/services/homepageConfig.ts` generates
-  `apps/home-page/data/services.yaml` from the registry, each app's live
-  `service_exposure` row, and the `homepage.*` compose labels — a tile per app
-  that is **both running and exposed**, linking to `https://<hostname>`, not
-  `localhost`. Label auto-discovery is disabled. A non-exposable app (no HTTP
-  port, `lanOnly`, `overlayOnly`) has no tile (`plan.md` §112.3). The `homepage.*` labels stay **mandatory** as
-  the source of name/group/icon/description: a compose file carries
-  `homepage.group`, `homepage.name`, `homepage.icon`, `homepage.description`
-  (and `homepage.href` for a human reading the file — the generator ignores
-  it), and the registry-wide test in `services.test.ts` fails when an app is
-  missing them. An app whose exposure exists only to serve another app, not a
-  person (OnlyOffice, which Nextcloud's browser-side editor loads), sets
-  `hideFromHomePage: true` in `services.ts` — running and exposed, but no
-  tile. The `homepage.*` labels stay mandatory for it all the same.
-- **Dependencies between apps** are declared in `services.ts`, in one of two
-  tiers. `dependsOn` is for what an app cannot boot without (Authelia's OIDC
-  provider, for something that crash-loops without it) — the API refuses the
-  start and the dashboard disables the button. `requires` is for what it needs
-  to do its job but not to come up (NetBird needs Tailscale for signalling);
-  the dashboard lists it and warns when it is down, and never blocks a start.
-  Putting a proxy or a VPN in `dependsOn` would make "that one is stopped" mean
-  "nothing can be started". Do **not** declare `nginx-proxy-manager` on an app
-  just because it is exposed: ingress is Cloudflare → NPM → app for everything,
-  so the card derives that from the app's live exposure instead. Declare it only
-  where the app's own function needs it (CrowdSec parsing NPM's logs).
-- **Commits**: imperative, sentence case, describing the outcome — "Fix the VPN:
-  port renumbering left Tailscale Funnel pointing at a dead port". No
-  conventional-commit prefixes; `plan:` prefix for plan.md-only commits.
+- **Tests** live beside code as `*.test.ts` (vitest, backend). Cover parse/derive logic; no test Docker itself.
+- **Comments explain why, not what.** This codebase lean on them heavy — non-obvious port pin, dependency order, workaround for upstream behaviour all get sentence say what break without it. Match that.
+- **Ports** follow `docs/ports.md`: core stack `10000`–`10099`, managed app `10100`+ alphabetical in ten. Below `10000` be on purpose and documented (NPM `80`/`443`, Pi-hole `53`, Home Assistant `8123`) — allocator only manage compose default `>= 10000`.
+- **Adding an app**: `apps/<name>/` with compose + `.env.example`, entry in `services.ts`, port per scheme, and row in `docs/ports.md`, `docs/app-credentials.md` **and `docs/licences.md`**. Licence row no optional: every new app **and every base/sidecar image** in its compose file get upstream licence check against resale model in that file (software no sold; setup/maintain/hardware sold; client run box). Flag anything copyleft-on-network (AGPL), "fair-code" / source-available (n8n Sustainable Use License, RSAL/SSPL), or carry non-software ToS (WhatsApp). If candidate app licence fail that test, it no go in.
+- **Exposure is automatic (`plan.md` §331).** Every app `getExposability()` allow (have HTTP port, not `lanOnly`/`overlayOnly`) be exposed behind Authelia — no per-app toggle and no `PUT …/exposure` route. `ensureAutoExposure()` keep each `service_exposure` row in step on every start and in ~6 h reconciler sweep; `enabled` column set from exposability, never by user. `lanOnly` (Samba) and `overlayOnly` (nginx-proxy-manager) stay off tunnel. Cloudflare token + tunnel provision config live on **Settings** page (`<app-network-settings>`).
+- **A running, publicly exposed app shows up on the Home Page.** Home Page itself public at bare domain (`plan.md` §111), so dashboard own its service list: `backend/src/services/homepageConfig.ts` make `apps/home-page/data/services.yaml` from registry, each app live `service_exposure` row, and `homepage.*` compose label — tile per app that **both run and exposed**, link to `https://<hostname>`, not `localhost`. Label auto-discovery off. Non-exposable app (no HTTP port, `lanOnly`, `overlayOnly`) have no tile (`plan.md` §112.3). `homepage.*` label stay **mandatory** as source of name/group/icon/description: compose file carry `homepage.group`, `homepage.name`, `homepage.icon`, `homepage.description` (and `homepage.href` for human read file — generator ignore it), and registry-wide test in `services.test.ts` fail when app miss them. App whose exposure exist only to serve another app, not person (OnlyOffice, which Nextcloud browser-side editor load), set `hideFromHomePage: true` in `services.ts` — run and exposed, but no tile. `homepage.*` label stay mandatory for it all same.
+- **Dependencies between apps** declare in `services.ts`, in one of two tier. `dependsOn` be for what app cannot boot without (Authelia OIDC provider, for something that crash-loop without it) — API refuse start and dashboard disable button. `requires` be for what it need to do job but not to come up (NetBird need Tailscale for signal); dashboard list it and warn when down, and never block start. Put proxy or VPN in `dependsOn` would make "that one stopped" mean "nothing can start". Do **not** declare `nginx-proxy-manager` on app just because it exposed: ingress be Cloudflare → NPM → app for everything, so card derive that from app live exposure instead. Declare only where app own function need it (CrowdSec parse NPM log).
 
 ## Never
 
-- Commit any `.env`, secret, token or password. The repo is **public**
-  (`kiko2306/business-lab`). `.env.example` templates only.
-- `docker compose down` **at the repo root** — it tears down the running
-  dashboard (frontend, backend, database, socket proxy). Restart individual
-  services instead. `docker compose down` on a *managed app's* own project is
-  fine — it's how apps get stopped, and how a removed app's leftovers get
-  cleaned up (`removedAppCleanup.ts`).
-- Edit an app's compose file from backend code. Backend generates `.env` files
-  (`appEnv.ts`) and managed config files; compose files are read-only to it.
-- Claim something works because it type-checks. This project's history is full
-  of things that passed CI and failed on the host — verify against the real
-  stack when the change touches Docker, exposure, networking or backups.
-- Assume data on `tx-home-utils.com` is safe or that a service there must stay
-  up — it is a no-guarantees dev/test box (see the section above). Production
-  is a separate, per-client deployment.
+- Commit any `.env`, secret, token or password. Repo be **public** (`kiko2306/business-lab`). `.env.example` template only.
+- `docker compose down` **at repo root** — it tear down run dashboard (frontend, backend, database, socket proxy). Restart individual service instead. `docker compose down` on *managed app* own project be fine — it how app get stopped, and how removed app leftover get cleaned (`removedAppCleanup.ts`).
+- Edit app compose file from backend code. Backend make `.env` file (`appEnv.ts`) and managed config file; compose file be read-only to it.
+- Claim something work because it type-check. This project history full of thing that pass CI and fail on host — verify against real stack when change touch Docker, exposure, network or backup.
+- Assume data on `tx-home-utils.com` safe or that service there must stay up — it be no-guarantees dev/test box (see section above). Production be separate, per-client deployment.
 
-The first two of those are enforced, not just asked for. `.claude/settings.json`
-denies the Read/Edit/Write tools on `.env` files, and `.claude/hooks/bash-guards.sh`
-covers what per-tool rules cannot: it refuses a `docker compose down` aimed at
-the repo root (a down targeting a file under `apps/` is allowed), and
-refuses a shell command that reads or writes a real `.env` (`.env.example`
-templates, `ls`, `find` and `git` are left alone). A refusal from either is the
-rule working — find another way rather than routing around it.
+First two of those enforced, not just asked for. `.claude/settings.json` deny Read/Edit/Write tool on `.env` file, and `.claude/hooks/bash-guards.sh` cover what per-tool rule cannot: it refuse `docker compose down` aimed at repo root (down target file under `apps/` allowed), and refuse shell command that read or write real `.env` (`.env.example` template, `ls`, `find` and `git` left alone). Refusal from either be rule work — find another way rather than route around it.
 
-The version-bump rule is enforced the same way: `.claude/hooks/require-version-bump.sh`
-blocks a `git commit` that changes a non-test file under `backend/src` or
-`frontend/src` unless the same commit bumps the repo-root `VERSION` file and
-adds a `CHANGELOG.md` entry (also update the `**Version X.Y.Z**` line under the
-README title). Docs/plan/test-only commits are untouched.
+Version-bump rule enforced same way: `.claude/hooks/require-version-bump.sh` block `git commit` that change non-test file under `backend/src` or `frontend/src` unless same commit bump repo-root `VERSION` file and add `CHANGELOG.md` entry (also update `**Version X.Y.Z**` line under README title). Doc/plan/test-only commit untouched.
 
-`VERSION` is the single source of truth: the backend reads it live from the
-bind-mounted checkout and serves it at `GET /version` (plan.md §343), so a
-version-only bump deploys as a bare `git pull` with no rebuild. The
-`package.json` version fields are frozen and unused — do **not** bump them.
+`VERSION` be single truth source: backend read it live from bind-mount checkout and serve at `GET /version` (plan.md §343), so version-only bump deploy as bare `git pull` with no rebuild. `package.json` version field frozen and unused — do **not** bump them.
 
-Do the bump with `scripts/bump-version.sh <patch|minor> <Category> "<bullet>"`
-rather than editing the three files by hand — it writes `VERSION`, the README
-line, and the `CHANGELOG.md` entry from one source of truth. Review its diff
-before committing.
+Do bump with `scripts/bump-version.sh <patch|minor> <Category> "<bullet>"` rather than hand-edit three file — it write `VERSION`, README line, and `CHANGELOG.md` entry from one truth source. Review its diff before commit.
 
 ## Agent skills
 
 ### Issue tracker
 
-GitHub Issues (`kiko2306/business-lab`) via `gh`, for the mattpocock skills only. README TODO stays the tracker for this repo's own working loop. See `docs/agents/issue-tracker.md`.
+GitHub Issues (`kiko2306/business-lab`) via `gh`, for mattpocock skill only. README TODO stay tracker for this repo own working loop. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
@@ -361,3 +126,11 @@ Default five-label vocabulary. See `docs/agents/triage-labels.md`.
 ### Domain docs
 
 single-context. See `docs/agents/domain.md`.
+
+## Caveman Behavior Rules
+
+These override any conflicting rule above.
+
+- **Commits:** Execute `caveman-commit`. Max 50 chars. Lowercase. No trailing periods. (e.g., `feat(api): add post route`).
+- **Plan Maintenance:** Execute `caveman-compress` on `plan.md`. No fluff words. Use brackets for state: `[x] done`, `[-] active`, `[ ] todo`.
+- **Chat:** Reply in short fragments. Never say "Sure, I can help."
