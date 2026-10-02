@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -239,8 +239,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       on; a recovery code works; (2) done (§821) — on `beta`, a wrong enrol code and a
       wrong disable code each show a message under their own field (in pt-PT too) and put the cursor
       back in it; no banner at the top;
-      (3) the recovery-codes screen leads with "save these now", drops the duplicate alert, neutral
-      ink for the codes, and "Done" waits for a copy or download; (4) open the 2FA panel by
+      (3) done (§822) — on `beta`, after Activate: the
+      first thing is "Save these now", no green alert or toast, codes in plain ink, Done is greyed
+      until Copy, Download or the tick box; (4) open the 2FA panel by
       default and drop "TOTP"/"enrolment"; (5) phone: `otpauth://` link, copy-key, 44px targets,
       focus moved after each step, an accessible name on the QR. On `beta`, after each: run the
       full journey (set up, wrong code, activate, recovery codes, disable) on a phone.

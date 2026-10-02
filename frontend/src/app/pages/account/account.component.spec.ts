@@ -113,7 +113,6 @@ describe('AccountComponent', () => {
 
     expect(operations.activateTotp).toHaveBeenCalledWith('123456');
     expect(component['view']).toBe('recovery-codes');
-    expect(toast.success).toHaveBeenCalled();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('aaaaa-11111');
   });
 
@@ -124,6 +123,76 @@ describe('AccountComponent', () => {
   // person's language, saying what to try.
   const rejected = () => throwError(() => new HttpErrorResponse({ status: 400, error: { error: 'That code is not valid.' } }));
   const text = () => (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+  // plan.md §819: the screen that shows the recovery codes — once — was the
+  // quietest on the page: "shown only now" in small muted text, a green alert
+  // and a toast saying the same thing, pink code text that read as an error, and
+  // the loudest button was "I've saved them", with nothing behind it.
+  describe('the recovery-codes screen', () => {
+    const codes = ['aaaaa-11111', 'bbbbb-22222'];
+    const host = () => fixture.nativeElement as HTMLElement;
+    const done = () => host().querySelector('.recovery-done') as HTMLButtonElement;
+
+    beforeEach(() => {
+      operations.setupTotp.and.returnValue(of(setupResponse));
+      operations.activateTotp.and.returnValue(of({ enabled: true, recoveryCodes: codes } as TotpActivateResponse));
+      fixture.detectChanges();
+      openPanel();
+      component.beginSetup();
+      component['activateForm'].setValue({ code: '123456' });
+      component.activate();
+      fixture.detectChanges();
+    });
+
+    it('leads with a warning that they will not be shown again', () => {
+      const warning = host().querySelector('.recovery-warning') as HTMLElement;
+      expect(warning.textContent).toContain('Save these now');
+      expect(warning.textContent).toContain('again');
+    });
+
+    it('says the codes are on once, not three times', () => {
+      expect(host().querySelector('.alert-success')).toBeNull();
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it('moves focus to the heading so a screen reader lands on the codes', async () => {
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(document.activeElement?.id).toBe('recovery-heading');
+    });
+
+    it('sets the codes in body ink, not the pink that reads as an error', () => {
+      const code = host().querySelector('.recovery-codes code') as HTMLElement;
+      expect(getComputedStyle(code).color).toBe(getComputedStyle(host().querySelector('.recovery-codes') as HTMLElement).color);
+    });
+
+    it('orders Copy, Download, then Done', () => {
+      const labels = Array.from(host().querySelectorAll('.recovery-actions button')).map((b) => b.textContent?.trim());
+      expect(labels).toEqual(['Copy', 'Download', 'I’ve saved them']);
+    });
+
+    it('holds Done until the codes are copied, downloaded, or the person says they are stored', () => {
+      expect(done().disabled).toBeTrue();
+
+      (host().querySelector('#codes-stored') as HTMLInputElement).click();
+      fixture.detectChanges();
+      expect(done().disabled).toBeFalse();
+    });
+
+    it('releases Done once the codes are downloaded', () => {
+      component.downloadRecoveryCodes();
+      fixture.detectChanges();
+      expect(done().disabled).toBeFalse();
+    });
+
+    it('releases Done once the codes are copied', async () => {
+      spyOnProperty(navigator, 'clipboard', 'get').and.returnValue({ writeText: () => Promise.resolve() } as unknown as Clipboard);
+      component.copyRecoveryCodes();
+      await Promise.resolve();
+      await Promise.resolve();
+      fixture.detectChanges();
+      expect(done().disabled).toBeFalse();
+    });
+  });
 
   it('puts a rejected enrol code beside the field, announced, with no page banner', async () => {
     operations.setupTotp.and.returnValue(of(setupResponse));

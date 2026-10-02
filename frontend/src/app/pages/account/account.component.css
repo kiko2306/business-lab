@@ -21,6 +21,12 @@
   columns: 2;
 }
 
+/* Bootstrap paints <code> pink, which in the dark theme reads as an error on
+   the one screen that must read as "keep these" (plan.md §819). */
+.recovery-codes code {
+  color: inherit;
+}
+
 .recovery-codes li {
   font-size: 1rem;
   letter-spacing: 0.03em;

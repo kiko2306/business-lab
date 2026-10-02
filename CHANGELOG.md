@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.4] — 2026-10-02
+
+### Changed
+
+- Account: the recovery-codes screen leads with "Save these now", says 2FA is on once instead of three times, sets the codes in neutral ink, and holds Done until they are copied, downloaded or marked stored
+
 ## [0.163.3] — 2026-10-02
 
 ### Fixed

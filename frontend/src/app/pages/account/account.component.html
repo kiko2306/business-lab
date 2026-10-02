@@ -100,18 +100,24 @@
 
       <!-- Recovery codes: shown once, right after activation -->
       <ng-container *ngIf="view === 'recovery-codes'">
-        <div class="alert alert-success">{{ 'account.recoveryCodes.enabledAlert' | t }}</div>
-        <h2 class="h6">{{ 'account.recoveryCodes.heading' | t }}</h2>
+        <h2 class="h6" id="recovery-heading" tabindex="-1">{{ 'account.recoveryCodes.heading' | t }}</h2>
+        <!-- The one fact that matters, loud: they are shown once. -->
+        <p class="recovery-warning fw-semibold text-warning-emphasis mb-1">{{ 'account.recoveryCodes.warning' | t }}</p>
         <p class="text-body-secondary small">
           {{ 'account.recoveryCodes.description' | t }}
         </p>
-        <ul class="recovery-codes list-unstyled border rounded p-3">
+        <ul class="recovery-codes list-unstyled border rounded p-3" [attr.aria-label]="'account.recoveryCodes.heading' | t">
           <li *ngFor="let rc of recoveryCodes"><code>{{ rc }}</code></li>
         </ul>
-        <div class="d-flex gap-2">
-          <button class="btn btn-outline-secondary btn-sm" (click)="downloadRecoveryCodes()">{{ 'account.recoveryCodes.downloadButton' | t }}</button>
+        <div class="recovery-actions d-flex flex-wrap gap-2">
           <button class="btn btn-outline-secondary btn-sm" (click)="copyRecoveryCodes()">{{ 'account.recoveryCodes.copyButton' | t }}</button>
-          <button class="btn btn-primary btn-sm ms-auto" (click)="finishRecoveryCodes()">{{ 'account.recoveryCodes.doneButton' | t }}</button>
+          <button class="btn btn-outline-secondary btn-sm" (click)="downloadRecoveryCodes()">{{ 'account.recoveryCodes.downloadButton' | t }}</button>
+          <button class="recovery-done btn btn-primary btn-sm ms-auto" [disabled]="!codesStored" (click)="finishRecoveryCodes()">{{ 'account.recoveryCodes.doneButton' | t }}</button>
+        </div>
+        <!-- Copying or downloading ticks this; so does writing them down. -->
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" id="codes-stored" [checked]="codesStored" (change)="codesStored = $any($event.target).checked" />
+          <label class="form-check-label small" for="codes-stored">{{ 'account.recoveryCodes.storedLabel' | t }}</label>
         </div>
       </ng-container>
 

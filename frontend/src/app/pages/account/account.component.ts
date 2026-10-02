@@ -51,6 +51,8 @@ export class AccountComponent implements OnInit {
   // Shown exactly once, straight after activate. The backend never returns
   // these again, so leaving this view without saving them is the user's loss.
   protected recoveryCodes: string[] = [];
+  /** Done stays held until the codes are copied, downloaded or the person says they are stored. */
+  protected codesStored = false;
 
   // Failures of a code sit under the field that failed (announced through
   // appFieldError), not in the page banner `errorMessage`, which is for the
@@ -145,10 +147,14 @@ export class AccountComponent implements OnInit {
       .subscribe({
         next: (response) => {
           this.recoveryCodes = response.recoveryCodes;
+          this.codesStored = false;
           this.qrSvg = null;
           this.secret = '';
           this.view = 'recovery-codes';
-          this.toast.success(this.translate.t('account.toast.enabled'));
+          // No toast: the screen itself says it, and a toast over the header
+          // for five seconds was a third copy of the same news. Focus moves to
+          // the heading so a screen reader lands on the codes.
+          this.refocus('recovery-heading');
         },
         error: (error) => {
           this.activateError = this.codeFailure(error, 'account.errors.codeRejected', 'account.errors.activateFailed');
@@ -176,11 +182,15 @@ export class AccountComponent implements OnInit {
     anchor.download = 'business-lab-recovery-codes.txt';
     anchor.click();
     URL.revokeObjectURL(url);
+    this.codesStored = true;
   }
 
   copyRecoveryCodes(): void {
     void navigator.clipboard?.writeText(this.recoveryCodes.join('\n')).then(
-      () => this.toast.success(this.translate.t('account.toast.recoveryCopied')),
+      () => {
+        this.codesStored = true;
+        this.toast.success(this.translate.t('account.toast.recoveryCopied'));
+      },
       () => this.toast.error(this.translate.t('account.toast.copyFailed')),
     );
   }

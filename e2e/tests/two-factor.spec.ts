@@ -39,8 +39,10 @@ test('enrol, sign in with a code, then disable TOTP', async ({ page }) => {
   await page.getByLabel('Enter the 6-digit code to confirm').fill(freshToken(secret));
   await page.getByRole('button', { name: 'Activate' }).click();
 
-  await expect(page.getByText('Two-factor authentication is now on')).toBeVisible();
+  await expect(page.getByText('Save these now')).toBeVisible();
   // The button label uses a typographic apostrophe (I’ve), so match loosely.
+  // Done is held until the codes are copied, downloaded or marked stored (plan.md §819).
+  await page.getByLabel(/stored them somewhere safe/).check();
   await page.getByRole('button', { name: /saved them/ }).click();
   await expect(page.getByText('On', { exact: true })).toBeVisible();
 

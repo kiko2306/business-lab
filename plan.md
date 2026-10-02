@@ -37068,3 +37068,25 @@ Specs: a 400 shows the message beside the field, announced, described by it, wit
 none of the server's English, and focus lands in the field; the same in pt-PT; a 500 reads
 differently from a 400; a failed load's banner is `role="alert"`. 313 frontend specs, build clean,
 browser E2E passes. The old spec that asserted the banner text was replaced, not loosened.
+
+## 822. Account: the recovery-codes screen is the loudest thing on it (§819 fix 3, P1)
+
+The one screen that shows the recovery codes — once — was the quietest: "shown only now" in small
+muted text; a green alert and a toast both saying 2FA was on; Bootstrap's pink `<code>`, which in
+the dark theme reads as an error; and the prominent blue "I've saved them" with nothing behind it.
+
+- **Leads with the fact.** A bold warning-ink line, "Save these now. We can't show them again.",
+  sits under the heading; the description keeps one sentence saying 2FA is on and what a code is
+  for. The green alert is gone and so is the activation toast (a toast over the header for five
+  seconds was a third copy of the same news). Focus moves to the heading so a screen reader lands
+  on the codes, which the toast's `role="alert"` used to do by accident.
+- **Neutral ink.** `.recovery-codes code { color: inherit }` — a spec compares the computed colour
+  with the list's own and failed against `rgb(214, 51, 132)`.
+- **Done is gated.** Held until the codes are copied, downloaded, or the person ticks "I've stored
+  them somewhere safe" (for someone who wrote them on paper). Buttons are ordered Copy, Download,
+  Done, and the list is named for a screen reader. **Rejected:** requiring copy or download only —
+  it would lock out the person who writes them down; and a countdown or a second confirm dialog,
+  which punishes the careful.
+
+The browser E2E needed two edits and caught both: it asserted the green alert's text, and clicked
+"I've saved them" while it is now held. 321 frontend specs, build clean, E2E passes.
