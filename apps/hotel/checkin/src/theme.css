@@ -37,6 +37,14 @@
   /* Text on a filled ink (an outline button's hover). */
   --app-ink-on: #ffffff;
 
+  /* Non-text contrast, WCAG 1.4.11: a control's edge and its focus ring must
+     read at 3:1 on what they sit on. Bootstrap's stock edge (--bs-border-color)
+     measured 1.3–1.5:1 on an input or an unchecked box, and its focus halo — a
+     translucent 4px shadow — 1.3–2.2:1 (plan.md §813.6). The card/divider
+     border stays pale on purpose; only a *control's* edge uses this token. */
+  --app-control-edge: #64748b;
+  --app-focus: var(--app-ink-primary);
+
   /* Bootstrap's stock link blue is #0d6efd, which on this canvas measures
      4.19:1 — under the 4.5:1 floor for body text, and links here are small
      (measured in a real Chromium against Tally's shop view, plan.md §806.3).
@@ -75,6 +83,7 @@
   --app-ink-secondary: #cbd5e1;
   --app-ink-info: #6edff6;
   --app-ink-on: #0f172a;
+  --app-control-edge: #7c8da4;
 
   --bs-body-bg: #1e293b;
   --bs-body-color: #e2e8f0;
@@ -200,6 +209,26 @@ a {
 }
 
 /* ---------------------------------------------------------------------------
+   Controls: edge and focus ring at 3:1 (plan.md §813.6).
+
+   One solid 2px ring for everything focusable, as DESIGN.md already specifies
+   for the panel toggle. `!important` because Bootstrap's `.form-control:focus`
+   and `.btn:focus` set `outline: 0` at a higher specificity and replace it with
+   a translucent shadow that never reaches 3:1 on this palette. `:focus-visible`,
+   not `:focus`, so a mouse click on a button leaves no ring behind.
+   --------------------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--app-focus) !important;
+  outline-offset: 2px;
+}
+
+.form-control,
+.form-select,
+.form-check-input:not(:checked) {
+  border-color: var(--app-control-edge);
+}
+
+/* ---------------------------------------------------------------------------
    Responsive tables — collapse to a card per row on phones.
 
    A wide `.table` inside `.table-responsive` scrolls sideways on a narrow
@@ -247,11 +276,14 @@ a {
     /* neutralise Bootstrap's .table-striped per-cell background shadow */
     --bs-table-bg-type: transparent;
     display: grid;
-    grid-template-columns: 7.5rem 1fr;
+    /* minmax(0, …), not 1fr: 1fr's minimum is the content's, so one unbroken
+       email held the column at 576px on a 390px phone (plan.md §813). */
+    grid-template-columns: 7.5rem minmax(0, 1fr);
     gap: 0.1rem 0.75rem;
     align-items: start;
     padding: 0.2rem 0;
     border: 0;
+    overflow-wrap: anywhere;
     /* beat per-page `.table td { white-space: nowrap }` and `.text-end` */
     white-space: normal !important;
     text-align: left !important;

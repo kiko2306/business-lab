@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.1] — 2026-10-02
+
+### Fixed
+
+- Shared theme: control edges and the focus ring now meet 3:1 (a solid 2px ring on everything focusable, and visible borders on inputs, selects and unchecked boxes), in the dashboard, Tally and the hotel apps
+
 ## [0.163.0] — 2026-10-02
 
 ### Changed

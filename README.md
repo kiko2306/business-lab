@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -225,9 +225,14 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       checkboxes and Cancel drops unsaved ones, and your own row has no Edit roles; (5) plain role names
       and presets. The P2 focus-ring and control-border contrast belongs to the shared theme and
       is its own item below. On `beta`, after each: open Users on a phone with a long email.
-- [ ] **Shared theme: focus rings and control borders under 3:1 (plan.md §813.6)** — extend
-      `theme-contrast.spec.ts` to measure the focus ring and unchecked checkbox/input borders on
-      both surfaces in both modes, watch it fail, then fix the shared theme; check Tally follows.
+- [ ] **Beta-test the shared theme's focus ring and control edges (plan.md §818)** — on `beta`,
+      Tab through Users, Settings and Backups in dark and light: every control shows a solid blue
+      ring (no mouse-click ring on buttons), and inputs, selects and unticked boxes have a visible
+      edge. Open a Tally shop view and check the same there.
+- [ ] **Touch targets: 16px checkboxes and buttons under 44px (plan.md §813.6)** — measured on
+      the Users page (every button ≤31px, 87 checkboxes at 16px); a density change on every page,
+      so decide a phone-only rule first (bigger hit area, not bigger look), test it on one page,
+      then apply it through the shared theme.
 - [ ] **Critique: Account (2FA) (plan.md §812)** — `pages/account`; every user sees it; check enrol, recovery codes and disable on a phone.
 - [ ] **Critique: Sign-in flow (login, setup, recovery, set-password) (plan.md §812)** — `pages/login, setup, recovery, set-password`; public, first contact, phone-heavy; critique as one flow.
 - [ ] **Critique: Updates (plan.md §812)** — `pages/self-update`; the operator must trust it not to break the box: progress, failure and rollback wording.

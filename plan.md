@@ -36944,3 +36944,29 @@ rule: a spec that does not open an editor cannot check it). 299 specs, build cle
 **Not done, deliberately:** merging Edit roles and Edit access into one "Edit" panel, and a
 per-person card with app icons — both are bigger redesigns than the critique's P1 asked for, and
 the row is already scannable. Left as the §813 question, with presets (fix 5).
+
+## 818. Shared theme: control edges and the focus ring at 3:1 (§813.6)
+
+§813's measured render found, dashboard-wide: focus rings 1.3–2.2:1 (Bootstrap's translucent 4px
+shadow), unchecked checkbox and input borders 1.3–1.5:1 (WCAG 1.4.11). Fixed once in the shared
+theme, not on Users: `--app-control-edge` (slate-500 light, a lighter slate dark) for `.form-control`,
+`.form-select` and unchecked `.form-check-input`, and one `:focus-visible` outline (2px solid,
+`--app-focus` = the primary ink, 2px offset) for everything focusable. Cards and dividers keep the
+pale `--bs-border-color`: only a control's own edge is held to 3:1.
+
+**The spec** extends `theme-contrast.spec.ts` with a control list (text/search input, select,
+checkbox, radio) and a focusable list (those plus primary/danger/outline buttons and a link), on
+canvas and card, light and dark. Karma's headless Chrome *does* match `:focus-visible` after a
+programmatic `.focus()`, so the real ring is measured, not inferred from the CSS text; a control that
+does not match fails loudly rather than passing unmeasured. Eight cases failed first with exactly
+the ratios the render found (1.38–1.48:1, "no solid outline"), 307 specs pass after.
+
+`!important` on the outline is deliberate and commented: Bootstrap's `.form-control:focus` and
+`.btn:focus` zero the outline at a higher specificity. **Rejected:** darkening `--bs-border-color`
+itself — it would also darken every card and divider, and the pale card edge is intentional (§807).
+The theme is synced to Tally and the hotel apps (`sync-app-theme.sh`; Tally's 139 specs and both
+builds pass).
+
+**Not claimed:** touch-target size (16px checkboxes, ≤31px buttons) — a layout change, not a colour
+one, and it touches density on every page; left as its own item. The hotel apps still have no
+harness, so the ring reaches them unmeasured.
