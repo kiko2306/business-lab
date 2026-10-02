@@ -220,10 +220,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Critique: Utils (plan.md §812)** — `pages/utils`.
 - [ ] **Critique: Content (social) (plan.md §812)** — `pages/social`; route `/content`.
 - [ ] **Critique: Small pages (audit logs, access denied, unsubscribe) (plan.md §812)** — `pages/audit-logs, access-denied, unsubscribe`; one critique, three pages.
-- [ ] **Critique: Hotel check-in (plan.md §812)** — `apps/hotel/checkin`; guest-facing; no spec harness, so render and measure in the critique.
-- [ ] **Critique: Hotel pulse (plan.md §812)** — `apps/hotel/pulse`; owner-facing like Tally; no spec harness.
-- [ ] **Critique: Hotel admin (plan.md §812)** — `apps/hotel/admin`; no spec harness.
-- [ ] **Critique: Price-compare (plan.md §812)** — `apps/price-compare/app/public`; plain JS, not Angular; no spec harness.
 
 ### Dashboard critique fixes (plan.md §776)
 

@@ -36800,10 +36800,6 @@ has **never** had a critique:
 | Utils | `pages/utils` | 101 | |
 | Content | `pages/social` | 78 | route `/content`, §254 |
 | Small pages | `audit-logs`, `access-denied`, `unsubscribe` | 78/67/28 | one critique, three pages |
-| Hotel check-in | `apps/hotel/checkin` | — | guest-facing; §620–§625 rebuild |
-| Hotel pulse | `apps/hotel/pulse` | — | owner-facing, like Tally |
-| Hotel admin | `apps/hotel/admin` | — | |
-| Price-compare | `apps/price-compare/app/public` | — | plain JS, not Angular |
 
 Not repeated: Home, Apps, Backups, Settings (§776, since fixed), Tally (§806–§810).
 
@@ -36811,8 +36807,10 @@ Not repeated: Home, Apps, Backups, Settings (§776, since fixed), Tally (§806�
 this time, since §776's source-only pass left contrast and layout unmeasured), findings logged
 here as a new section with the score, then fixes one page at a time, test first, each its own
 commit and version bump. Order is by who sees it and how bad a miss would be: Users, Account,
-sign-in flow, Updates, Utils, Content, small pages, then the hotel apps and price-compare.
-The hotel apps and price-compare have no spec harness (§811), so their fixes need a measured
-render in the critique itself rather than a theme-spec guarantee.
+sign-in flow, Updates, Utils, Content, small pages.
+
+**Left out (user, 2026-10-02):** hotel check-in, pulse and admin, and price-compare. All four are
+still in development, so a critique now would judge a moving target. Add them back once each
+settles; none has a spec harness (§811), so that critique needs a measured render.
 
 Nothing is changed by this section; each README item below is one critique-then-fix run.
