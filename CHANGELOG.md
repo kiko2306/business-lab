@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.162.7] — 2026-10-02
+
+### Fixed
+
+- Users: the table fits at laptop and phone widths — a long email or an admin's feature checkboxes no longer push Reset password and Delete off the screen
+
 ## [0.162.6] — 2026-10-02
 
 ### Fixed

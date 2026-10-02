@@ -247,11 +247,14 @@ a {
     /* neutralise Bootstrap's .table-striped per-cell background shadow */
     --bs-table-bg-type: transparent;
     display: grid;
-    grid-template-columns: 7.5rem 1fr;
+    /* minmax(0, …), not 1fr: 1fr's minimum is the content's, so one unbroken
+       email held the column at 576px on a 390px phone (plan.md §813). */
+    grid-template-columns: 7.5rem minmax(0, 1fr);
     gap: 0.1rem 0.75rem;
     align-items: start;
     padding: 0.2rem 0;
     border: 0;
+    overflow-wrap: anywhere;
     /* beat per-page `.table td { white-space: nowrap }` and `.text-end` */
     white-space: normal !important;
     text-align: left !important;

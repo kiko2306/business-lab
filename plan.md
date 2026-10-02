@@ -36852,3 +36852,28 @@ named "Edit access" with no person attached.
 B injected it with `bypassCSP` — a harness workaround, not a finding. A bare `docker compose down`
 of the test stack is refused by the repo guard (it cannot tell the test project from the root
 one), so the test containers were removed by name.
+
+## 814. Users: the table fits (§813 fix 1, the P0)
+
+The cause was two things, not the one the critique's first reading blamed. The stack rule already
+beat `td { white-space: nowrap }` on a phone, so the phone's 576px Email cell came from the grid
+itself: `grid-template-columns: 7.5rem 1fr` gives the `1fr` track the content's minimum width, and
+a 70-character address has no break. On a laptop the nowrap was the cause — every cell as wide as
+its content, so one long email plus an admin's eight feature checkboxes made the table 1750px.
+
+Fixed in the shared `.table-stack` rule (`minmax(0, 1fr)` and `overflow-wrap: anywhere`, which also
+helps Audit logs and Utils) and in `users.component.css` (nowrap replaced by `overflow-wrap:
+anywhere`, which, unlike `break-word`, lowers a cell's minimum width).
+
+**The spec** (`users-layout.spec.ts`) mounts the real page in an iframe of the width being checked,
+copies the stylesheets in, and measures: page width against viewport, each `.table-responsive`'s
+`scrollWidth` against its `clientWidth`, and every row button's right edge. Karma's own window is
+neither a phone nor a laptop, so without the iframe a media query never evaluates the way it does
+for a user. It failed for the right reason in all four cases (1280 and 390, EN and pt-PT: table
+1746–1897px in a 1149px box; page 1028px in a 375px viewport) and passes now. Tried and kept
+out: asserting on the CSS text, which would pass while the layout stayed broken. 282 specs, build
+clean.
+
+**Not claimed:** a real phone. The spec proves no sideways overflow at 390 with the reset editor
+open; it does not cover the access editor (needs app options) or the 44px touch targets, which are
+the shared-theme item.

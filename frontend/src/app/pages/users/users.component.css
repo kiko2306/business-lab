@@ -1,6 +1,11 @@
+/* Not `white-space: nowrap`: that made every cell as wide as its content, so a
+   long email plus an admin's eight feature checkboxes pushed the table to
+   1350–1750px and Delete off the screen (plan.md §813). `anywhere`, unlike
+   `break-word`, also lowers a cell's minimum width, so an address with no
+   spaces cannot hold its column open. */
 .table td,
 .table th {
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .app-access-grid {

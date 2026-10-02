@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.162.6** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.162.7** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -214,9 +214,9 @@ score in a new plan section, then fix one page at a time, test first, own commit
 bump. Delete the item when its fixes land (a fix still needing a `beta` look gets its own item).
 
 - [ ] **Users: fix the critique's findings (plan.md §813)** — in order, test first, one
-      commit and version bump each: (1) P0 table overflow at 1280 and 390 (`users.component.css`
-      nowrap, email wrap, `data-label` on editor rows; a Playwright spec asserting no horizontal
-      overflow at both widths in EN and pt-PT, with a 70-character email); (2) the delete dialog's
+      commit and version bump each: (1) done (§814) — on `beta`, open Users on a phone and a
+      laptop with a very long email and the reset-password editor open: no sideways scroll,
+      Reset password and Delete reachable; (2) the delete dialog's
       focus move, trap, restore and the global Enter; (3) consequence text for delete, revoke and
       reset password; (4) open Accounts by default and one line per person; (5) plain role names
       and presets. The P2 focus-ring and control-border contrast belongs to the shared theme and
