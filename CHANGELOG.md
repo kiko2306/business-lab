@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.162.3] — 2026-10-02
+
+### Fixed
+
+- Tally's Tables in use now counts tables waiting to pay, and a failed request no longer vanishes or shows a raw status code (plan.md §806.6)
+
 ## [0.162.2] — 2026-10-02
 
 ### Fixed

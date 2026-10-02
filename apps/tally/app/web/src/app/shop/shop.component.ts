@@ -1,5 +1,6 @@
 import { CommonModule, Location } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Title } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../api.service';
@@ -22,6 +23,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   private api = inject(ApiService);
   private route = inject(ActivatedRoute);
   private url = inject(Location);
+  private title = inject(Title);
 
   storeId = '';
   store: Store | null = null;
@@ -44,7 +46,16 @@ export class ShopComponent implements OnInit, OnDestroy {
   loading = true;
   /** Set when the shop's agent is not connected — a distinct state from an error. */
   offline = false;
-  error = '';
+  /**
+   * Kept per source: the overview's success used to clear any error, so a tab
+   * request that failed first was wiped by the overview landing afterwards,
+   * leaving the tab on "Loading…" with nothing said.
+   */
+  private overviewError = '';
+  private tabError = '';
+  get error(): string {
+    return this.overviewError || this.tabError;
+  }
   openTable: number | null = null;
   /** "€412 more than last Saturday", or null until the reference day resolves. */
   comparison: Comparison | null = null;
@@ -68,10 +79,14 @@ export class ShopComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.storeId = this.route.snapshot.paramMap.get('id') ?? '';
     this.readStateFromUrl();
+    this.title.setTitle(`${t('Shop')} · Tally`);
     window.addEventListener('offline', this.onOffline);
     window.addEventListener('online', this.onOnline);
     this.api.listStores().subscribe({
-      next: (stores) => (this.store = stores.find((s) => s.id === this.storeId) ?? null),
+      next: (stores) => {
+        this.store = stores.find((s) => s.id === this.storeId) ?? null;
+        if (this.store) this.title.setTitle(`${this.store.name} · Tally`);
+      },
       error: () => undefined,
     });
     this.api.agentPackage().subscribe({ next: (pkg) => (this.agentPackage = pkg), error: () => undefined });
@@ -179,7 +194,7 @@ export class ShopComponent implements OnInit, OnDestroy {
         this.overview = overview;
         if (!overview.archive && overview.businessDate) this.runningDate = overview.businessDate;
         this.offline = false;
-        this.error = '';
+        this.overviewError = '';
         this.loading = false;
         this.refreshing = false;
         if (!quiet) this.statusNote = t('Updated at {time}', { time: new Date().toLocaleTimeString(numberLocale) });
@@ -187,7 +202,7 @@ export class ShopComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.refreshing = false;
-        this.fail(err);
+        this.fail(err, 'overview');
       },
     });
     this.loadTab();
@@ -196,13 +211,19 @@ export class ShopComponent implements OnInit, OnDestroy {
   private loadTab(): void {
     if (this.tab === 'tables' && !this.date) {
       this.api.tables(this.storeId).subscribe({
-        next: (tables) => (this.tables = tables),
-        error: (err) => this.fail(err),
+        next: (tables) => {
+          this.tables = tables;
+          this.tabError = '';
+        },
+        error: (err) => this.fail(err, 'tab'),
       });
     } else {
       this.api.soldItems(this.storeId, this.date || undefined).subscribe({
-        next: (items) => (this.soldItems = items),
-        error: (err) => this.fail(err),
+        next: (items) => {
+          this.soldItems = items;
+          this.tabError = '';
+        },
+        error: (err) => this.fail(err, 'tab'),
       });
     }
   }
@@ -261,11 +282,25 @@ export class ShopComponent implements OnInit, OnDestroy {
     return (this.overview?.totals.invoiced ?? 0) + (this.overview?.totals.open ?? 0);
   }
 
-  /** Share of tables occupied right now; only meaningful for the running day. */
-  get occupancy(): number {
+  /**
+   * Tables with people at them. Wintouch's `occupied` is estado 2 only and
+   * `awaitingPayment` (estado 1) is a disjoint count, so a table waiting to pay
+   * was left out: 6 occupied + 4 waiting read as "6 / 14" and 43 % when ten
+   * tables had customers (plan.md §806.6).
+   */
+  get tablesInUse(): number {
     const t = this.overview?.tables;
-    const total = t ? t.occupied + t.free + t.awaitingPayment : 0;
-    return total ? (100 * (t?.occupied ?? 0)) / total : 0;
+    return t ? t.occupied + t.awaitingPayment : 0;
+  }
+
+  get tablesTotal(): number {
+    const t = this.overview?.tables;
+    return t ? t.occupied + t.free + t.awaitingPayment : 0;
+  }
+
+  /** Share of tables with customers right now; only meaningful for the running day. */
+  get occupancy(): number {
+    return this.tablesTotal ? (100 * this.tablesInUse) / this.tablesTotal : 0;
   }
 
   /** Top ten only — a long tail of one-offs buries the items that matter. */
@@ -276,8 +311,12 @@ export class ShopComponent implements OnInit, OnDestroy {
       .slice(0, 10);
   }
 
-  private fail(err: HttpErrorResponse): void {
+  private fail(err: HttpErrorResponse, source: 'overview' | 'tab' = 'overview'): void {
     this.loading = false;
+    const set = (message: string) => {
+      if (source === 'overview') this.overviewError = message;
+      else this.tabError = message;
+    };
     if (err.status === 401) {
       // The Authelia session lapsed: a reload goes back through the gate and
       // returns here signed in. Guarded, because if the identity headers are
@@ -288,7 +327,7 @@ export class ShopComponent implements OnInit, OnDestroy {
         location.reload();
         return;
       }
-      this.error = t('Not signed in, and reloading did not help. The proxy may not be forwarding identity headers.');
+      set(t('Not signed in, and reloading did not help. The proxy may not be forwarding identity headers.'));
       return;
     }
     sessionStorage.removeItem('tally-reauth');
@@ -300,10 +339,23 @@ export class ShopComponent implements OnInit, OnDestroy {
       this.overview = null;
       this.tables = null;
       this.soldItems = null;
-      this.error = '';
+      this.overviewError = '';
+      this.tabError = '';
       return;
     }
     this.offline = false;
-    this.error = err.error?.error ?? t('Could not reach the shop ({status})', { status: err.status });
+    // The browser having no connection is already said by its own banner; a
+    // second red alert for the same cause only made it look like two problems.
+    if (this.browserOffline) return;
+    // Plain sentences, not a status code or whatever the relay put in its body:
+    // the reader needs "is it them or me", and neither "(0)" nor "ECONNRESET"
+    // answers that.
+    if (err.status === 0) {
+      set(t('Could not reach the server. Check the connection and try again.'));
+    } else if (err.status >= 500) {
+      set(t('The shop did not answer. Try again in a moment.'));
+    } else {
+      set(err.error?.error ?? t('Could not reach the shop ({status})', { status: err.status }));
+    }
   }
 }

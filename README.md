@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.162.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.162.3** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -224,6 +224,21 @@ item is deleted.
       it must expand, announce its state, and return focus sensibly. Confirm the
       Shops page shows "Request failed" alone when the API is unreachable (stop
       the tally container) rather than also claiming there are no shops.
+- [ ] **Tally: finish the second critique's clarity items (plan.md §806.6)** —
+      the comparison sentence must say it is cut to the hour on a running day
+      ("…than last Saturday by this hour" / "a esta hora"), and the pre-first-sale
+      view must drop the hourly card and the staff/payment charts (three empty
+      strings) while keeping the tab bar. Explain "Forecast" and "Open tabs".
+- [ ] **Dashboard: outline buttons in dark mode (plan.md §806.6)** — Bootstrap does
+      not recolour `.btn-outline-primary`/`-danger` per colour mode, so their
+      labels measure ~3.2:1 on the card in dark. Fixed in Tally's own styles; the
+      dashboard almost certainly has the same defect. Measure it with the same
+      computed-contrast spec before touching the shared theme (four-app blast radius).
+- [ ] **Tally: touch targets, titles and the tables-in-use count (plan.md §806.6)** —
+      on `beta`, on a phone: the day-counters heading, a table's number and the
+      back link must each be easy to hit (44px); the tab title reads "<shop> ·
+      Tally"; and with some tables awaiting payment, "Tables in use" must count
+      them (e.g. 6 seated + 4 waiting shows 10, with "4 waiting to pay").
 - [ ] **Tally: URL state, refresh feedback and offline (plan.md §806.5)** — on
       `beta`, pick a past day on a phone, reload: you must land on that day, and
       the address must carry `?date=`. Press Refresh: it must read "Refreshing…"

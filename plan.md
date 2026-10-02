@@ -36394,3 +36394,66 @@ The other items:
 
 58 specs. Not done: nothing further from the critique list; the 24/40 score itself is still
 unmeasured — a re-run of `/impeccable critique` is what would show whether it moved.
+
+### 806.6 — the second critique (27/40): correctness
+
+`/impeccable critique` re-run after §806.1–§806.5 scored **27/40** (was 24). Assessment A rated
+four of the five original P1s fixed and the hero the best moment in the product; B measured the
+rest in a real browser. The user chose **correctness first**, and to **keep the offline panel
+blank** rather than show aged figures (the API deliberately stores none).
+
+Three of what follows were things I had claimed closed. Recorded plainly:
+
+- **The shop page had no `<h1>`.** §806.2 said both pages gained one. The edit was a Python
+  `str.replace` with the wrong indentation, which returns the string unchanged and raises
+  nothing, and no test looked. The new spec asserts exactly one `<h1>` naming the shop, and the
+  edit now asserts it applied.
+- **The zero-state was half done**, and **contrast was measured only on the shop view**, so the
+  shell tagline (2.84:1 in dark) and the Shops page (outline buttons and the version code at
+  ~3.2:1) shipped unmeasured. `contrast-pages.spec.ts` now renders both in both colour modes
+  with the same computed-colour-over-painted-background method; disabled controls are exempt
+  (WCAG excludes inactive components).
+
+The real defect:
+
+**"Tables in use" undercounted the floor.** Verified in `ShopReader.cs:204-205`: `occupied` is
+Wintouch `estado` 2 only and `awaitingPayment` (`estado` 1) is a *disjoint* count. A table
+waiting to pay still has people at it, so six occupied and four waiting read as "6 / 14" and
+43 % when ten tables had customers — wrong at exactly the moment the owner looks, the evening
+rush. Both tiles and Occupancy now use `tablesInUse` (occupied + awaiting), with "4 waiting to
+pay" shown as the part of it still to collect, no longer ambiguous with a subset.
+
+**Errors.**
+
+- *A failed tab was erased by the overview.* `error` was one string, and the overview's success
+  set it to `''`, so a tab request that failed first was wiped by the overview landing after it,
+  leaving the tab on "Loading…" with nothing said. Errors are now kept per source
+  (`overviewError`, `tabError`) and `error` is a getter over both; a tab clears only its own.
+- *One cause, two alerts.* With the browser offline the 30 s tick added a red "Could not reach the
+  shop (0)" over the yellow banner. `fail()` now returns early while `browserOffline`.
+- *Status codes and relay text are gone from the reader's screen.* Status 0 → "Could not reach
+  the server. Check the connection and try again."; 5xx → "The shop did not answer. Try again in a
+  moment."; a 4xx with a body keeps the server's message. Neither "(0)" nor "ECONNRESET" answers
+  the reader's question, which is "is it them or me".
+- *The offline panel* now says when the shop was last seen (`store.lastSeenAt`, which the Shops
+  list already showed and this page dropped exactly where it matters), and says "the shop's till
+  computer" rather than "agent". It still shows no figures, per the decision above.
+
+**Smaller:** the shop page and the Shops page each get a real document title ("Pastelaria
+Central · Tally", "Shops · Tally") — every route was "Tally"; `.btn-outline-primary` and
+`-danger` get Bootstrap's own emphasis shades in dark; the version colour uses
+`text-success-emphasis`/`text-danger-emphasis`; and the three bare text controls (the day-counters
+heading, a table's number, the back link) get a 44px floor under `(pointer: coarse)` — they
+measured 19, 26 and 37px.
+
+**Proof.** 75 Karma specs. Karma cannot emulate a coarse pointer, so the touch sizes were proved
+in a real browser instead: a touch context against the stub API measured the back link, the
+counters toggle and the table-number button at **44px**, one `<h1>`, and both titles. The
+stub's `Tables in use` tile reads "4 / 12 · 1 waiting to pay" for 3 occupied + 1 awaiting.
+
+**Not done, and why.** The dashboard almost certainly has the same dark-mode outline-button
+contrast problem (Bootstrap does not recolour outline buttons per mode), but the shared theme is
+a four-app blast radius and the fix here is app-owned in Tally's `styles.css`. Left as a README
+item rather than widened in passing. Also not done: the comparison's "by this hour" wording and
+finishing the zero-state, the two clarity items from the same critique — the user picked
+correctness first.

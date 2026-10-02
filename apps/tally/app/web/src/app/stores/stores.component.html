@@ -89,8 +89,8 @@
             <td [attr.data-label]="'Version' | t">
               @if (store.agentVersion) {
                 <code
-                  [class.text-success]="agentPackage && agentPackage.version === store.agentVersion"
-                  [class.text-danger]="agentPackage && agentPackage.version !== store.agentVersion"
+                  [class.text-success-emphasis]="agentPackage && agentPackage.version === store.agentVersion"
+                  [class.text-danger-emphasis]="agentPackage && agentPackage.version !== store.agentVersion"
                   [title]="agentPackage && agentPackage.version !== store.agentVersion ? ('Out of date — latest is {v}' | t: { v: agentPackage.version }) : ('Current version' | t)"
                   >{{ store.agentVersion }}</code
                 >
@@ -165,8 +165,8 @@
                         @if (store.agentVersion) {
                           {{ 'Version' | t }}
                           <code
-                            [class.text-success]="agentPackage && agentPackage.version === store.agentVersion"
-                            [class.text-danger]="agentPackage && agentPackage.version !== store.agentVersion"
+                            [class.text-success-emphasis]="agentPackage && agentPackage.version === store.agentVersion"
+                            [class.text-danger-emphasis]="agentPackage && agentPackage.version !== store.agentVersion"
                             >{{ store.agentVersion }}</code
                           >
                           @if (agentPackage && agentPackage.version !== store.agentVersion) {

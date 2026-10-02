@@ -1,7 +1,7 @@
 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
   <div>
     <a routerLink="/" class="small text-decoration-none">&larr; {{ 'All shops' | t }}</a>
-    <h2 class="h4 mb-0">{{ store?.name ?? 'Shop' }}</h2>
+    <h1 class="h4 mb-0">{{ store?.name ?? ('Shop' | t) }}</h1>
   </div>
   <div class="d-flex flex-wrap align-items-center gap-2 gap-md-3">
     @if (overview) {
@@ -51,8 +51,11 @@
 @if (offline) {
   <div class="alert alert-warning" role="alert">
     <p class="fw-semibold mb-1">{{ 'This shop is offline.' | t }}</p>
+    @if (store?.lastSeenAt) {
+      <p class="mb-1 small">{{ 'Last seen at {time}' | t: { time: (store!.lastSeenAt | date: 'HH:mm') } }}</p>
+    }
     <p class="mb-0 small">
-      {{ 'Its agent is not connected, so there are no live figures to show. Nothing is displayed rather than showing the last known numbers as though they were current. It reconnects by itself once the shop\'s machine and network are back.' | t }}
+      {{ 'The shop\'s till computer is not connected, so there are no live figures to show. Nothing is displayed rather than showing the last known numbers as though they were current. It reconnects by itself once the till computer and the shop\'s network are back.' | t }}
     </p>
   </div>
 } @else if (loading && !overview) {
@@ -71,8 +74,8 @@
           <div class="card-body">
             <p class="stat-label text-body-secondary mb-1">{{ 'Tables in use' | t }}</p>
             <p class="stat-value mb-0">
-              {{ overview.tables.occupied }}<span class="fs-6 text-body-secondary">
-                / {{ overview.tables.occupied + overview.tables.free + overview.tables.awaitingPayment }}</span>
+              {{ tablesInUse }}<span class="fs-6 text-body-secondary">
+                / {{ tablesTotal }}</span>
             </p>
           </div>
         </div>
@@ -126,10 +129,10 @@
           <div class="card-body">
             <p class="stat-label text-body-secondary mb-1">{{ 'Tables in use' | t }}</p>
             <p class="stat-value mb-0">
-              {{ overview.tables.occupied }}<span class="fs-6 text-body-secondary">
-                / {{ overview.tables.occupied + overview.tables.free + overview.tables.awaitingPayment }}</span>
+              {{ tablesInUse }}<span class="fs-6 text-body-secondary">
+                / {{ tablesTotal }}</span>
             </p>
-            <p class="small text-body-secondary mb-0">{{ overview.tables.awaitingPayment }} {{ 'awaiting payment' | t }}</p>
+            <p class="small text-body-secondary mb-0">{{ overview.tables.awaitingPayment }} {{ 'waiting to pay' | t }}</p>
           </div>
         </div>
       </div>
