@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.162.7** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.162.8** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -216,8 +216,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Users: fix the critique's findings (plan.md §813)** — in order, test first, one
       commit and version bump each: (1) done (§814) — on `beta`, open Users on a phone and a
       laptop with a very long email and the reset-password editor open: no sideways scroll,
-      Reset password and Delete reachable; (2) the delete dialog's
-      focus move, trap, restore and the global Enter; (3) consequence text for delete, revoke and
+      Reset password and Delete reachable; (2) done (§815) — on `beta`, open any
+      confirm (delete a user): focus is in the dialog, Tab stays in it, Esc returns focus to the
+      button, Enter with focus on the page does nothing; (3) consequence text for delete, revoke and
       reset password; (4) open Accounts by default and one line per person; (5) plain role names
       and presets. The P2 focus-ring and control-border contrast belongs to the shared theme and
       is its own item below. On `beta`, after each: open Users on a phone with a long email.

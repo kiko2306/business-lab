@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.162.8] — 2026-10-02
+
+### Fixed
+
+- The confirm dialog is a real modal: focus moves into it, Tab stays inside, focus returns afterwards, and Enter no longer answers yes from anywhere on the page
+
 ## [0.162.7] — 2026-10-02
 
 ### Fixed

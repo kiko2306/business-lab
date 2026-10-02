@@ -36877,3 +36877,20 @@ clean.
 **Not claimed:** a real phone. The spec proves no sideways overflow at 390 with the reset editor
 open; it does not cover the access editor (needs app options) or the 44px touch targets, which are
 the shared-theme item.
+
+## 815. The confirm dialog is a real modal (§813 fix 2, P1)
+
+`ConfirmDialogComponent` is the one modal every confirmation in the app uses (delete a user, stop
+an app, restore), and it was `aria-modal` only. §776 gave the Backups dialogs `appModalFocus`; this
+one was missed. Measured in §813: focus did not move in (the `autofocus` on a button created after
+load is ignored), 9 of 9 Tab presses landed on the page behind it, and focus was not restored. Worse,
+`@HostListener('document:keydown.enter')` confirmed from anywhere, so Enter with focus on a page
+control answered "delete this user?" yes.
+
+Now `appModalFocus` is on the dialog (focus in, Tab trapped, Escape dismisses, focus restored to
+the opener) and both document-level listeners are gone. **Rejected:** keeping a document-level
+Enter that checked focus was inside the dialog — that is just the native button behaviour with
+more code. **Behaviour change to know about:** Enter no longer confirms straight away; focus lands
+on the dialog and the first Tab reaches Cancel, so a destructive confirm needs a deliberate move to
+the red button. `confirm-dialog.component.spec.ts` failed 3 of 5 first (focus, trap, stray Enter);
+the other two (confirm via the button, Escape restoring focus) are regression guards. 287 specs.
