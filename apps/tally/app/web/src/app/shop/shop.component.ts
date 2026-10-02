@@ -7,6 +7,9 @@ import { ApiService } from '../api.service';
 import { BarChartComponent, BarDatum } from '../charts/bar-chart.component';
 import { HourlyChartComponent } from '../charts/hourly-chart.component';
 import { TPipe, numberLocale, t } from '../i18n';
+import { Clock, localDay } from '../clock';
+import { ConnectionService } from '../connection';
+import { describeFailure } from '../errors';
 import { Comparison, comparableTotal, comparisonDate, describeComparison } from './comparison';
 import { AgentPackage, Overview, SoldItemsView, Store, TablesView } from '../models';
 
@@ -24,6 +27,8 @@ export class ShopComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private url = inject(Location);
   private title = inject(Title);
+  private clock = inject(Clock);
+  private connection = inject(ConnectionService);
 
   storeId = '';
   store: Store | null = null;
@@ -66,13 +71,13 @@ export class ShopComponent implements OnInit, OnDestroy {
   /** Read aloud when a user-requested refresh lands; the silent 30 s one never touches it. */
   statusNote = '';
   /** The browser itself has no connection — distinct from the shop's agent being away. */
-  browserOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  get browserOffline(): boolean {
+    return this.connection.offline();
+  }
 
-  private readonly onOffline = () => (this.browserOffline = true);
-  private readonly onOnline = () => {
-    this.browserOffline = false;
-    this.refresh(true);
-  };
+  private readonly onOnline = () => this.refresh(true);
+  /** The reference day never changes once read, so it is read once per day, not every 30 s. */
+  private readonly referenceDays = new Map<string, Overview>();
 
   private timer?: ReturnType<typeof setInterval>;
 
@@ -80,15 +85,8 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.storeId = this.route.snapshot.paramMap.get('id') ?? '';
     this.readStateFromUrl();
     this.title.setTitle(`${t('Shop')} · Tally`);
-    window.addEventListener('offline', this.onOffline);
     window.addEventListener('online', this.onOnline);
-    this.api.listStores().subscribe({
-      next: (stores) => {
-        this.store = stores.find((s) => s.id === this.storeId) ?? null;
-        if (this.store) this.title.setTitle(`${this.store.name} · Tally`);
-      },
-      error: () => undefined,
-    });
+    this.loadStore();
     this.api.agentPackage().subscribe({ next: (pkg) => (this.agentPackage = pkg), error: () => undefined });
     // Quiet: the first paint is not something to announce as an "update".
     this.refresh(true);
@@ -101,8 +99,41 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.timer) clearInterval(this.timer);
-    window.removeEventListener('offline', this.onOffline);
     window.removeEventListener('online', this.onOnline);
+  }
+
+  private loadStore(): void {
+    this.api.listStores().subscribe({
+      next: (stores) => {
+        this.store = stores.find((s) => s.id === this.storeId) ?? null;
+        if (this.store) this.title.setTitle(`${this.store.name} · Tally`);
+      },
+      error: () => undefined,
+    });
+  }
+
+  /** The shop's wall-clock day, from the clock seam. */
+  private get today(): string {
+    return localDay(this.clock.now());
+  }
+
+  /** dd/MM — the weekday-free short date used in labels. */
+  private shortDate(day: string): string {
+    return new Intl.DateTimeFormat(numberLocale, { day: '2-digit', month: '2-digit', timeZone: 'UTC' }).format(
+      new Date(`${day}T00:00:00Z`)
+    );
+  }
+
+  /**
+   * The picker's bounds, enforced rather than advised: `min`/`max` only stop the
+   * widget, so a typed 2020 date, or `?date=2099-01-01`, was relayed to a
+   * Windows machine in the shop to come back empty.
+   */
+  private dayAllowed(day: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(Date.parse(`${day}T00:00:00Z`))) return false;
+    const tomorrow = new Date(this.clock.now());
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return day >= this.earliestDate && day <= (this.runningDate ?? localDay(tomorrow));
   }
 
   /**
@@ -115,7 +146,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   private readStateFromUrl(): void {
     const query = this.route.snapshot.queryParamMap;
     const date = query?.get('date') ?? '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
+    if (this.dayAllowed(date)) {
       this.date = date;
     }
     const tab = query?.get('tab');
@@ -161,7 +192,7 @@ export class ShopComponent implements OnInit, OnDestroy {
    * back empty, so the floor is a year back from the running day.
    */
   get earliestDate(): string {
-    const from = this.runningDate ? new Date(`${this.runningDate}T00:00:00Z`) : new Date();
+    const from = this.runningDate ? new Date(`${this.runningDate}T00:00:00Z`) : new Date(`${this.today}T00:00:00Z`);
     from.setUTCFullYear(from.getUTCFullYear() - 1);
     return from.toISOString().slice(0, 10);
   }
@@ -173,6 +204,7 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   /** Picking the running day itself is not "another day" — it goes back to the live view. */
   pickDate(value: string): void {
+    if (value && !this.dayAllowed(value)) return;
     this.date = !value || value === this.runningDate ? '' : value;
     // Open tables are the running moment; a closed day has none to show.
     if (this.date && this.tab === 'tables') this.tab = 'items';
@@ -189,18 +221,24 @@ export class ShopComponent implements OnInit, OnDestroy {
       this.loading = true;
       this.refreshing = true;
     }
-    this.api.overview(this.storeId, this.date || undefined).subscribe({
+    // An answer for a day that is no longer the chosen one is dropped: picking
+    // A then B quickly, or a day while the 30 s refresh is in flight, let the
+    // older response land last and put one day's figures under another's picker.
+    const day = this.date;
+    this.api.overview(this.storeId, day || undefined).subscribe({
       next: (overview) => {
+        if (day !== this.date) return;
         this.overview = overview;
         if (!overview.archive && overview.businessDate) this.runningDate = overview.businessDate;
         this.offline = false;
         this.overviewError = '';
         this.loading = false;
         this.refreshing = false;
-        if (!quiet) this.statusNote = t('Updated at {time}', { time: new Date().toLocaleTimeString(numberLocale) });
+        if (!quiet) this.statusNote = t('Updated at {time}', { time: this.clock.now().toLocaleTimeString(numberLocale) });
         this.loadComparison(overview);
       },
       error: (err) => {
+        if (day !== this.date) return;
         this.refreshing = false;
         this.fail(err, 'overview');
       },
@@ -209,32 +247,53 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   private loadTab(): void {
-    if (this.tab === 'tables' && !this.date) {
+    const day = this.date;
+    const tab = this.tab;
+    const stale = () => day !== this.date || tab !== this.tab;
+    if (tab === 'tables' && !day) {
       this.api.tables(this.storeId).subscribe({
         next: (tables) => {
+          if (stale()) return;
           this.tables = tables;
           this.tabError = '';
         },
-        error: (err) => this.fail(err, 'tab'),
+        error: (err) => !stale() && this.fail(err, 'tab'),
       });
     } else {
-      this.api.soldItems(this.storeId, this.date || undefined).subscribe({
+      this.api.soldItems(this.storeId, day || undefined).subscribe({
         next: (items) => {
+          if (stale()) return;
           this.soldItems = items;
           this.tabError = '';
         },
-        error: (err) => this.fail(err, 'tab'),
+        error: (err) => !stale() && this.fail(err, 'tab'),
       });
     }
   }
 
   /**
-   * Fetch the same weekday a week back and phrase the difference.
+   * The last hour both sides are compared through, or null to compare whole days.
    *
-   * A running day is compared only up to the hour it has reached — holding a
-   * morning's takings against last week's whole day reads as a collapse. A
-   * failure here is silent on purpose: the comparison is an extra, and a shop
-   * owner who cannot reach last week should still see today.
+   * A running day is cut to the *complete* hours on the clock — the hour in
+   * progress is a partial against last week's full one, which read as a
+   * shortfall. When the agent's business day is not today's calendar day (just
+   * after midnight) the clock says nothing about it, so it falls back to the
+   * last hour with a sale. A day with no hourly breakdown cannot be cut.
+   */
+  private comparisonCutoff(today: Overview): number | null {
+    if (today.archive || !(today.hourly ?? []).length) return null;
+    if (today.businessDate === this.today) {
+      const complete = this.clock.now().getHours() - 1;
+      if (complete >= 0) return complete;
+    }
+    return today.hourly.reduce((max, h) => Math.max(max, h.hour), -1);
+  }
+
+  /**
+   * Fetch the same weekday a week back and phrase the difference. A failure is
+   * silent on purpose — the comparison is an extra, and an owner who cannot
+   * reach last week should still see today — and it hides the line rather than
+   * saying "no figures", which would blame last week for a network blip.
    */
   private loadComparison(today: Overview): void {
     const reference = comparisonDate(today.businessDate);
@@ -242,21 +301,61 @@ export class ShopComponent implements OnInit, OnDestroy {
       this.comparison = null;
       return;
     }
-    const uptoHour = today.archive ? null : (today.hourly ?? []).reduce((max, h) => Math.max(max, h.hour), -1);
+    const upto = this.comparisonCutoff(today);
+    const render = (past: Overview) => {
+      if (this.overview !== today) return;
+      this.comparison = describeComparison(
+        comparableTotal(today, upto) ?? today.totals.invoiced,
+        comparableTotal(past, upto),
+        reference,
+        numberLocale,
+        upto === null ? null : upto + 1
+      );
+    };
+    const known = this.referenceDays.get(reference);
+    if (known) {
+      render(known);
+      return;
+    }
     this.api.overview(this.storeId, reference).subscribe({
       next: (past) => {
-        this.comparison = describeComparison(
-          today.totals.invoiced,
-          comparableTotal(past, uptoHour !== null && uptoHour >= 0 ? uptoHour : null),
-          reference,
-          numberLocale,
-          !today.archive
-        );
+        this.referenceDays.set(reference, past);
+        render(past);
       },
       error: () => {
-        this.comparison = describeComparison(today.totals.invoiced, null, reference, numberLocale);
+        if (this.overview === today) this.comparison = null;
       },
     });
+  }
+
+  /** What the hero says its figure is — and when the agent's day is not today, which day. */
+  get heroLabel(): string {
+    const o = this.overview;
+    if (o?.archive) return t('Invoiced');
+    if (o?.businessDate && o.businessDate !== this.today) {
+      return t('Taken on {date}', { date: this.shortDate(o.businessDate) });
+    }
+    return t('Taken today');
+  }
+
+  /** A closed day nothing was rung up on: one sentence, as the running day gets. */
+  get emptyClosedDay(): boolean {
+    const o = this.overview;
+    return !!o?.archive && o.totals.invoiced === 0 && o.totals.open === 0 && !(o.hourly ?? []).length && !(o.staff ?? []).length;
+  }
+
+  get emptyClosedDayText(): string {
+    return t('No takings recorded on {date}.', { date: this.shortDate(this.overview?.businessDate ?? this.date) });
+  }
+
+  /** "Last seen at 11:40", or with the day when it was not today — an outage from last night reads ambiguous as a bare time. */
+  get lastSeenText(): string {
+    const seen = this.store?.lastSeenAt ? new Date(this.store.lastSeenAt) : null;
+    if (!seen || Number.isNaN(seen.getTime())) return '';
+    const time = new Intl.DateTimeFormat(numberLocale, { hour: '2-digit', minute: '2-digit' }).format(seen);
+    return localDay(seen) === this.today
+      ? t('Last seen at {time}', { time })
+      : t('Last seen {date} at {time}', { date: this.shortDate(localDay(seen)), time });
   }
 
   /** Largest first: the comparison is the point, so rank carries it. */
@@ -313,7 +412,9 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   private fail(err: HttpErrorResponse, source: 'overview' | 'tab' = 'overview'): void {
-    this.loading = false;
+    // Only the overview ends "loading": a tab failing first used to blank the
+    // page to an alert over nothing while the overview was still on its way.
+    if (source === 'overview') this.loading = false;
     const set = (message: string) => {
       if (source === 'overview') this.overviewError = message;
       else this.tabError = message;
@@ -342,21 +443,15 @@ export class ShopComponent implements OnInit, OnDestroy {
       this.soldItems = null;
       this.overviewError = '';
       this.tabError = '';
+      // `store` was read once when the page opened, so the "last seen" it
+      // prints would be the time the page opened, not the time the shop went dark.
+      this.loadStore();
       return;
     }
     this.offline = false;
     // The browser having no connection is already said by its own banner; a
     // second red alert for the same cause only made it look like two problems.
     if (this.browserOffline) return;
-    // Plain sentences, not a status code or whatever the relay put in its body:
-    // the reader needs "is it them or me", and neither "(0)" nor "ECONNRESET"
-    // answers that.
-    if (err.status === 0) {
-      set(t('Could not reach the server. Check the connection and try again.'));
-    } else if (err.status >= 500) {
-      set(t('The shop did not answer. Try again in a moment.'));
-    } else {
-      set(err.error?.error ?? t('Could not reach the shop ({status})', { status: err.status }));
-    }
+    set(describeFailure(err, t('Could not reach the shop ({status})', { status: err.status })));
   }
 }

@@ -94,18 +94,17 @@ describe('ShopComponent', () => {
     expect((element.querySelector('.hero-compare') as HTMLElement).textContent).toContain('more than');
   });
 
-  it('says there is nothing to compare rather than inventing a number', async () => {
+  // A request that failed is not "that day was empty": telling a network blip
+  // as "No figures for last Saturday" was a small lie (plan.md §806.8).
+  it('hides the sentence when last week cannot be fetched, rather than blaming last week', async () => {
     await build(overview(), 'fail');
-    const compare = element.querySelector('.hero-compare') as HTMLElement;
-    expect(compare.textContent).toContain('No figures for last Saturday');
-    expect(compare.classList).not.toContain('up');
-    expect(compare.classList).not.toContain('down');
+    expect(element.querySelector('.hero-compare')).toBeNull();
   });
 
   it('folds the six Wintouch counters away, and opens them in one tap', async () => {
     await build(overview());
     const toggle = element.querySelector('.counters-toggle') as HTMLButtonElement;
-    const panel = toggle.closest('h3')!.nextElementSibling as HTMLElement;
+    const panel = toggle.closest('h2')!.nextElementSibling as HTMLElement;
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(panel.hidden).toBeTrue();
 
@@ -324,7 +323,7 @@ describe('ShopComponent clarity (plan.md §806.7)', () => {
 
   it('says the comparison is by this hour on a running day', async () => {
     await build(overview());
-    expect(element.querySelector('.hero-compare')!.textContent).toContain('by this hour');
+    expect(element.querySelector('.hero-compare')!.textContent).toMatch(/by \d\d:00/);
   });
 
   // The one-sentence card exists to stop "broken" reading as "early"; the three
@@ -356,6 +355,7 @@ describe('ShopComponent clarity (plan.md §806.7)', () => {
     expect(element.textContent).not.toContain('No takings yet today');
     expect(element.textContent).not.toContain('Nothing taken yet');
     expect(element.textContent).not.toContain('No payments yet');
-    expect(element.textContent).toContain('No takings that day');
+    // The one-sentence closed-day card replaces the empty charts entirely (§806.8).
+    expect(element.textContent).toContain('No takings recorded on');
   });
 });

@@ -5,6 +5,8 @@ import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../api.service';
 import { TPipe, t } from '../i18n';
+import { ConnectionService } from '../connection';
+import { describeFailure } from '../errors';
 import { AgentPackage, EnrolmentCode, Identity, Store } from '../models';
 
 @Component({
@@ -15,6 +17,7 @@ import { AgentPackage, EnrolmentCode, Identity, Store } from '../models';
   styleUrl: './stores.component.css',
 })
 export class StoresComponent implements OnInit {
+  protected connection = inject(ConnectionService);
   private api = inject(ApiService);
 
   stores: Store[] = [];
@@ -212,6 +215,6 @@ export class StoresComponent implements OnInit {
       return;
     }
     sessionStorage.removeItem('tally-reauth');
-    this.error = err.error?.error ?? t('Request failed ({status})', { status: err.status });
+    this.error = describeFailure(err, t('Request failed ({status})', { status: err.status }));
   }
 }

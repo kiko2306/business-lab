@@ -8,9 +8,12 @@
       <span class="small text-body-secondary">
         @if (overview.businessDate) {
           {{ (overview.archive ? 'Closed day' : 'Business day') | t }}
-          <strong>{{ overview.businessDate | date: 'dd/MM/yyyy' }}</strong> ·
+          <strong>{{ overview.businessDate | date: 'dd/MM/yyyy' }}</strong>
         }
-        {{ 'As of' | t }} {{ overview.asOf | date: 'HH:mm:ss' }}
+        <!-- "As of" is the time of the read; on a closed day it says nothing about the day. -->
+        @if (!overview.archive) {
+          · {{ 'As of' | t }} {{ overview.asOf | date: 'HH:mm:ss' }}
+        }
       </span>
     }
     <label class="d-flex align-items-center gap-2 small text-body-secondary mb-0">
@@ -51,8 +54,8 @@
 @if (offline) {
   <div class="alert alert-warning" role="alert">
     <p class="fw-semibold mb-1">{{ 'This shop is offline.' | t }}</p>
-    @if (store?.lastSeenAt) {
-      <p class="mb-1 small">{{ 'Last seen at {time}' | t: { time: (store!.lastSeenAt | date: 'HH:mm') } }}</p>
+    @if (lastSeenText) {
+      <p class="mb-1 small">{{ lastSeenText }}</p>
     }
     <p class="mb-0 small">
       {{ 'The shop\'s till computer is not connected, so there are no live figures to show. Nothing is displayed rather than showing the last known numbers as though they were current. It reconnects by itself once the till computer and the shop\'s network are back.' | t }}
@@ -61,7 +64,13 @@
 } @else if (loading && !overview) {
   <p class="text-body-secondary">{{ 'Loading…' | t }}</p>
 } @else if (overview) {
-  @if (beforeFirstSale) {
+  @if (emptyClosedDay) {
+    <div class="card stat-card mb-4">
+      <div class="card-body">
+        <p class="mb-0">{{ emptyClosedDayText }}</p>
+      </div>
+    </div>
+  } @else if (beforeFirstSale) {
     <!-- One sentence instead of eleven zeroes and four empty strings. -->
     <div class="card stat-card mb-4">
       <div class="card-body">
@@ -69,6 +78,7 @@
       </div>
     </div>
     <div class="row g-3 mb-4">
+      @if (tablesTotal > 0) {
       <div class="col-6">
         <div class="card stat-card h-100">
           <div class="card-body">
@@ -80,6 +90,7 @@
           </div>
         </div>
       </div>
+      }
       <div class="col-6">
         <div class="card stat-card h-100">
           <div class="card-body">
@@ -95,7 +106,7 @@
        cell in a grid (plan.md §806). -->
   <div class="card stat-card hero mb-3">
     <div class="card-body">
-      <p class="stat-label text-body-secondary mb-1">{{ (overview.archive ? 'Invoiced' : 'Taken today') | t }}</p>
+      <p class="stat-label text-body-secondary mb-1">{{ heroLabel }}</p>
       <p class="hero-value mb-0">{{ overview.totals.invoiced | currency: 'EUR' }}</p>
       @if (!overview.archive) {
         <p class="small text-body-secondary mb-0">{{ 'Forecast' | t }} {{ forecast | currency: 'EUR' }}
@@ -113,11 +124,14 @@
     </div>
   </div>
 
+  <!-- Two-up on a phone, three-up from sm: three-up left ~67px of text per tile at
+       360px, and an open-tabs figure of €12,345.67 measured 132px — spilling out of
+       its card (plan.md §806.8). -->
   <!-- The running moment, beside the answer rather than competing with it. A
        closed day has no open tabs, tables or guests. -->
   @if (!overview.archive) {
     <div class="row g-3 mb-4">
-      <div class="col-4">
+      <div class="col-6 col-sm-4">
         <div class="card stat-card h-100">
           <div class="card-body">
             <p class="stat-label text-body-secondary mb-1">{{ 'Open tabs' | t }}</p>
@@ -126,7 +140,8 @@
           </div>
         </div>
       </div>
-      <div class="col-4">
+      @if (tablesTotal > 0) {
+      <div class="col-6 col-sm-4">
         <div class="card stat-card h-100">
           <div class="card-body">
             <p class="stat-label text-body-secondary mb-1">{{ 'Tables in use' | t }}</p>
@@ -138,7 +153,8 @@
           </div>
         </div>
       </div>
-      <div class="col-4">
+      }
+      <div class="col-6 col-sm-4">
         <div class="card stat-card h-100">
           <div class="card-body">
             <p class="stat-label text-body-secondary mb-1">{{ 'Here now' | t }}</p>
@@ -153,14 +169,14 @@
        Wintouch's dashboard on the running day (§683). Hidden for an agent that
        does not send them yet. -->
   @if (overview.stats) {
-    <h3 class="h6 mb-2">
-      <button type="button" class="counters-toggle" [attr.aria-expanded]="countersOpen"
+    <h2 class="h6 mb-2">
+      <button type="button" class="counters-toggle" [attr.aria-expanded]="countersOpen" aria-controls="day-counters"
               (click)="countersOpen = !countersOpen">
         <span class="chevron" [class.open]="countersOpen" aria-hidden="true">&#9656;</span>
         {{ 'Day counters' | t }}
       </button>
-    </h3>
-    <div class="row g-3 mb-4" [hidden]="!countersOpen">
+    </h2>
+    <div id="day-counters" class="row g-3 mb-4" [hidden]="!countersOpen">
       <div class="col-6 col-lg-2">
         <div class="card stat-card h-100">
           <div class="card-body">
@@ -202,7 +218,7 @@
           </div>
         </div>
       </div>
-      @if (!overview.archive) {
+      @if (!overview.archive && tablesTotal > 0) {
         <div class="col-6 col-lg-2">
           <div class="card stat-card h-100">
             <div class="card-body">
@@ -219,29 +235,29 @@
 
   <!-- Before the first sale these are three empty strings under the one-sentence
        card, which read as broken rather than early (plan.md §806.7). -->
-  @if (!beforeFirstSale) {
+  @if (!beforeFirstSale && !emptyClosedDay) {
   <div class="card stat-card mb-4">
     <div class="card-body">
-      <h3 class="h6 mb-3">{{ 'Takings by hour' | t }}</h3>
+      <h2 class="h6 mb-3">{{ 'Takings by hour' | t }}</h2>
       <app-hourly-chart [data]="overview.hourly" [emptyText]="(overview.archive ? 'No takings that day.' : 'No takings yet today.') | t"></app-hourly-chart>
     </div>
   </div>
 
   <div class="row g-4 mb-4">
     <div class="col-12 col-lg-6">
-      <h3 class="h6 mb-3">{{ 'Taken by staff' | t }}</h3>
+      <h2 class="h6 mb-3">{{ 'Taken by staff' | t }}</h2>
       <app-bar-chart [data]="staffBars" [emptyText]="(overview.archive ? 'Nothing taken that day.' : 'Nothing taken yet.') | t"></app-bar-chart>
     </div>
 
     <div class="col-12 col-lg-6">
-      <h3 class="h6 mb-3">{{ 'By payment method' | t }}</h3>
+      <h2 class="h6 mb-3">{{ 'By payment method' | t }}</h2>
       <app-bar-chart [data]="paymentBars" [emptyText]="(overview.archive ? 'No payments that day.' : 'No payments yet.') | t"></app-bar-chart>
     </div>
   </div>
 
   }
 
-  <ul class="nav nav-tabs mb-3" role="group" [attr.aria-label]="'Show' | t">
+  <ul class="nav nav-tabs mb-3" [attr.aria-label]="'Show' | t">
     @if (!viewingArchive) {
       <li class="nav-item">
         <button class="nav-link" [class.active]="tab === 'tables'" [attr.aria-pressed]="tab === 'tables'" type="button" (click)="setTab('tables')">
@@ -342,7 +358,7 @@
         {{ '{q} items, {v}.' | t: { q: (soldItems.totalQuantity | number: '1.0-2'), v: (soldItems.totalValue | currency: 'EUR') } }}
       </p>
       <div class="mb-4">
-        <h3 class="h6 mb-3">{{ 'Top items by quantity' | t }}</h3>
+        <h2 class="h6 mb-3">{{ 'Top items by quantity' | t }}</h2>
         <app-bar-chart [data]="itemBars" unit="count" [emptyText]="'Nothing sold yet.' | t"></app-bar-chart>
       </div>
       <!-- The table stays below the chart: it is the exact-values view, and

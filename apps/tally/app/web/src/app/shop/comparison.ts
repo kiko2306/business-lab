@@ -1,5 +1,5 @@
 import { Overview } from '../models';
-import { t } from '../i18n';
+import { currency, t } from '../i18n';
 
 /**
  * "Is today good?" — the question the shop day view never answered.
@@ -67,11 +67,12 @@ export function describeComparison(
   referenceDate: string | null,
   locale: string,
   /**
-   * True for a running day. Its figure is cut to the hour already reached
-   * (`comparableTotal`), so the sentence says so — otherwise "€212 less than
-   * last Saturday" at 11:30 reads as a whole-day verdict.
+   * For a running day, the hour both sides were cut to ("by 14:00" = every
+   * hour before it, complete). Null for a closed day, which is compared whole.
+   * Saying the hour matters: at 11:30 "€212 less than last Saturday" reads as a
+   * whole-day verdict, which is the reading the cut exists to avoid.
    */
-  byThisHour = false
+  byHour: number | null = null
 ): Comparison | null {
   if (!referenceDate) {
     return null;
@@ -84,31 +85,23 @@ export function describeComparison(
   }
 
   const money = (value: number) =>
-    new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format(value);
+    new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value);
+  const hour = byHour === null ? '' : String(byHour).padStart(2, '0');
   const difference = today - reference;
   // Money, so a cent is the smallest difference worth a word; anything under
   // that is the same takings arrived at by a different rounding path.
   if (Math.abs(difference) < 0.01) {
     return {
       direction: 'level',
-      text: t(byThisHour ? 'The same as last {weekday} by this hour' : 'The same as last {weekday}', { weekday }),
+      text: t(byHour === null ? 'The same as last {weekday}' : 'The same as last {weekday} by {hour}:00', { weekday, hour }),
     };
   }
-  // Whole sentences per case, not a suffix: "a esta hora" does not attach to
-  // the Portuguese the way " by this hour" attaches to the English.
-  return difference > 0
-    ? {
-        direction: 'up',
-        text: t(byThisHour ? '{amount} more than last {weekday} by this hour' : '{amount} more than last {weekday}', {
-          amount: money(difference),
-          weekday,
-        }),
-      }
-    : {
-        direction: 'down',
-        text: t(byThisHour ? '{amount} less than last {weekday} by this hour' : '{amount} less than last {weekday}', {
-          amount: money(-difference),
-          weekday,
-        }),
-      };
+  // Whole translated sentences per case, not a suffix: the Portuguese puts the
+  // weekday inside "da semana passada" so it needs no gender agreement, which
+  // "segunda-feira passado" got wrong for Monday to Friday.
+  const up = difference > 0;
+  const key = up
+    ? byHour === null ? '{amount} more than last {weekday}' : '{amount} more than last {weekday} by {hour}:00'
+    : byHour === null ? '{amount} less than last {weekday}' : '{amount} less than last {weekday} by {hour}:00';
+  return { direction: up ? 'up' : 'down', text: t(key, { amount: money(Math.abs(difference)), weekday, hour }) };
 }

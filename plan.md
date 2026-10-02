@@ -36483,3 +36483,63 @@ undid the point (A noticed; I had said it was done). Those are now inside `@if
 
 83 specs; the new ones assert the by-this-hour wording both ways, that the charts disappear and
 the tab bar stays before the first sale, and that nothing says "yet"/"today" about a closed day.
+
+### 806.8 — the third critique (27/40, unchanged): a new layer underneath
+
+The third run scored **27/40** again. A confirmed every earlier fix in the code and then found a
+layer the first two runs could not reach — mostly correctness of *what the figures mean*, not of
+how they look. The user chose **all real defects** and the **"da semana passada"** Portuguese
+phrasing. Done test-first (102 → 103 specs); the browser measured what Karma cannot.
+
+**"Last seen at" lied.** `store` was loaded once when the page opened and never again, so an
+offline panel printed the time the page opened. It now re-reads the shop when the 503 arrives, and
+names the day when it was not today (an outage from last night reads ambiguous as a bare time).
+
+**The hero could be yesterday's figure labelled "today".** The agent's running day is the newest
+day in the sales table (`ResolveDayAsync`), not the calendar day, so at 07:40 Monday the hero said
+"Taken today" over Sunday night's number with the real date in 13px grey. When the business day is
+not today's, the label names the date ("Taken on 03/10"). "Today" comes from a new `Clock` seam so
+specs can assert it; the machine's real date made the previous specs unfalsifiable.
+
+**The comparison cut was biased.** It stopped at the last hour *with a sale* and included that
+hour whole: late in an hour today is partial against a full reference hour, which read as a
+shortfall, and a lull stopped the cut early and read as a lead. Both sides are now cut to the last
+*complete clock hour* and the sentence says which ("by 14:00") — "by this hour" promised more
+precision than it delivered. When the business day is not today's calendar day the clock says
+nothing about it, so it falls back to the last sale. The reference day is read **once**, not
+every 30 s (it never changes), and a failed read hides the line instead of saying "No figures for
+last Saturday", which blamed last week for a network blip.
+
+**Portuguese weekday gender.** "acima de segunda-feira passado" is wrong for Monday to Friday
+(`segunda-feira … passada`), and my spec only asserted that "sábado" appeared. The sentence is now
+"… {weekday} da semana passada", where the weekday carries no agreement — correct for all seven
+days with no lookup table.
+
+**Stale answers and unchecked dates.** Picking day A then B quickly let A's response land last and
+put one day's figures under another's picker; a response for a day no longer chosen is now
+dropped. `min`/`max` on the date input only stop the widget, so a typed 2020 date or
+`?date=2099-01-01` was relayed to the till PC; both are now refused. A tab request that failed
+while the overview was pending cleared `loading`, leaving an alert over a blank page — only an
+overview failure ends "loading" now.
+
+**Shops page.** It printed the response body on a list failure ("x"); it shares `describeFailure`
+with the shop page now, and has the browser-offline banner (via a shared `ConnectionService`).
+
+**Contrast and touch.** `.btn-outline-primary` and `-danger` fail in *light* too — "Running day"
+4.19:1, "Revoke agent" 4.30:1 — so light gets `#0a58ca` / `#b02a37` (5.99:1 measured). Under a
+coarse pointer every `.btn`, the brand, nav links and table links are 44px, and `.btn-sm` 44px
+wide: the Shops page's Open/Manage/Rename sat in a `btn-group-sm` and measured 31px, Add shop 38,
+shop-name links 24. Proved in a touch browser: nothing under 44px remains on the Shops page.
+
+**One claim A made from arithmetic, which the browser confirmed**: three-up tiles at 360px left
+~67px of text and an open-tabs figure of €12,345.67 measured 132px, spilling out of its card
+(B had tested 390px with small figures). The running tiles are `col-6 col-sm-4` now — two-up on a
+phone — and re-measured at 126px inside 158px cards.
+
+**Smaller:** a closed day with no trade gets one sentence ("No takings recorded on 13/09"); a shop
+with no tables hides the `0 / 0` tile and Occupancy; "As of" no longer sits beside "Closed day";
+section headings are `h2` (the page jumped h1 → h3); the view switch drops `role="group"`, which
+stripped its list semantics; the counters toggle has `aria-controls`.
+
+**Not done.** Single-shop owners landing on the admin table (a product call — a redirect also
+makes "← All shops" loop), the first hour's card-wide bar, and remembering the counters fold.

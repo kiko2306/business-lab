@@ -224,6 +224,19 @@ item is deleted.
       it must expand, announce its state, and return focus sensibly. Confirm the
       Shops page shows "Request failed" alone when the API is unreachable (stop
       the tally container) rather than also claiming there are no shops.
+- [ ] **Tally: the third critique's fixes (plan.md §806.8)** — on `beta`: shortly
+      after midnight (or any time the shop's trading day is not today's date)
+      the hero must say "Taken on dd/MM", not "today"; mid-afternoon the
+      comparison must read "…by HH:00" with the hour a complete one; unplug the
+      till PC's network and confirm "Last seen" shows the real time (and the
+      date if it was yesterday), not the time the page opened; in Portuguese,
+      the sentence reads "… {dia} da semana passada" for a Monday as well as a
+      Saturday; a typed day outside the picker's range is refused; and with an
+      open-tabs figure above €10,000 on a 360px phone nothing spills out of its
+      tile.
+- [ ] **Tally: single-shop owners land on the admin table (plan.md §806.8)** —
+      a non-admin with exactly one shop could go straight to it, but then
+      "← All shops" would loop; decide the behaviour before building it.
 - [ ] **Tally: clarity wording and the quiet-day view (plan.md §806.7)** — on
       `beta`, mid-morning on a running day the sentence under the hero must end
       "by this hour" ("a esta hora"); on a closed day it must not. Before the
