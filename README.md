@@ -224,11 +224,14 @@ item is deleted.
       it must expand, announce its state, and return focus sensibly. Confirm the
       Shops page shows "Request failed" alone when the API is unreachable (stop
       the tally container) rather than also claiming there are no shops.
-- [ ] **Tally: finish the second critique's clarity items (plan.md §806.6)** —
-      the comparison sentence must say it is cut to the hour on a running day
-      ("…than last Saturday by this hour" / "a esta hora"), and the pre-first-sale
-      view must drop the hourly card and the staff/payment charts (three empty
-      strings) while keeping the tab bar. Explain "Forecast" and "Open tabs".
+- [ ] **Tally: clarity wording and the quiet-day view (plan.md §806.7)** — on
+      `beta`, mid-morning on a running day the sentence under the hero must end
+      "by this hour" ("a esta hora"); on a closed day it must not. Before the
+      first sale only the one-sentence card, Tables in use and Here now show —
+      no hourly card, no empty staff/payment charts — and the Tables/Items bar
+      is still there. "Forecast" reads "Taken plus open tabs" and Open tabs reads
+      "Not paid yet". A closed day with no sales says "No takings that day", not
+      "yet"/"today".
 - [ ] **Dashboard: outline buttons in dark mode (plan.md §806.6)** — Bootstrap does
       not recolour `.btn-outline-primary`/`-danger` per colour mode, so their
       labels measure ~3.2:1 on the card in dark. Fixed in Tally's own styles; the

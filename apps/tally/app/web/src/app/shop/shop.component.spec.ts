@@ -293,3 +293,69 @@ describe('ShopComponent polish', () => {
     expect(element.querySelector('.text-danger')).toBeNull();
   });
 });
+
+describe('ShopComponent clarity (plan.md §806.7)', () => {
+  let element: HTMLElement;
+
+  const build = async (today: Overview) => {
+    const api = jasmine.createSpyObj('ApiService', ['listStores', 'agentPackage', 'overview', 'tables', 'soldItems']);
+    api.listStores.and.returnValue(of([]));
+    api.agentPackage.and.returnValue(of(null) as never);
+    api.overview.and.callFake((_id: string, date?: string) =>
+      of(date ? overview({ totals: { invoiced: 800, open: 0 }, archive: true }) : today) as never
+    );
+    api.tables.and.returnValue(of({ free: 12, tables: [] }) as never);
+    api.soldItems.and.returnValue(of({ items: [], totalQuantity: 0, totalValue: 0 }) as never);
+    await TestBed.configureTestingModule({
+      imports: [ShopComponent],
+      providers: [
+        provideRouter([]),
+        { provide: ApiService, useValue: api },
+        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: new Map([['id', 'abc']]) } } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(ShopComponent);
+    element = fixture.nativeElement;
+    fixture.detectChanges();
+  };
+
+  const quiet = () =>
+    overview({ totals: { invoiced: 0, open: 0 }, hourly: [], stats: undefined, clients: { present: 0 } });
+
+  it('says the comparison is by this hour on a running day', async () => {
+    await build(overview());
+    expect(element.querySelector('.hero-compare')!.textContent).toContain('by this hour');
+  });
+
+  // The one-sentence card exists to stop "broken" reading as "early"; the three
+  // empty chart strings under it undid that.
+  it('drops the empty charts before the first sale, and keeps the tab bar', async () => {
+    await build(quiet());
+    expect(element.textContent).not.toContain('No takings yet today');
+    expect(element.textContent).not.toContain('Nothing taken yet');
+    expect(element.textContent).not.toContain('No payments yet');
+    expect(element.querySelector('app-hourly-chart')).toBeNull();
+    expect(element.querySelector('.nav-tabs')).not.toBeNull();
+  });
+
+  it('still shows the charts once there is a sale', async () => {
+    await build(overview());
+    expect(element.querySelector('app-hourly-chart')).not.toBeNull();
+  });
+
+  it('explains Forecast and Open tabs in the shop’s words', async () => {
+    await build(overview());
+    const text = element.textContent!;
+    expect(text).toContain('Taken plus open tabs');
+    expect(text).toContain('Not paid yet');
+  });
+
+  // "yet" and "today" on a closed day suggest the day is still going.
+  it('does not say "yet" or "today" about a closed day', async () => {
+    await build(overview({ archive: true, totals: { invoiced: 0, open: 0 }, staff: [], payments: [], hourly: [] }));
+    expect(element.textContent).not.toContain('No takings yet today');
+    expect(element.textContent).not.toContain('Nothing taken yet');
+    expect(element.textContent).not.toContain('No payments yet');
+    expect(element.textContent).toContain('No takings that day');
+  });
+});

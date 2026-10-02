@@ -24,7 +24,7 @@ export interface HourlyDatum {
   imports: [CommonModule, TPipe],
   template: `
     @if (!data.length) {
-      <p class="text-body-secondary small mb-0">{{ 'No takings yet today.' | t }}</p>
+      <p class="text-body-secondary small mb-0">{{ emptyText }}</p>
     } @else {
       <!-- One graphic with one name; the columns are decoration and the exact
            figures are in the table beside it, which is the text alternative
@@ -67,6 +67,8 @@ export interface HourlyDatum {
 })
 export class HourlyChartComponent {
   @Input() data: HourlyDatum[] = [];
+  /** Differs for a closed day, where "yet" and "today" would suggest it is still going. */
+  @Input() emptyText = t('No takings yet today.');
 
   get peak(): number {
     return Math.max(...this.data.map((d) => d.total), 0);

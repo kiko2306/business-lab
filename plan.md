@@ -36457,3 +36457,29 @@ a four-app blast radius and the fix here is app-owned in Tally's `styles.css`. L
 item rather than widened in passing. Also not done: the comparison's "by this hour" wording and
 finishing the zero-state, the two clarity items from the same critique — the user picked
 correctness first.
+
+### 806.7 — the clarity items from the second critique
+
+The two P1s and the P2 §806.6 deferred when the user chose correctness first.
+
+**The comparison says it is cut to the hour.** `comparableTotal` already holds a running day's
+figure to the hours reached — so as not to read as a collapse against last week's whole day — but
+the sentence said "than last Saturday", and at 11:30 "€212 less than last Saturday" reads as a
+whole-day verdict, which is exactly the reading the cut exists to avoid. A running day now says
+"…than last Saturday by this hour" (`a esta hora`); a closed day is compared whole and says
+nothing extra; "No figures" claims no hour. Whole translated sentences per case rather than a
+suffix, because " a esta hora" does not attach to the Portuguese the way " by this hour" attaches
+to the English.
+
+**The quiet day is finished.** §806.2 put one sentence above the figures but left the hourly
+card, the staff and payment charts and their three empty strings rendering under it, which half
+undid the point (A noticed; I had said it was done). Those are now inside `@if
+(!beforeFirstSale)`; the tab bar stays, because open tables are real at zero sales.
+
+**"Forecast" and "Open tabs" explain themselves**: "Taken plus open tabs" under Forecast and
+"Not paid yet" under Open tabs, both in Portuguese. **Closed-day empties** no longer say "yet" or
+"today" — the hourly chart takes an `emptyText` input, and the staff and payment strings switch on
+`overview.archive` ("No takings that day").
+
+83 specs; the new ones assert the by-this-hour wording both ways, that the charts disappear and
+the tab bar stays before the first sale, and that nothing says "yet"/"today" about a closed day.

@@ -65,7 +65,13 @@ export function describeComparison(
   today: number,
   reference: number | null,
   referenceDate: string | null,
-  locale: string
+  locale: string,
+  /**
+   * True for a running day. Its figure is cut to the hour already reached
+   * (`comparableTotal`), so the sentence says so — otherwise "€212 less than
+   * last Saturday" at 11:30 reads as a whole-day verdict.
+   */
+  byThisHour = false
 ): Comparison | null {
   if (!referenceDate) {
     return null;
@@ -83,9 +89,26 @@ export function describeComparison(
   // Money, so a cent is the smallest difference worth a word; anything under
   // that is the same takings arrived at by a different rounding path.
   if (Math.abs(difference) < 0.01) {
-    return { direction: 'level', text: t('The same as last {weekday}', { weekday }) };
+    return {
+      direction: 'level',
+      text: t(byThisHour ? 'The same as last {weekday} by this hour' : 'The same as last {weekday}', { weekday }),
+    };
   }
+  // Whole sentences per case, not a suffix: "a esta hora" does not attach to
+  // the Portuguese the way " by this hour" attaches to the English.
   return difference > 0
-    ? { direction: 'up', text: t('{amount} more than last {weekday}', { amount: money(difference), weekday }) }
-    : { direction: 'down', text: t('{amount} less than last {weekday}', { amount: money(-difference), weekday }) };
+    ? {
+        direction: 'up',
+        text: t(byThisHour ? '{amount} more than last {weekday} by this hour' : '{amount} more than last {weekday}', {
+          amount: money(difference),
+          weekday,
+        }),
+      }
+    : {
+        direction: 'down',
+        text: t(byThisHour ? '{amount} less than last {weekday} by this hour' : '{amount} less than last {weekday}', {
+          amount: money(-difference),
+          weekday,
+        }),
+      };
 }

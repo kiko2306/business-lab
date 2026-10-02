@@ -249,7 +249,8 @@ export class ShopComponent implements OnInit, OnDestroy {
           today.totals.invoiced,
           comparableTotal(past, uptoHour !== null && uptoHour >= 0 ? uptoHour : null),
           reference,
-          numberLocale
+          numberLocale,
+          !today.archive
         );
       },
       error: () => {

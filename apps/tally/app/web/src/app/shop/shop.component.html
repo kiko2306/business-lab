@@ -98,7 +98,8 @@
       <p class="stat-label text-body-secondary mb-1">{{ (overview.archive ? 'Invoiced' : 'Taken today') | t }}</p>
       <p class="hero-value mb-0">{{ overview.totals.invoiced | currency: 'EUR' }}</p>
       @if (!overview.archive) {
-        <p class="small text-body-secondary mb-0">{{ 'Forecast' | t }} {{ forecast | currency: 'EUR' }}</p>
+        <p class="small text-body-secondary mb-0">{{ 'Forecast' | t }} {{ forecast | currency: 'EUR' }}
+          <span class="d-block">{{ 'Taken plus open tabs' | t }}</span></p>
       }
       <!-- The words carry the comparison; the arrow only reinforces them. -->
       @if (comparison) {
@@ -121,6 +122,7 @@
           <div class="card-body">
             <p class="stat-label text-body-secondary mb-1">{{ 'Open tabs' | t }}</p>
             <p class="stat-value mb-0">{{ overview.totals.open | currency: 'EUR' }}</p>
+            <p class="small text-body-secondary mb-0">{{ 'Not paid yet' | t }}</p>
           </div>
         </div>
       </div>
@@ -215,24 +217,29 @@
 
   }
 
+  <!-- Before the first sale these are three empty strings under the one-sentence
+       card, which read as broken rather than early (plan.md §806.7). -->
+  @if (!beforeFirstSale) {
   <div class="card stat-card mb-4">
     <div class="card-body">
       <h3 class="h6 mb-3">{{ 'Takings by hour' | t }}</h3>
-      <app-hourly-chart [data]="overview.hourly"></app-hourly-chart>
+      <app-hourly-chart [data]="overview.hourly" [emptyText]="(overview.archive ? 'No takings that day.' : 'No takings yet today.') | t"></app-hourly-chart>
     </div>
   </div>
 
   <div class="row g-4 mb-4">
     <div class="col-12 col-lg-6">
       <h3 class="h6 mb-3">{{ 'Taken by staff' | t }}</h3>
-      <app-bar-chart [data]="staffBars" [emptyText]="'Nothing taken yet.' | t"></app-bar-chart>
+      <app-bar-chart [data]="staffBars" [emptyText]="(overview.archive ? 'Nothing taken that day.' : 'Nothing taken yet.') | t"></app-bar-chart>
     </div>
 
     <div class="col-12 col-lg-6">
       <h3 class="h6 mb-3">{{ 'By payment method' | t }}</h3>
-      <app-bar-chart [data]="paymentBars" [emptyText]="'No payments yet.' | t"></app-bar-chart>
+      <app-bar-chart [data]="paymentBars" [emptyText]="(overview.archive ? 'No payments that day.' : 'No payments yet.') | t"></app-bar-chart>
     </div>
   </div>
+
+  }
 
   <ul class="nav nav-tabs mb-3" role="group" [attr.aria-label]="'Show' | t">
     @if (!viewingArchive) {

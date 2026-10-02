@@ -102,3 +102,25 @@ describe('describeComparison', () => {
     expect(describeComparison(1200, 800, saturday, 'pt-PT')!.text).toContain('sábado');
   });
 });
+
+// A running day's figure is cut to the hour already reached, so the sentence
+// has to say "by this hour" — otherwise an owner reading "€212 less than last
+// Saturday" at 11:30 takes it as a whole-day verdict, which is exactly the
+// reading the cut exists to avoid (plan.md §806.7).
+describe('describeComparison on a running day', () => {
+  const saturday = '2026-10-03';
+
+  it('says it is by this hour when the day is still running', () => {
+    expect(describeComparison(1200, 800, saturday, 'en', true)!.text).toBe('€400.00 more than last Saturday by this hour');
+    expect(describeComparison(800, 1200, saturday, 'en', true)!.text).toBe('€400.00 less than last Saturday by this hour');
+    expect(describeComparison(1000, 1000, saturday, 'en', true)!.text).toBe('The same as last Saturday by this hour');
+  });
+
+  it('says nothing extra for a closed day, which is compared whole', () => {
+    expect(describeComparison(1200, 800, saturday, 'en', false)!.text).toBe('€400.00 more than last Saturday');
+  });
+
+  it('does not claim an hour when there is nothing to compare', () => {
+    expect(describeComparison(1200, null, saturday, 'en', true)!.text).toBe('No figures for last Saturday');
+  });
+});
