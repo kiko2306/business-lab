@@ -165,6 +165,101 @@ describe('AccountComponent', () => {
   const rejected = () => throwError(() => new HttpErrorResponse({ status: 400, error: { error: 'That code is not valid.' } }));
   const text = () => (fixture.nativeElement as HTMLElement).textContent ?? '';
 
+  // plan.md §819 fix 5: the QR cannot be scanned from the phone that shows it,
+  // focus fell to <body> after every view change, and the QR had no name.
+  describe('setting up from a phone', () => {
+    const host = () => fixture.nativeElement as HTMLElement;
+    const settle = () => new Promise((resolve) => setTimeout(resolve));
+
+    beforeEach(() => {
+      operations.setupTotp.and.returnValue(of(setupResponse));
+      fixture.detectChanges();
+    });
+
+    function enrol(): void {
+      component.beginSetup();
+      fixture.detectChanges();
+    }
+
+    it('offers an otpauth link the authenticator on the same phone can open', () => {
+      enrol();
+
+      const link = host().querySelector('a.open-in-app') as HTMLAnchorElement;
+      expect(link.getAttribute('href')).toBe('otpauth://totp/x');
+    });
+
+    it('copies the key with one tap and says so', async () => {
+      const write = spyOn(navigator.clipboard, 'writeText').and.resolveTo();
+      enrol();
+
+      (host().querySelector('.copy-key') as HTMLButtonElement).click();
+      await settle();
+
+      expect(write).toHaveBeenCalledWith('ABCDEF0123456789');
+      expect(toast.success).toHaveBeenCalled();
+    });
+
+    it('names the QR code for a screen reader', () => {
+      enrol();
+
+      const qr = host().querySelector('.qr') as HTMLElement;
+      expect(qr.getAttribute('role')).toBe('img');
+      expect(qr.getAttribute('aria-label')).toContain('QR');
+    });
+
+    it('warns that leaving mid-setup means a new code', () => {
+      enrol();
+
+      expect(text()).toContain('new QR code');
+    });
+
+    it('moves focus to the setup step when it opens', async () => {
+      enrol();
+      await settle();
+
+      expect(document.activeElement?.id).toBe('enrolling-heading');
+    });
+
+    it('puts focus back on the status after Cancel', async () => {
+      enrol();
+      component.cancelSetup();
+      fixture.detectChanges();
+      await settle();
+
+      expect(document.activeElement?.id).toBe('status-summary');
+    });
+
+    it('puts focus on the status once the recovery codes are done', async () => {
+      operations.activateTotp.and.returnValue(of({ enabled: true, recoveryCodes: ['a-1'] } as TotpActivateResponse));
+      enrol();
+      component['activateForm'].setValue({ code: '123456' });
+      component.activate();
+      fixture.detectChanges();
+      operations.getTotpStatus.and.returnValue(of(enabledStatus));
+
+      component.finishRecoveryCodes();
+      fixture.detectChanges();
+      await settle();
+
+      expect(document.activeElement?.id).toBe('status-summary');
+    });
+
+    it('puts focus on the status after turning it off', async () => {
+      operations.getTotpStatus.and.returnValue(of(enabledStatus));
+      operations.disableTotp.and.returnValue(of({ enabled: false as const }));
+      component.ngOnInit();
+      fixture.detectChanges();
+      component['disableForm'].setValue({ code: '123456' });
+
+      operations.getTotpStatus.and.returnValue(of(disabledStatus));
+      await component.disable();
+      fixture.detectChanges();
+      await settle();
+
+      expect(document.activeElement?.id).toBe('status-summary');
+    });
+  });
+
   // plan.md §819: the screen that shows the recovery codes — once — was the
   // quietest on the page: "shown only now" in small muted text, a green alert
   // and a toast saying the same thing, pink code text that read as an error, and

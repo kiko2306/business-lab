@@ -37126,3 +37126,20 @@ saying "enrolment" and a subtitle naming CrowdSec.
   neighbours would overlap two 44px targets. `pointer: coarse` instead of width: not testable
   in Karma, and a narrow desktop window is the same layout problem.
 - **Not verified:** a real render of Users on a phone — README beta item.
+
+## 825. Account: setting up two-factor from the phone that shows the QR (§819 fix 5, P2)
+
+[x] done. A phone cannot scan its own screen, and focus fell to `<body>` after every step.
+
+- **Link + copy.** The setup view carries an `otpauth://` link (`.open-in-app`; the URL is our
+  own backend's, so `bypassSecurityTrustUrl`, as the QR SVG already does) and a "Copy key" button
+  with a toast. The QR container is `role="img"` with a label.
+- **Focus.** Setup opens on its heading (`enrolling-heading`); Cancel, Done on the recovery codes
+  and turning it off land on `status-summary`, the status line, via `loadStatus(true)`.
+- **44px.** Not done here: §824's phone rule in the shared theme covers Set up, Activate, Cancel,
+  Disable, Copy, Download and Done.
+- **Mid-setup exit.** Leaving still issues a new secret next visit; a line under the key says so
+  ("Finish here. If you leave this page you get a new QR code…"). **Rejected:** resuming the
+  pending secret: it would need the backend to return it again, and the secret is shown once by
+  design. Open if wanted.
+- Eight specs failed first; 341 pass, build clean, E2E passes.

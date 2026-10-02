@@ -18,7 +18,7 @@
       <!-- Current state, and the disable form when it's on -->
       <ng-container *ngIf="view === 'status' && status">
         <ng-container *ngIf="status.enabled; else disabledBlock">
-          <p class="mb-1">
+          <p class="mb-1" id="status-summary" tabindex="-1">
             <span class="badge text-bg-success">{{ 'account.status.enabledBadge' | t }}</span>
             <span class="ms-2 text-body-secondary">{{ 'account.status.enabledSince' | t:{ date: (status.enrolledAt | date:'dd/MM/yyyy':undefined:translate.locale()) ?? '' } }}</span>
           </p>
@@ -52,7 +52,7 @@
         </ng-container>
 
         <ng-template #disabledBlock>
-          <p class="mb-2"><span class="badge text-bg-secondary">{{ 'account.disabledBlock.offBadge' | t }}</span></p>
+          <p class="mb-2" id="status-summary" tabindex="-1"><span class="badge text-bg-secondary">{{ 'account.disabledBlock.offBadge' | t }}</span></p>
           <p class="text-body-secondary">
             {{ 'account.disabledBlock.description' | t }}
           </p>
@@ -64,12 +64,16 @@
 
       <!-- Enrolment: scan, then confirm a code -->
       <ng-container *ngIf="view === 'enrolling'">
+        <h2 class="h6" id="enrolling-heading" tabindex="-1">{{ 'account.enrolling.heading' | t }}</h2>
         <p class="mb-2">{{ 'account.enrolling.scanPrompt' | t }}</p>
-        <div class="qr my-3" [innerHTML]="qrSvg"></div>
-        <p class="small text-body-secondary">
+        <div class="qr my-3" role="img" [attr.aria-label]="'account.enrolling.qrLabel' | t" [innerHTML]="qrSvg"></div>
+        <p class="mb-2"><a class="open-in-app" [href]="otpauthUrl">{{ 'account.enrolling.openInApp' | t }}</a></p>
+        <p class="small text-body-secondary mb-2">
           {{ 'account.enrolling.manualEntry' | t }}
           <code class="user-select-all">{{ secret }}</code>
         </p>
+        <button class="copy-key btn btn-outline-secondary btn-sm" type="button" (click)="copyKey()">{{ 'account.enrolling.copyKey' | t }}</button>
+        <p class="small text-body-secondary mt-2 mb-0">{{ 'account.enrolling.leaveWarning' | t }}</p>
         <form [formGroup]="activateForm" (ngSubmit)="activate()" class="mt-3">
           <label class="form-label fw-semibold" for="activate-code">{{ 'account.enrolling.codeLabel' | t }}</label>
           <input

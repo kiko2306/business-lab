@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { DomSanitizer, SafeHtml, SafeUrl } from '@angular/platform-browser';
 import { HttpErrorResponse } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
@@ -46,6 +46,9 @@ export class AccountComponent implements OnInit {
   // succeeds or the user cancels. The secret is also shown as text for manual
   // entry into apps that can't scan.
   protected qrSvg: SafeHtml | null = null;
+  // The same secret as an otpauth:// link: on the phone showing the QR, an
+  // authenticator cannot scan its own screen, but it can open this.
+  protected otpauthUrl: SafeUrl | null = null;
   protected secret = '';
 
   // Shown exactly once, straight after activate. The backend never returns
@@ -75,12 +78,16 @@ export class AccountComponent implements OnInit {
     this.loadStatus();
   }
 
-  private loadStatus(): void {
+  /** `focusSummary`: a step just ended, so focus lands on the status rather than falling to <body>. */
+  private loadStatus(focusSummary = false): void {
     this.view = 'loading';
     this.operations.getTotpStatus().subscribe({
       next: (status) => {
         this.status = status;
         this.view = 'status';
+        if (focusSummary) {
+          this.refocus('status-summary');
+        }
       },
       error: (error) => {
         this.errorMessage = extractErrorMessage(error, this.translate.t('account.errors.loadStatus'));
@@ -101,9 +108,11 @@ export class AccountComponent implements OnInit {
           // input, so bypassing the sanitiser here is safe and necessary —
           // Angular would otherwise strip the <path> elements.
           this.qrSvg = this.sanitizer.bypassSecurityTrustHtml(response.qrSvg);
+          this.otpauthUrl = this.sanitizer.bypassSecurityTrustUrl(response.otpauthUri);
           this.secret = response.secret;
           this.activateForm.reset();
           this.view = 'enrolling';
+          this.refocus('enrolling-heading');
         },
         error: (error) => (this.errorMessage = extractErrorMessage(error, this.translate.t('account.errors.startEnrolment'))),
       });
@@ -125,11 +134,13 @@ export class AccountComponent implements OnInit {
     // The pending secret is left on the server; the next setup call replaces
     // it, and it's inert until activated.
     this.qrSvg = null;
+    this.otpauthUrl = null;
     this.secret = '';
     this.activateForm.reset();
     this.errorMessage = '';
     this.activateError = '';
     this.view = 'status';
+    this.refocus('status-summary');
   }
 
   activate(): void {
@@ -149,6 +160,7 @@ export class AccountComponent implements OnInit {
           this.recoveryCodes = response.recoveryCodes;
           this.codesStored = false;
           this.qrSvg = null;
+          this.otpauthUrl = null;
           this.secret = '';
           this.view = 'recovery-codes';
           // No toast: the screen itself says it, and a toast over the header
@@ -165,7 +177,7 @@ export class AccountComponent implements OnInit {
 
   finishRecoveryCodes(): void {
     this.recoveryCodes = [];
-    this.loadStatus();
+    this.loadStatus(true);
   }
 
   downloadRecoveryCodes(): void {
@@ -183,6 +195,13 @@ export class AccountComponent implements OnInit {
     anchor.click();
     URL.revokeObjectURL(url);
     this.codesStored = true;
+  }
+
+  copyKey(): void {
+    void navigator.clipboard?.writeText(this.secret).then(
+      () => this.toast.success(this.translate.t('account.toast.keyCopied')),
+      () => this.toast.error(this.translate.t('account.toast.copyFailed')),
+    );
   }
 
   copyRecoveryCodes(): void {
@@ -223,7 +242,7 @@ export class AccountComponent implements OnInit {
         next: () => {
           this.disableForm.reset();
           this.toast.success(this.translate.t('account.toast.disabled'));
-          this.loadStatus();
+          this.loadStatus(true);
         },
         error: (error) => {
           this.disableError = this.codeFailure(error, 'account.errors.disableRejected', 'account.errors.disable');

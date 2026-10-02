@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.6** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.7** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -233,19 +233,16 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
       label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
       no row of buttons overflows. At 1280px nothing looks different from before.
-- [ ] **Account: fix the critique's findings (plan.md §819)** — in order, test first, one
-      commit and version bump each: (1) done (§820) — on `beta`, Turn it off asks for a
-      code or recovery code (no password field), then a confirm; a wrong code is refused and 2FA stays
-      on; a recovery code works; (2) done (§821) — on `beta`, a wrong enrol code and a
-      wrong disable code each show a message under their own field (in pt-PT too) and put the cursor
-      back in it; no banner at the top;
-      (3) done (§822) — on `beta`, after Activate: the
-      first thing is "Save these now", no green alert or toast, codes in plain ink, Done is greyed
-      until Copy, Download or the tick box; (4) done (§823) — on `beta`, Account opens with the 2FA
-      panel already open, no "TOTP" or "enrolment" anywhere on the page (EN and pt-PT), and a closed
-      panel stays closed; (5) phone: `otpauth://` link, copy-key, 44px targets,
-      focus moved after each step, an accessible name on the QR. On `beta`, after each: run the
-      full journey (set up, wrong code, activate, recovery codes, disable) on a phone.
+- [ ] **Account: fix the critique's findings (plan.md §819)** — all five done; this item is now
+      only the `beta` look. (1) §820 — on `beta`, Turn it off asks for a code or recovery code (no
+      password field), then a confirm; a wrong code is refused and 2FA stays on; (2) §821 — a wrong
+      enrol code and a wrong disable code each show a message under their own field (in pt-PT too)
+      and put the cursor back in it; (3) §822 — after Activate: "Save these now" first, no green
+      alert or toast, Done greyed until Copy, Download or the tick box; (4) §823 — the panel opens
+      by default, no "TOTP"/"enrolment"; (5) §825 — **on a phone**: the setup step has an "Open in
+      your authenticator app" link and a Copy key button, focus lands on the step's heading, then on
+      the status line after Cancel, Done and turning it off, and a line says leaving starts over.
+      Run the full journey (set up, wrong code, activate, recovery codes, disable) on a phone.
 - [ ] **Critique: Sign-in flow (login, setup, recovery, set-password) (plan.md §812)** — `pages/login, setup, recovery, set-password`; public, first contact, phone-heavy; critique as one flow.
 - [ ] **Critique: Updates (plan.md §812)** — `pages/self-update`; the operator must trust it not to break the box: progress, failure and rollback wording.
 - [ ] **Critique: Utils (plan.md §812)** — `pages/utils`.

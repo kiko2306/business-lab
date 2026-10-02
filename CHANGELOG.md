@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.7] — 2026-10-02
+
+### Account
+
+- Account: set up two-factor from a phone: open-in-app link, copy key, named QR, focus kept after each step
+
 ## [0.163.6] — 2026-10-02
 
 ### Changed
