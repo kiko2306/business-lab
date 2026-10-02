@@ -56,7 +56,7 @@ export function setLang(next: Lang): void {
   location.reload();
 }
 
-const PT: Record<string, string> = {
+export const PT: Record<string, string> = {
   'Language': 'Idioma',
   'Switch light/dark theme': 'Alternar tema claro/escuro',
   'Invoices, employees and payments control': 'Controlo de faturas, funcionários e pagamentos',
@@ -135,6 +135,13 @@ const PT: Record<string, string> = {
   'Day': 'Dia',
   'Running day': 'Dia em curso',
   'Refresh': 'Atualizar',
+  'Hour': 'Hora',
+  'Takings by hour. Peak {v} at {h}:00': 'Receita por hora. Pico de {v} às {h}:00',
+  'Refreshing…': 'A atualizar…',
+  'Updated at {time}': 'Atualizado às {time}',
+  'Show': 'Mostrar',
+  'You are offline. Figures will refresh when the connection returns.':
+    'Sem ligação. Os valores atualizam quando a ligação voltar.',
   'This shop is offline.': 'Esta loja está offline.',
   "Its agent is not connected, so there are no live figures to show. Nothing is displayed rather than showing the last known numbers as though they were current. It reconnects by itself once the shop's machine and network are back.":
     'O agente não está ligado, por isso não há valores em direto para mostrar. Não se mostra nada em vez de apresentar os últimos valores conhecidos como se fossem atuais. Volta a ligar-se sozinho assim que a máquina e a rede da loja estiverem de volta.',
@@ -151,7 +158,7 @@ const PT: Record<string, string> = {
   'Forecast': 'Previsto',
   'Tables in use': 'Mesas em uso',
   'awaiting payment': 'a aguardar pagamento',
-  'Guests in': 'Clientes presentes',
+  'Here now': 'Agora na loja',
   'Transactions': 'Transações',
   'Average ticket': 'Talão médio',
   'Customers': 'Clientes',

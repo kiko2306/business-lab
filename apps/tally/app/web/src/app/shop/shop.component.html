@@ -26,9 +26,23 @@
     @if (date) {
       <button class="btn btn-sm btn-outline-primary" type="button" (click)="pickDate('')">{{ 'Running day' | t }}</button>
     }
-    <button class="btn btn-sm btn-outline-secondary" type="button" (click)="refresh()">{{ 'Refresh' | t }}</button>
+    <button class="btn btn-sm btn-outline-secondary refresh" type="button" [disabled]="refreshing" (click)="refresh()">
+      @if (refreshing) {
+        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>{{ 'Refreshing…' | t }}
+      } @else {
+        {{ 'Refresh' | t }}
+      }
+    </button>
   </div>
 </div>
+
+<!-- Read aloud when a refresh the reader asked for lands. The 30 s one is
+     silent on purpose: announcing it would interrupt whatever they are reading. -->
+<p class="visually-hidden" role="status" aria-live="polite">{{ statusNote }}</p>
+
+@if (browserOffline) {
+  <div class="alert alert-warning" role="alert">{{ 'You are offline. Figures will refresh when the connection returns.' | t }}</div>
+}
 
 @if (error) {
   <div class="alert alert-danger" role="alert">{{ error }}</div>
@@ -66,7 +80,7 @@
       <div class="col-6">
         <div class="card stat-card h-100">
           <div class="card-body">
-            <p class="stat-label text-body-secondary mb-1">{{ 'Guests in' | t }}</p>
+            <p class="stat-label text-body-secondary mb-1">{{ 'Here now' | t }}</p>
             <p class="stat-value mb-0">{{ overview.clients.present }}</p>
           </div>
         </div>
@@ -122,7 +136,7 @@
       <div class="col-4">
         <div class="card stat-card h-100">
           <div class="card-body">
-            <p class="stat-label text-body-secondary mb-1">{{ 'Guests in' | t }}</p>
+            <p class="stat-label text-body-secondary mb-1">{{ 'Here now' | t }}</p>
             <p class="stat-value mb-0">{{ overview.clients.present }}</p>
           </div>
         </div>
@@ -217,16 +231,16 @@
     </div>
   </div>
 
-  <ul class="nav nav-tabs mb-3">
+  <ul class="nav nav-tabs mb-3" role="group" [attr.aria-label]="'Show' | t">
     @if (!viewingArchive) {
       <li class="nav-item">
-        <button class="nav-link" [class.active]="tab === 'tables'" type="button" (click)="setTab('tables')">
+        <button class="nav-link" [class.active]="tab === 'tables'" [attr.aria-pressed]="tab === 'tables'" type="button" (click)="setTab('tables')">
           {{ 'Tables' | t }}
         </button>
       </li>
     }
     <li class="nav-item">
-      <button class="nav-link" [class.active]="tab === 'items'" type="button" (click)="setTab('items')">
+      <button class="nav-link" [class.active]="tab === 'items'" [attr.aria-pressed]="tab === 'items'" type="button" (click)="setTab('items')">
         {{ 'Items sold' | t }}
       </button>
     </li>

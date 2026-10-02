@@ -36350,3 +36350,47 @@ Confirmation round (stub API, real Chromium): hero 56px desktop / 40px phone; Po
 "4 582,18 €" and "▲ 412,18 € acima de sábado passado"; `(pointer: coarse)` lifts Refresh and the
 day picker from 31px to **44px** on a touch viewport and leaves them at 31px on the desktop one;
 no horizontal overflow at 390 or 1440 in either theme. 40 specs green.
+
+### 806.5 — the leftovers from §806's "everything" scope
+
+§806 said all five items were done under a scope of "everything". Several critique findings
+had not been touched; this closes them, and records the one that turned out to be a real bug.
+
+**A dead dark-mode rule, in production.** Writing the bar-contrast spec first, the dark-mode
+case measured the fill at `rgb(42, 120, 214)` — the *light* colour — in a dark theme. The charts
+set their dark colour with `:root[data-bs-theme='dark'] .bar-fill`, and Angular's emulated view
+encapsulation scopes **every** compound selector in a rule, so that compiled to
+`:root[_ngcontent-x][data-bs-theme='dark'] .bar-fill[_ngcontent-x]` and `:root` never carries a
+component attribute. The dark override had never matched; the bars were the light blue in dark
+mode, which is where §806's "2.85:1" figure came from — and the audit's own static reading
+(`#3987e5` against its track) described a colour that was never actually painted. Fixed with
+`:host-context([data-bs-theme='dark'])`, which Angular rewrites correctly, and the dark fill is
+now `#4a94ee` (3.33:1 against its track, from 2.85:1). Both charts. A grep found no other
+theme-conditional component CSS in the dashboard or the other apps.
+
+The other items:
+
+- **Day and tab in the URL** (`?date=&tab=`), read on open and written with `Location.replaceState`
+  — a reload, bookmark or shared link lands on the same day, and choosing a day is not a history
+  entry the back button should return to. `date` is validated before use because it is relayed to
+  a Windows machine in a shop; a closed day never opens on Tables.
+- **Refresh says what it is doing**: disabled with "Refreshing…" while in flight, so it cannot be
+  pressed twice (each press is a relay to the shop), and a polite live region reads "Updated at
+  HH:MM" for a refresh the reader asked for. The 30 s timer and the first paint stay silent —
+  announcing those would interrupt whatever is being read.
+- **Switching Tables ↔ Items fetches only the tab.** `setTab()` called `refresh()`, which re-read
+  the overview too. `refresh()` is now `loadTab()` plus the overview.
+- **The Tables / Items switch reports its state with `aria-pressed`, not `role="tablist"`.** A
+  tablist promises arrow-key navigation this does not implement; two buttons that switch a view
+  should say which is pressed and nothing more.
+- **Charts**: the hourly chart is one `role="img"` with a one-sentence summary and a
+  visually-hidden table of exact figures, replacing 24 anonymous images; the bar chart's tracks
+  are `aria-hidden`, because each bar rendered its value as text *and* as a `role="img"` label and
+  was read twice.
+- **Offline**: `online`/`offline` listeners show "You are offline" — the service worker is a
+  deliberate no-op, so an installed app with no connectivity otherwise got only a failed request.
+- **`Guests in` → `Here now`** (`Agora na loja`): it and `Customers` both read as *Clientes* two
+  tiles apart, and they are different figures.
+
+58 specs. Not done: nothing further from the critique list; the 24/40 score itself is still
+unmeasured — a re-run of `/impeccable critique` is what would show whether it moved.

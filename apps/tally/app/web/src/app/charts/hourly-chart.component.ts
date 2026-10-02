@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
-import { TPipe, currency, numberLocale } from '../i18n';
+import { TPipe, currency, numberLocale, t } from '../i18n';
 
 export interface HourlyDatum {
   hour: number;
@@ -26,9 +26,12 @@ export interface HourlyDatum {
     @if (!data.length) {
       <p class="text-body-secondary small mb-0">{{ 'No takings yet today.' | t }}</p>
     } @else {
-      <div class="hourly">
+      <!-- One graphic with one name; the columns are decoration and the exact
+           figures are in the table beside it, which is the text alternative
+           twenty-four anonymous role=img elements never were. -->
+      <div class="hourly" role="img" [attr.aria-label]="summary">
         @for (d of data; track d.hour) {
-          <div class="hourly-col" [attr.title]="label(d)" role="img" [attr.aria-label]="label(d)">
+          <div class="hourly-col" [attr.title]="label(d)" aria-hidden="true">
             <div class="hourly-track">
               <div class="hourly-fill" [style.height.%]="percent(d.total)"></div>
             </div>
@@ -39,6 +42,22 @@ export interface HourlyDatum {
           </div>
         }
       </div>
+      <table class="visually-hidden">
+        <thead>
+          <tr>
+            <th scope="col">{{ 'Hour' | t }}</th>
+            <th scope="col">{{ 'Total' | t }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (d of data; track d.hour) {
+            <tr>
+              <td>{{ pad(d.hour) }}:00</td>
+              <td>{{ format(d.total) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
       <p class="small text-body-secondary mt-2 mb-0">
         {{ 'Peak {v} at {h}:00' | t: { v: format(peak), h: pad(peakHour) } }}
       </p>
@@ -69,6 +88,11 @@ export class HourlyChartComponent {
 
   format(total: number): string {
     return new Intl.NumberFormat(numberLocale, { style: 'currency', currency }).format(total);
+  }
+
+  /** What the graphic says in one sentence, for a reader who cannot see its shape. */
+  get summary(): string {
+    return t('Takings by hour. Peak {v} at {h}:00', { v: this.format(this.peak), h: this.pad(this.peakHour) });
   }
 
   label(d: HourlyDatum): string {

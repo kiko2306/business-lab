@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.162.2] — 2026-10-02
+
+### Fixed
+
+- Tally's chart colours in dark mode actually apply (the override never matched under Angular view encapsulation), and the shop view keeps its day in the URL (plan.md §806.5)
+
 ## [0.162.1] — 2026-10-01
 
 ### Fixed

@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -21,6 +21,7 @@ type Tab = 'tables' | 'items';
 export class ShopComponent implements OnInit, OnDestroy {
   private api = inject(ApiService);
   private route = inject(ActivatedRoute);
+  private url = inject(Location);
 
   storeId = '';
   store: Store | null = null;
@@ -49,17 +50,33 @@ export class ShopComponent implements OnInit, OnDestroy {
   comparison: Comparison | null = null;
   /** The six Wintouch counters: reference, not the answer, so they start folded. */
   countersOpen = false;
+  /** A user-requested re-read is in flight over figures already on screen. */
+  refreshing = false;
+  /** Read aloud when a user-requested refresh lands; the silent 30 s one never touches it. */
+  statusNote = '';
+  /** The browser itself has no connection — distinct from the shop's agent being away. */
+  browserOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+
+  private readonly onOffline = () => (this.browserOffline = true);
+  private readonly onOnline = () => {
+    this.browserOffline = false;
+    this.refresh(true);
+  };
 
   private timer?: ReturnType<typeof setInterval>;
 
   ngOnInit(): void {
     this.storeId = this.route.snapshot.paramMap.get('id') ?? '';
+    this.readStateFromUrl();
+    window.addEventListener('offline', this.onOffline);
+    window.addEventListener('online', this.onOnline);
     this.api.listStores().subscribe({
       next: (stores) => (this.store = stores.find((s) => s.id === this.storeId) ?? null),
       error: () => undefined,
     });
     this.api.agentPackage().subscribe({ next: (pkg) => (this.agentPackage = pkg), error: () => undefined });
-    this.refresh();
+    // Quiet: the first paint is not something to announce as an "update".
+    this.refresh(true);
     // A floor dashboard is left open on a screen, so it refreshes itself. The
     // figures are read live from the shop on every call — there is no cache to
     // go stale, only this interval.
@@ -69,11 +86,42 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.timer) clearInterval(this.timer);
+    window.removeEventListener('offline', this.onOffline);
+    window.removeEventListener('online', this.onOnline);
   }
 
+  /**
+   * The day and the tab live in the query string, so a reload, a bookmark, a
+   * shared link and the back button all land where the reader was — they used
+   * to be component fields, and iOS discarding a background tab silently
+   * returned the running day. Validated before use: `date` is relayed to a
+   * Windows machine in a shop, so only a real-looking day gets through.
+   */
+  private readStateFromUrl(): void {
+    const query = this.route.snapshot.queryParamMap;
+    const date = query?.get('date') ?? '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
+      this.date = date;
+    }
+    const tab = query?.get('tab');
+    if (tab === 'tables' || tab === 'items') this.tab = tab;
+    // Open tables are the running moment; a closed day has none to show.
+    if (this.date && this.tab === 'tables') this.tab = 'items';
+  }
+
+  /** `replaceState`, not a navigation: choosing a day is not a page the back button should return to. */
+  private writeStateToUrl(): void {
+    const params = new URLSearchParams();
+    if (this.date) params.set('date', this.date);
+    if (this.tab !== 'tables') params.set('tab', this.tab);
+    this.url.replaceState(this.url.path().split('?')[0] ?? '', params.toString());
+  }
+
+  /** Only the tab's own payload: the overview on screen is already current. */
   setTab(tab: Tab): void {
     this.tab = tab;
-    this.refresh(true);
+    this.writeStateToUrl();
+    this.loadTab();
   }
 
   toggleTable(table: number): void {
@@ -116,12 +164,16 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.overview = null;
     this.soldItems = null;
     this.comparison = null;
+    this.writeStateToUrl();
     this.refresh();
   }
 
-  /** `quiet` keeps the current figures on screen while re-fetching. */
+  /** `quiet` keeps the current figures on screen while re-fetching, and says nothing. */
   refresh(quiet = false): void {
-    if (!quiet) this.loading = true;
+    if (!quiet) {
+      this.loading = true;
+      this.refreshing = true;
+    }
     this.api.overview(this.storeId, this.date || undefined).subscribe({
       next: (overview) => {
         this.overview = overview;
@@ -129,11 +181,19 @@ export class ShopComponent implements OnInit, OnDestroy {
         this.offline = false;
         this.error = '';
         this.loading = false;
+        this.refreshing = false;
+        if (!quiet) this.statusNote = t('Updated at {time}', { time: new Date().toLocaleTimeString(numberLocale) });
         this.loadComparison(overview);
       },
-      error: (err) => this.fail(err),
+      error: (err) => {
+        this.refreshing = false;
+        this.fail(err);
+      },
     });
+    this.loadTab();
+  }
 
+  private loadTab(): void {
     if (this.tab === 'tables' && !this.date) {
       this.api.tables(this.storeId).subscribe({
         next: (tables) => (this.tables = tables),

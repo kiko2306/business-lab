@@ -38,8 +38,9 @@
   min-width: 2px;
 }
 
-:root[data-bs-theme='dark'] .bar-fill {
-  background: #3987e5;
+/* 3.33:1 against the dark track; the old #3987e5 was 2.85:1, under the 3:1 floor for graphics. */
+:host-context([data-bs-theme='dark']) .bar-fill {
+  background: #4a94ee;
 }
 
 .bar-value {

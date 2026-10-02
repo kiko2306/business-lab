@@ -32,13 +32,11 @@ export interface BarDatum {
         @for (d of data; track d.label) {
           <div class="bar-row">
             <span class="bar-label text-body-secondary" [title]="d.label">{{ d.label }}</span>
-            <span class="bar-track">
-              <span
-                class="bar-fill"
-                [style.width.%]="percent(d.value)"
-                [attr.title]="d.label + ': ' + format(d.value)"
-                role="img"
-                [attr.aria-label]="d.label + ': ' + format(d.value)"></span>
+            <!-- Decorative: the label and the value beside it already say
+                 everything, and a role=img here made a screen reader read each
+                 bar twice. -->
+            <span class="bar-track" aria-hidden="true">
+              <span class="bar-fill" [style.width.%]="percent(d.value)" [attr.title]="d.label + ': ' + format(d.value)"></span>
             </span>
             <span class="bar-value text-body num">{{ format(d.value) }}</span>
           </div>

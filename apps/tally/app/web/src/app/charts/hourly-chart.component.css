@@ -33,8 +33,8 @@
   border-radius: 3px 3px 0 0;
 }
 
-:root[data-bs-theme='dark'] .hourly-fill {
-  background: #3987e5;
+:host-context([data-bs-theme='dark']) .hourly-fill {
+  background: #4a94ee;
 }
 
 .hourly-hour {
