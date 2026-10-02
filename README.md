@@ -234,9 +234,12 @@ item is deleted.
       Saturday; a typed day outside the picker's range is refused; and with an
       open-tabs figure above €10,000 on a 360px phone nothing spills out of its
       tile.
-- [ ] **Tally: single-shop owners land on the admin table (plan.md §806.8)** —
-      a non-admin with exactly one shop could go straight to it, but then
-      "← All shops" would loop; decide the behaviour before building it.
+- [ ] **Tally: sole-shop viewers skip the list (plan.md §809)** — on `beta`, sign in
+      as a non-admin who has been granted exactly one shop: opening Tally must land
+      on that shop directly (no flash of the list), the shop page must have no
+      "← All shops" link, and the browser back button must not bounce between the
+      two. Then as an admin with one shop, and as a non-admin with two, confirm
+      the list and the link are both still there.
 - [ ] **Tally: clarity wording and the quiet-day view (plan.md §806.7)** — on
       `beta`, mid-morning on a running day the sentence under the hero must end
       "by this hour" ("a esta hora"); on a closed day it must not. Before the

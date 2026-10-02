@@ -36624,3 +36624,30 @@ with Escape. Full E2E suite: 14 passed. 277 specs.
 **Honestly unproven:** the idle-cost number is Karma's, on a synthetic 50-card host; it is the
 work saved per pass, not a measured frame-time or INP improvement on a real Apps page. The
 direction is certain and the size is not.
+
+## 809. Tally: a viewer with one shop skips the list
+
+The product call §806.8 left open — a non-admin with exactly one shop lands on the admin table,
+full of agent and version vocabulary, to click through to the one page they came for. The user
+said to take it with the recommended default, so the behaviour is decided here rather than
+asked about again:
+
+- **The Shops page redirects** a non-admin with exactly one shop straight to it, with
+  `replaceUrl: true`, so the back button does not return to a list that would redirect again.
+- **The shop page drops "← All shops"** for that same viewer. The two halves have to ship
+  together — a link to a list that redirects straight back is a loop with extra steps, which is
+  the reason this was left for a decision.
+- **Admins always keep the list** (they manage it), as does anyone with two or more shops.
+
+The rule is one pure function, `isSoleShopViewer(identity, stores)`, shared by both pages, and it
+is deliberately conservative: it is false until *both* the identity and the list are known (so a
+half-loaded page never redirects), false for an empty list, and a failed request never redirects
+(an empty list from a failure is not "one shop"). The shop page's own `me()` call is new, which
+is why the existing shop specs gained a `me` spy.
+
+114 Tally specs: the pure function's four edges, the redirect (and its three non-redirects), and
+the link present for an admin and for a two-shop viewer, absent for the sole-shop owner.
+
+**Not proven in a browser.** The redirect is Angular's `Router.navigate` against a spied router
+in Karma; it was not driven through a real Authelia-fronted session with a granted non-admin
+identity, which the test stack cannot produce. A README beta item carries that.

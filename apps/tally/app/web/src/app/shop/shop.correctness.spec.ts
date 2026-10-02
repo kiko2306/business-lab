@@ -41,9 +41,10 @@ describe('ShopComponent correctness (plan.md §806.6)', () => {
     tables: Observable<unknown> = of({ free: 4, tables: [] }),
     stores: Store[] = [store()]
   ) => {
-    const api = jasmine.createSpyObj('ApiService', ['listStores', 'agentPackage', 'overview', 'tables', 'soldItems']);
+    const api = jasmine.createSpyObj('ApiService', ['listStores', 'me', 'agentPackage', 'overview', 'tables', 'soldItems']);
     api.listStores.and.returnValue(of(stores));
     api.agentPackage.and.returnValue(of(null) as never);
+    api.me.and.returnValue(of({ user: 'owner', isAdmin: true }) as never);
     api.overview.and.callFake((_id: string, date?: string) =>
       date ? (of(overview({ totals: { invoiced: 800, open: 0 } })) as never) : (('subscribe' in over ? over : of(over)) as never)
     );

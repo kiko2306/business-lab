@@ -1,11 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { RouterLink, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../api.service';
 import { TPipe, t } from '../i18n';
 import { ConnectionService } from '../connection';
+import { isSoleShopViewer } from '../access';
 import { describeFailure } from '../errors';
 import { AgentPackage, EnrolmentCode, Identity, Store } from '../models';
 
@@ -19,6 +20,7 @@ import { AgentPackage, EnrolmentCode, Identity, Store } from '../models';
 export class StoresComponent implements OnInit {
   protected connection = inject(ConnectionService);
   private api = inject(ApiService);
+  private router = inject(Router);
 
   stores: Store[] = [];
   /**
@@ -54,6 +56,7 @@ export class StoresComponent implements OnInit {
     this.api.me().subscribe({
       next: (identity) => {
         this.identity = identity;
+        this.goStraightToTheOnlyShop();
       },
       error: () => undefined,
     });
@@ -72,9 +75,17 @@ export class StoresComponent implements OnInit {
       next: (stores) => {
         this.stores = stores;
         this.loading = false;
+        this.goStraightToTheOnlyShop();
       },
       error: (err) => this.fail(err),
     });
+  }
+
+  /** `replaceUrl`, so the back button does not return to a list that would redirect again. */
+  private goStraightToTheOnlyShop(): void {
+    if (!this.loading && !this.error && isSoleShopViewer(this.identity, this.stores)) {
+      void this.router.navigate(['/shops', this.stores[0].id], { replaceUrl: true });
+    }
   }
 
   create(): void {

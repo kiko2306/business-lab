@@ -27,9 +27,10 @@ describe('ShopComponent state, feedback and announcements (plan.md §806.5)', ()
   let location: Location;
 
   const build = async (query: Record<string, string> = {}) => {
-    api = jasmine.createSpyObj('ApiService', ['listStores', 'agentPackage', 'overview', 'tables', 'soldItems']);
+    api = jasmine.createSpyObj('ApiService', ['listStores', 'me', 'agentPackage', 'overview', 'tables', 'soldItems']);
     api.listStores.and.returnValue(of([]));
     api.agentPackage.and.returnValue(of(null) as never);
+    api.me.and.returnValue(of({ user: 'owner', isAdmin: true }) as never);
     api.overview.and.returnValue(of(overview()) as never);
     api.tables.and.returnValue(of({ free: 8, tables: [] }) as never);
     api.soldItems.and.returnValue(of({ items: [], totalQuantity: 0, totalValue: 0 }) as never);

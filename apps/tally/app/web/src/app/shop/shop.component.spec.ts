@@ -37,9 +37,10 @@ describe('ShopComponent', () => {
   });
 
   const build = async (today: Overview, lastWeek: Overview | 'fail' = lastWeekDefault) => {
-    api = jasmine.createSpyObj('ApiService', ['listStores', 'agentPackage', 'overview', 'tables', 'soldItems']);
+    api = jasmine.createSpyObj('ApiService', ['listStores', 'me', 'agentPackage', 'overview', 'tables', 'soldItems']);
     api.listStores.and.returnValue(of([]));
     api.agentPackage.and.returnValue(of(null) as never);
+    api.me.and.returnValue(of({ user: 'owner', isAdmin: true }) as never);
     api.tables.and.returnValue(of({ tables: [] }) as never);
     api.soldItems.and.returnValue(of({ items: [] }) as never);
     api.overview.and.callFake((_id: string, date?: string) => {
@@ -129,9 +130,10 @@ describe('ShopComponent table drill-down', () => {
   let element: HTMLElement;
 
   beforeEach(async () => {
-    const api = jasmine.createSpyObj('ApiService', ['listStores', 'agentPackage', 'overview', 'tables', 'soldItems']);
+    const api = jasmine.createSpyObj('ApiService', ['listStores', 'me', 'agentPackage', 'overview', 'tables', 'soldItems']);
     api.listStores.and.returnValue(of([]));
     api.agentPackage.and.returnValue(of(null) as never);
+    api.me.and.returnValue(of({ user: 'owner', isAdmin: true }) as never);
     api.overview.and.returnValue(of(overview()) as never);
     api.soldItems.and.returnValue(of({ items: [] }) as never);
     api.tables.and.returnValue(
@@ -205,9 +207,10 @@ describe('ShopComponent before the first sale', () => {
   let element: HTMLElement;
 
   const build = async (today: Overview) => {
-    const api = jasmine.createSpyObj('ApiService', ['listStores', 'agentPackage', 'overview', 'tables', 'soldItems']);
+    const api = jasmine.createSpyObj('ApiService', ['listStores', 'me', 'agentPackage', 'overview', 'tables', 'soldItems']);
     api.listStores.and.returnValue(of([]));
     api.agentPackage.and.returnValue(of(null) as never);
+    api.me.and.returnValue(of({ user: 'owner', isAdmin: true }) as never);
     api.overview.and.returnValue(of(today) as never);
     api.tables.and.returnValue(of({ free: 12, tables: [] }) as never);
     api.soldItems.and.returnValue(of({ items: [], totalQuantity: 0, totalValue: 0 }) as never);
@@ -262,11 +265,12 @@ describe('ShopComponent polish', () => {
   let element: HTMLElement;
 
   beforeEach(async () => {
-    const api = jasmine.createSpyObj('ApiService', ['listStores', 'agentPackage', 'overview', 'tables', 'soldItems']);
+    const api = jasmine.createSpyObj('ApiService', ['listStores', 'me', 'agentPackage', 'overview', 'tables', 'soldItems']);
     api.listStores.and.returnValue(
       of([{ id: 'abc', name: 'Pastelaria Central', isActive: true, agentVersion: '1.3.0' }]) as never
     );
     api.agentPackage.and.returnValue(of({ version: '1.4.0' }) as never);
+    api.me.and.returnValue(of({ user: 'owner', isAdmin: true }) as never);
     api.overview.and.returnValue(of(overview()) as never);
     api.tables.and.returnValue(of({ free: 8, tables: [] }) as never);
     api.soldItems.and.returnValue(of({ items: [], totalQuantity: 0, totalValue: 0 }) as never);
@@ -297,9 +301,10 @@ describe('ShopComponent clarity (plan.md §806.7)', () => {
   let element: HTMLElement;
 
   const build = async (today: Overview) => {
-    const api = jasmine.createSpyObj('ApiService', ['listStores', 'agentPackage', 'overview', 'tables', 'soldItems']);
+    const api = jasmine.createSpyObj('ApiService', ['listStores', 'me', 'agentPackage', 'overview', 'tables', 'soldItems']);
     api.listStores.and.returnValue(of([]));
     api.agentPackage.and.returnValue(of(null) as never);
+    api.me.and.returnValue(of({ user: 'owner', isAdmin: true }) as never);
     api.overview.and.callFake((_id: string, date?: string) =>
       of(date ? overview({ totals: { invoiced: 800, open: 0 }, archive: true }) : today) as never
     );

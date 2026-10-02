@@ -55,9 +55,10 @@ describe('shop day view contrast', () => {
 
   const render = async (theme: 'light' | 'dark') => {
     document.documentElement.setAttribute('data-bs-theme', theme);
-    const api = jasmine.createSpyObj('ApiService', ['listStores', 'agentPackage', 'overview', 'tables', 'soldItems']);
+    const api = jasmine.createSpyObj('ApiService', ['listStores', 'me', 'agentPackage', 'overview', 'tables', 'soldItems']);
     api.listStores.and.returnValue(of([]));
     api.agentPackage.and.returnValue(of(null) as never);
+    api.me.and.returnValue(of({ user: 'owner', isAdmin: true }) as never);
     api.overview.and.returnValue(of(overview()) as never);
     api.tables.and.returnValue(of({ free: 8, tables: [] }) as never);
     api.soldItems.and.returnValue(of({ items: [], totalQuantity: 0, totalValue: 0 }) as never);

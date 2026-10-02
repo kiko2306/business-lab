@@ -10,8 +10,9 @@ import { TPipe, numberLocale, t } from '../i18n';
 import { Clock, localDay } from '../clock';
 import { ConnectionService } from '../connection';
 import { describeFailure } from '../errors';
+import { isSoleShopViewer } from '../access';
 import { Comparison, comparableTotal, comparisonDate, describeComparison } from './comparison';
-import { AgentPackage, Overview, SoldItemsView, Store, TablesView } from '../models';
+import { AgentPackage, Identity, Overview, SoldItemsView, Store, TablesView } from '../models';
 
 type Tab = 'tables' | 'items';
 
@@ -32,6 +33,8 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   storeId = '';
   store: Store | null = null;
+  private identity: Identity | null = null;
+  private allStores: Store[] | null = null;
   /** What the current agent build is, so the shown version can be coloured against it (§670). */
   agentPackage: AgentPackage | null = null;
 
@@ -87,6 +90,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.title.setTitle(`${t('Shop')} · Tally`);
     window.addEventListener('online', this.onOnline);
     this.loadStore();
+    this.api.me().subscribe({ next: (identity) => (this.identity = identity), error: () => undefined });
     this.api.agentPackage().subscribe({ next: (pkg) => (this.agentPackage = pkg), error: () => undefined });
     // Quiet: the first paint is not something to announce as an "update".
     this.refresh(true);
@@ -105,11 +109,17 @@ export class ShopComponent implements OnInit, OnDestroy {
   private loadStore(): void {
     this.api.listStores().subscribe({
       next: (stores) => {
+        this.allStores = stores;
         this.store = stores.find((s) => s.id === this.storeId) ?? null;
         if (this.store) this.title.setTitle(`${this.store.name} · Tally`);
       },
       error: () => undefined,
     });
+  }
+
+  /** The list is not offered to someone whose only shop this is — see access.ts. */
+  get canListShops(): boolean {
+    return !isSoleShopViewer(this.identity, this.allStores);
   }
 
   /** The shop's wall-clock day, from the clock seam. */

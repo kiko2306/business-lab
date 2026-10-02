@@ -47,11 +47,12 @@ describe('ShopComponent third pass (plan.md §806.8)', () => {
   const build = async (o: Options = {}) => {
     const resolve = (v: Observable<Overview> | Overview | undefined, fallback: Overview) =>
       v === undefined ? of(fallback) : 'subscribe' in v ? v : of(v);
-    api = jasmine.createSpyObj('ApiService', ['listStores', 'agentPackage', 'overview', 'tables', 'soldItems']);
+    api = jasmine.createSpyObj('ApiService', ['listStores', 'me', 'agentPackage', 'overview', 'tables', 'soldItems']);
     const lists = o.stores ?? [[store()]];
     let call = 0;
     api.listStores.and.callFake(() => of(lists[Math.min(call++, lists.length - 1)]) as never);
     api.agentPackage.and.returnValue(of(null) as never);
+    api.me.and.returnValue(of({ user: 'owner', isAdmin: true }) as never);
     api.overview.and.callFake(((_id: string, date?: string) =>
       date
         ? resolve(o.reference, overview({ totals: { invoiced: 800, open: 0 }, hourly: [{ hour: 9, total: 300 }, { hour: 10, total: 500 }, { hour: 14, total: 900 }] }))
@@ -220,9 +221,10 @@ describe('ShopComponent tiles on a phone (plan.md §806.8)', () => {
   // €12,345.67 measured 132px and spilled out of its card. Measured in a real
   // browser; this pins the layout that fixed it.
   it('lays the running tiles out two-up on a phone and three-up from sm', async () => {
-    const api = jasmine.createSpyObj('ApiService', ['listStores', 'agentPackage', 'overview', 'tables', 'soldItems']);
+    const api = jasmine.createSpyObj('ApiService', ['listStores', 'me', 'agentPackage', 'overview', 'tables', 'soldItems']);
     api.listStores.and.returnValue(of([]));
     api.agentPackage.and.returnValue(of(null) as never);
+    api.me.and.returnValue(of({ user: 'owner', isAdmin: true }) as never);
     api.overview.and.returnValue(of(overview()) as never);
     api.tables.and.returnValue(of({ free: 1, tables: [] }) as never);
     api.soldItems.and.returnValue(of({ items: [], totalQuantity: 0, totalValue: 0 }) as never);
