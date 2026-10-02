@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.7** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.8** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -222,8 +222,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       with app access (the dialog lists the apps), untick an app in Edit access (the line under the
       grid names it), open Reset password (the 8-character rule is visible, Save is held); (4) done (§817) — on `beta`, open Users: the
       accounts are listed without a click, each person is one line, **Edit roles** opens the
-      checkboxes and Cancel drops unsaved ones, and your own row has no Edit roles; (5) plain role names
-      and presets. The P2 focus-ring and control-border contrast belongs to the shared theme and
+      checkboxes and Cancel drops unsaved ones, and your own row has no Edit roles; (5) done (§826) — on `beta`, open Edit roles: the roles read Full admin, Admin and App user
+      with a line each, no "SSO user" or "Webmaster"; under Features, Everything, Day to day and View only
+      tick the boxes, the chosen one shows pressed, editing a box shows Custom, and nothing changes until
+      Save; the same in the Add user form and in pt-PT, with no sideways scroll on a phone. The P2 focus-ring and control-border contrast belongs to the shared theme and
       is its own item below. On `beta`, after each: open Users on a phone with a long email.
 - [ ] **Beta-test the shared theme's focus ring and control edges (plan.md §818)** — on `beta`,
       Tab through Users, Settings and Backups in dark and light: every control shows a solid blue

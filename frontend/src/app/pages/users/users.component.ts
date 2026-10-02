@@ -7,6 +7,7 @@ import { extractErrorMessage } from '../../core/api';
 import { AuthService } from '../../core/auth.service';
 import { AdminUser, AppAccessOption, Role } from '../../core/models';
 import { ALL_CAPABILITIES, Capability } from '../../core/capabilities';
+import { CAPABILITY_PRESETS, CapabilityPreset, PresetId, presetFor } from '../../core/capability-presets';
 import { OperationsService } from '../../core/operations.service';
 import { SettingsService } from '../../core/settings.service';
 import { ConfirmService } from '../../core/confirm.service';
@@ -50,6 +51,7 @@ export class UsersComponent implements OnInit {
 
   protected readonly allRoles = ALL_ROLES;
   protected readonly allCapabilities = ALL_CAPABILITIES;
+  protected readonly presets = CAPABILITY_PRESETS;
 
   protected readonly createForm = this.formBuilder.nonNullable.group({
     username: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(64)]],
@@ -181,6 +183,18 @@ export class UsersComponent implements OnInit {
   protected rolesDirty(user: AdminUser): boolean {
     const draft = this.selected(this.roleDraft[user.id] ?? this.toRecord(user.roles)).sort().join(',');
     return draft !== [...user.roles].sort().join(',');
+  }
+
+  /** Ticks exactly the preset's features. The boxes stay editable afterwards (plan.md §826). */
+  protected applyPreset(record: Record<Capability, boolean>, preset: CapabilityPreset): void {
+    for (const cap of ALL_CAPABILITIES) {
+      record[cap] = preset.capabilities.includes(cap);
+    }
+  }
+
+  /** Which preset the ticked boxes equal, so the button shows pressed; `custom` when none. */
+  protected activePreset(record: Record<Capability, boolean> | undefined): PresetId | 'custom' {
+    return presetFor(this.selectedCaps(record ?? ({} as Record<Capability, boolean>)));
   }
 
   private selectedCaps(record: Record<Capability, boolean>): Capability[] {

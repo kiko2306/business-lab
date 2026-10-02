@@ -37143,3 +37143,25 @@ saying "enrolment" and a subtitle naming CrowdSec.
   pending secret: it would need the backend to return it again, and the secret is shown once by
   design. Open if wanted.
 - Eight specs failed first; 341 pass, build clean, E2E passes.
+
+## 826. Users: plain role names and feature presets (§813 fix 5, P2)
+
+[x] done. "SSO user", "Webmaster" and eight raw feature names were the whole vocabulary.
+
+- **Names, display only.** Role keys and the API are unchanged. EN: Full admin / Admin / App user;
+  pt-PT: Administrador total / Administrador / Utilizador de aplicações. Each has a one-line hint
+  in the create form and the roles editor ("Every feature, always.", "Runs the dashboard; you pick
+  which features.", "Signs in to apps only, not to this dashboard.").
+- **Presets.** `core/capability-presets.ts`: Everything (all eight), Day to day (apps:control,
+  backups:manage, audit:view), View only (audit:view). A preset ticks the boxes and nothing more;
+  nothing is stored, a saved set is recognised by content (`presetFor`), the pressed button is
+  `aria-pressed`, and "Custom" shows when no preset matches. One `ng-template` serves the create
+  form and the editor. An unsaved preset leaves the row's "N of 8 features" alone until Save.
+- **A regression the existing layout spec caught.** The longer pt-PT role name in a row's badge held
+  a phone's cell at 312px in a 259px box (Bootstrap `.badge` is `nowrap`); badges now wrap inside
+  a table cell. The spec failed first, which is the §813 guard doing its job.
+- **Specs.** Presets as pure logic; the editor for names, hints, preset ticking, pressed state,
+  Custom, adjusting afterwards. ngModel writes a checkbox a microtask late, so the spec awaits
+  `whenStable`. 350 pass, build clean, E2E passes.
+- **Rejected:** a preset per role and a saved "template" entity: more state, and a preset that
+  drifts from the boxes. Preset contents are a judgment call: change them in the one list.

@@ -56,7 +56,7 @@ describe('Users list is one line per person', () => {
   it('shows roles as words and no checkbox in a row', () => {
     expect(row('ines').querySelectorAll('input[type="checkbox"]').length).toBe(0);
     expect(row('ines').textContent).toContain('Admin');
-    expect(row('ana').textContent).toContain('SSO user');
+    expect(row('ana').textContent).toContain('App user');
   });
 
   it('summarises an admin\'s features as a count instead of listing eight checkboxes', () => {

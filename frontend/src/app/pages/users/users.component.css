@@ -8,6 +8,14 @@
   overflow-wrap: anywhere;
 }
 
+/* A role's plain name ("Utilizador de aplicações") is longer than the old badge
+   text, and Bootstrap's `.badge { white-space: nowrap }` held a phone's cell
+   open at 312px in a 259px box (plan.md §826). Let a badge wrap in a cell. */
+.table td .badge {
+  white-space: normal;
+  text-align: left;
+}
+
 .app-access-grid {
   /* Grid, not multi-column: grid-auto-rows: 1fr makes every chip the height of
      the tallest, where columns let each chip size to its wrapped hostname. */

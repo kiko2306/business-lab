@@ -40,7 +40,7 @@
               [(ngModel)]="newRoles[role]"
               [ngModelOptions]="{ standalone: true }"
             />
-            <label class="form-check-label" [for]="'new-role-' + role">{{ ('users.role.' + role) | t }}</label>
+            <label class="form-check-label" [for]="'new-role-' + role">{{ ('users.role.' + role) | t }}<span class="d-block form-text mt-0">{{ ('users.roleHint.' + role) | t }}</span></label>
           </div>
         </div>
         <div class="form-text text-danger" role="alert" *ngIf="!newRolesValid()">{{ 'users.form.rolesError' | t }}</div>
@@ -50,6 +50,7 @@
         <p class="form-text mt-0 mb-2">
           {{ 'users.form.featuresHint' | t }}
         </p>
+        <ng-container *ngTemplateOutlet="presetBar; context: { $implicit: newCaps }"></ng-container>
         <div class="d-flex flex-wrap gap-3">
           <div class="form-check" *ngFor="let cap of allCapabilities">
             <input
@@ -186,7 +187,7 @@
                       [(ngModel)]="roleDraft[user.id][role]"
                       [ngModelOptions]="{ standalone: true }"
                     />
-                    <label class="form-check-label small" [for]="'role-' + user.id + '-' + role">{{ ('users.role.' + role) | t }}</label>
+                    <label class="form-check-label small" [for]="'role-' + user.id + '-' + role">{{ ('users.role.' + role) | t }}<span class="d-block form-text mt-0">{{ ('users.roleHint.' + role) | t }}</span></label>
                   </div>
                   <button
                     class="btn btn-sm btn-primary"
@@ -200,6 +201,7 @@
 
                 <div class="mt-2" *ngIf="showFeatures(user)">
                   <span class="form-label small fw-semibold d-block mb-1">{{ 'users.form.featuresLabel' | t }}</span>
+                  <ng-container *ngTemplateOutlet="presetBar; context: { $implicit: capDraft[user.id] }"></ng-container>
                   <div class="d-flex flex-wrap gap-2 align-items-center">
                     <div class="form-check form-check-inline m-0" *ngFor="let cap of allCapabilities">
                       <input
@@ -321,3 +323,20 @@
     </div>
   </app-panel>
 </main>
+
+<!-- Named starting points for the feature boxes; the boxes stay editable (plan.md §826). -->
+<ng-template #presetBar let-record>
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-2" role="group" [attr.aria-label]="'users.preset.label' | t">
+    <span class="small text-body-secondary">{{ 'users.preset.label' | t }}</span>
+    <button
+      *ngFor="let preset of presets"
+      type="button"
+      class="preset btn btn-sm"
+      [class.btn-primary]="activePreset(record) === preset.id"
+      [class.btn-outline-secondary]="activePreset(record) !== preset.id"
+      [attr.aria-pressed]="activePreset(record) === preset.id"
+      (click)="applyPreset(record, preset)"
+    >{{ 'users.preset.' + preset.id | t }}</button>
+    <span class="small text-body-secondary" *ngIf="activePreset(record) === 'custom'">{{ 'users.preset.custom' | t }}</span>
+  </div>
+</ng-template>

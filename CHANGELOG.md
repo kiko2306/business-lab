@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.8] — 2026-10-02
+
+### Users
+
+- Users: roles have plain names and a line saying what they are, and an admin's features start from a preset (Everything, Day to day, View only)
+
 ## [0.163.7] — 2026-10-02
 
 ### Account
