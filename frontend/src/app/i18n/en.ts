@@ -420,7 +420,11 @@ export const en: Record<string, string> = {
   'users.toast.passwordUpdated': 'Password updated successfully.',
   'users.toast.userDeleted': 'User deleted successfully.',
   'users.confirmDelete.title': 'Delete user',
-  'users.confirmDelete.message': 'Delete user "{{username}}"?\nThis cannot be undone.',
+  'users.confirmDelete.message': 'Delete user "{{username}}"?\nThey will no longer be able to sign in to the dashboard. This cannot be undone.',
+  'users.confirmDelete.messageWithApps': 'Delete user "{{username}}"?\nThey will lose their dashboard sign-in and access to {{apps}}. Accounts already created inside those apps are not removed there. This cannot be undone.',
+  'users.accessChange.remove': 'Saving removes access to: {{apps}}.',
+  'users.accessChange.add': 'Saving gives access to: {{apps}}.',
+  'users.resetHint': 'At least 8 characters. Their open dashboard sessions end within the hour, and they sign in with this password from now on.',
   'users.confirmDelete.confirmText': 'Delete',
 
   'recovery.title': 'Recovery mode',

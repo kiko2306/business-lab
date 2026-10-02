@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.162.9] — 2026-10-02
+
+### Changed
+
+- Users: delete names the apps the person loses, the access editor shows what Save will remove or add, and the password editor states its 8-character rule before Save
+
 ## [0.162.8] — 2026-10-02
 
 ### Fixed

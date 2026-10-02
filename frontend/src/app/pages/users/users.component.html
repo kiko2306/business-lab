@@ -225,10 +225,12 @@
                     [(ngModel)]="resetPasswordValue"
                     [ngModelOptions]="{ standalone: true }"
                     autocomplete="new-password"
+                    [attr.aria-describedby]="'reset-hint-' + user.id"
                   />
-                  <button class="btn btn-sm btn-primary" [disabled]="resetting" (click)="submitPasswordReset()">{{ 'users.saveButton' | t }}</button>
+                  <button class="btn btn-sm btn-primary reset-save" [disabled]="resetting || resetPasswordValue.length < 8" (click)="submitPasswordReset()">{{ 'users.saveButton' | t }}</button>
                   <button class="btn btn-sm btn-outline-secondary" (click)="cancelPasswordReset()">{{ 'common.cancel' | t }}</button>
                 </div>
+                <p class="form-text mb-0 mt-1 reset-hint" [id]="'reset-hint-' + user.id">{{ 'users.resetHint' | t }}</p>
               </td>
             </tr>
             <tr *ngIf="accessEditId === user.id">
@@ -285,6 +287,11 @@
                 <ng-template #noAppOptions>
                   <p class="form-text mt-0">{{ 'users.noAppsExposed' | t }}</p>
                 </ng-template>
+                <!-- What Save will do, before it is done: revoking access used to read only "Access updated." -->
+                <div class="small mt-2" aria-live="polite">
+                  <p class="access-change access-change--remove text-danger-emphasis mb-1" *ngIf="accessRemoved(user) as removed">{{ 'users.accessChange.remove' | t:{ apps: removed } }}</p>
+                  <p class="access-change access-change--add mb-1" *ngIf="accessAdded(user) as added">{{ 'users.accessChange.add' | t:{ apps: added } }}</p>
+                </div>
                 <div class="d-flex gap-2 mt-2">
                   <button class="btn btn-sm btn-primary" [disabled]="savingAccess" (click)="submitAccessEdit()">
                     {{ (savingAccess ? 'common.saving' : 'users.saveAccessButton') | t }}

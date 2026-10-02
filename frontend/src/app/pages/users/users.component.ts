@@ -381,11 +381,35 @@ export class UsersComponent implements OnInit {
       });
   }
 
+  private appLabel(serviceName: string): string {
+    return this.appOptions.find((option) => option.serviceName === serviceName)?.label ?? serviceName;
+  }
+
+  /** Apps ticked in the open access editor but not granted today, as "A, B". */
+  protected accessAdded(user: AdminUser): string {
+    return this.appOptions
+      .filter((o) => this.accessApps[o.serviceName] && !(user.appAccess ?? []).includes(o.serviceName))
+      .map((o) => o.label)
+      .join(', ');
+  }
+
+  /** Apps granted today but unticked in the open access editor, as "A, B". */
+  protected accessRemoved(user: AdminUser): string {
+    return (user.appAccess ?? [])
+      .filter((name) => !this.accessApps[name])
+      .map((name) => this.appLabel(name))
+      .join(', ');
+  }
+
   deleteUser(user: AdminUser): void {
+    const apps = (user.appAccess ?? []).map((name) => this.appLabel(name)).join(', ');
     void this.confirm
       .ask({
         title: this.translate.t('users.confirmDelete.title'),
-        message: this.translate.t('users.confirmDelete.message', { username: user.username }),
+        // Says what goes: "cannot be undone" alone gave an owner nothing to weigh.
+        message: apps
+          ? this.translate.t('users.confirmDelete.messageWithApps', { username: user.username, apps })
+          : this.translate.t('users.confirmDelete.message', { username: user.username }),
         confirmText: this.translate.t('users.confirmDelete.confirmText'),
         danger: true,
       })

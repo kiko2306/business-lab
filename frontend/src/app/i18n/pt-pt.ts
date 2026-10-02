@@ -420,7 +420,11 @@ export const ptPT: Record<string, string> = {
   'users.toast.passwordUpdated': 'Palavra-passe atualizada com sucesso.',
   'users.toast.userDeleted': 'Utilizador eliminado com sucesso.',
   'users.confirmDelete.title': 'Eliminar utilizador',
-  'users.confirmDelete.message': 'Eliminar o utilizador "{{username}}"?\nEsta ação não pode ser anulada.',
+  'users.confirmDelete.message': 'Eliminar o utilizador "{{username}}"?\nDeixa de poder iniciar sessão no painel. Esta ação não pode ser anulada.',
+  'users.confirmDelete.messageWithApps': 'Eliminar o utilizador "{{username}}"?\nPerde o acesso ao painel e a {{apps}}. As contas já criadas dentro dessas aplicações não são removidas. Esta ação não pode ser anulada.',
+  'users.accessChange.remove': 'Ao guardar, remove o acesso a: {{apps}}.',
+  'users.accessChange.add': 'Ao guardar, dá acesso a: {{apps}}.',
+  'users.resetHint': 'Pelo menos 8 caracteres. As sessões abertas no painel terminam dentro de uma hora e passa a iniciar sessão com esta palavra-passe.',
   'users.confirmDelete.confirmText': 'Eliminar',
 
   'recovery.title': 'Modo de recuperação',

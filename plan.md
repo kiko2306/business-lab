@@ -36894,3 +36894,28 @@ more code. **Behaviour change to know about:** Enter no longer confirms straight
 on the dialog and the first Tab reaches Cancel, so a destructive confirm needs a deliberate move to
 the red button. `confirm-dialog.component.spec.ts` failed 3 of 5 first (focus, trap, stray Enter);
 the other two (confirm via the button, Escape restoring focus) are regression guards. 287 specs.
+
+## 816. Users: actions say what they do (§813 fix 3, P1)
+
+Three high-stakes actions gave no consequence at the point of action. Each message below was
+checked against what the backend actually does, because a confident wrong sentence is worse than
+none.
+
+- **Delete** names the apps the person loses and says that accounts *already created inside those
+  apps are not removed*. That caveat is true: `DELETE /api/users/:id` removes the dashboard row
+  and re-syncs Authelia, and touches no app's own accounts, so a no-SSO app's credential-fanout
+  login (§480) keeps working. A person with no apps gets the shorter message, with no empty list.
+- **Revoke** — the access editor now says "Saving removes access to: Kimai" / "gives access to:
+  NocoDB" under the grid, live, in an `aria-live` region; nothing when unchanged. It is computed
+  from primitives (two joined strings), not an object, so `*ngIf … as` does not trip the
+  changed-after-checked check.
+- **Reset password** states the rule up front and holds Save until it is met, where it used to
+  discover the 8-character minimum after Save as a toast. The hint says sessions end *within the
+  hour*, not "signed out": the reset revokes refresh tokens but an issued access token runs out its
+  own hour (`users.ts` comment), so "signed out" would have overstated it.
+
+**Rejected:** an extra confirm step before revoking access — the diff on the screen the person is
+already looking at does the same job without another dialog; and a "send a reset link" action in
+place of a typed password (the critique's question), which is a real change to the flow and not a
+copy fix, so it stays a question for the owner. 291 specs, build clean; pt-PT strings added for
+all four.
