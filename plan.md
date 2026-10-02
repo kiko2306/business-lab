@@ -36584,3 +36584,43 @@ copies are deleted. 269 dashboard specs (4 new), 103 Tally, and both builds pass
 **Not measured, and therefore not claimed:** solid `btn-primary`/`btn-danger` and `text-bg-*`
 badges (white on a saturated fill — Tally's scan put them at 4.50–4.69:1, at the line, none
 under), and the hotel apps' own markup, which uses the theme but has no test harness of its own.
+
+## 808. The service card on `OnPush` (§802's last audit item)
+
+§802 deferred this on purpose: the card mutates state from 12 `subscribe` callbacks, two
+`EventSource` listeners and two timers, and under `OnPush` each needs a `markForCheck()` — a
+missed one is a card silently showing stale data, with no test to catch it. That is what this
+section changes: the tests first, then the flip.
+
+**Measured, not assumed.** A spec renders 50 idle cards and runs 10 change-detection passes — what
+any event anywhere causes — counting `TranslateService.t` calls, which run once per translated
+binding per check. **Default strategy: 5,000 calls. `OnPush`: 0.** It stays in the suite as a
+regression guard (`onPush === 0`, default `> 1000`), so the strategy cannot be quietly reverted.
+
+**How the marks are placed.** The plan said "signals first"; that was a larger rewrite than the
+problem needed — the template reads ~40 mutable fields, and converting each to a signal would have
+touched every binding for the same guarantee. Instead one wrapper, `marking(source$)`, marks on
+`next`, `error`, `complete` and `finalize`, and the seven requests that flip a template flag
+(`loadEnv`, `saveEnv`, `loadAdminUser`, `saveAdminUser`, `loadAppBackups`, `createAppBackup`,
+`restore/deleteAppBackup`) go through it. The non-request paths are marked by hand: after the
+startup-log ticket `await`, in the SSE `done` and `error` handlers, in `pushStartupLine` (reached
+from the throttled flush, the action-result subscription and the stream error), in
+`applyStartupActionResult`, and in `closeSettings`/`closeStartupLogs` (which the 2.5 s
+auto-close timer calls). Template events, `@HostListener` and input changes mark on their own, and
+a language switch repaints because `translate.locale()` is read as a signal inside the pipe.
+
+**Every one of those paths is driven under `OnPush`** in `service-card.component.spec.ts`:
+inputs changing; config fields arriving after the dialog opened; snapshots arriving late; Back up
+now going busy and idle again; a language switch; and the startup popup's phase flipping when the
+stream finishes, then auto-closing — through a fake `EventSource`, the one path a template-event
+test cannot reach. The first spec failed as it should have (`onPush` false), and the flip went
+green with all of them.
+
+**Real browser, too.** A throwaway E2E against the test stack opened a real card's settings
+dialog — whose config arrives from a request *after* the click, the exact path an unmarked card
+would leave on "Loading…" — and watched it fill in ("Configuration", "Backups"), then closed it
+with Escape. Full E2E suite: 14 passed. 277 specs.
+
+**Honestly unproven:** the idle-cost number is Karma's, on a synthetic 50-card host; it is the
+work saved per pass, not a measured frame-time or INP improvement on a real Apps page. The
+direction is certain and the size is not.

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.162.4** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.162.5** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -280,16 +280,14 @@ item is deleted.
       running. Also confirm no other app flips to error while this runs: a
       host-networked app (Home Assistant) and an app with no published port
       must both be unaffected.
-- [ ] **Put the service card on `OnPush` (plan.md §802)** — the last of the
-      audit's performance findings, and the 50x one: with 50 cards on a page,
-      every card's bindings are re-checked on every event. It was left out
-      because the card mutates state from 12 `subscribe` callbacks, two
-      `EventSource` listeners and two timers, and each one needs a
-      `markForCheck()` under `OnPush` — a missed one is a silently stale card
-      that no test catches. Do it by moving that async state to signals first
-      (which mark automatically), then flip the strategy; the existing card
-      specs plus a new one that asserts a late-arriving backup list still
-      renders are what makes it provable.
+- [ ] **Beta-test the OnPush service card (plan.md §808)** — on `beta`, on the
+      Apps page with a real, busy box: start an app and watch its startup popup
+      stream lines, flip to "running" and auto-close; open Settings and confirm
+      the config and snapshot list fill in; run "Back up now" and see it go busy
+      and idle; stop an app and confirm its row, health badge and dependency
+      chips update within one 15 s tick *without* a manual refresh; switch the
+      language and confirm every card re-renders. Any card that shows stale
+      state after one of those is a missed `markForCheck()` (plan.md §808).
 - [ ] **Beta-test that a config save leaves allocated ports alone (plan.md §800)** —
       the Settings panel no longer shows or submits `*_PORT` fields. On `beta`,
       open an app that has both a port and a real setting (Vaultwarden, ntfy),

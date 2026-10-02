@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import {
   AfterViewChecked,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   ElementRef,
   EventEmitter,
@@ -13,7 +15,7 @@ import {
   inject,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Subscription, filter, finalize } from 'rxjs';
+import { Observable, Subscription, filter, finalize, tap } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import {
   AppBackupEntry,
@@ -67,7 +69,14 @@ interface DependencyState {
   standalone: true,
   imports: [CommonModule, FormsModule, TranslatePipe],
   templateUrl: './service-card.component.html',
-  styleUrls: ['./service-card.component.css', './startup-logs.css']
+  styleUrls: ['./service-card.component.css', './startup-logs.css'],
+  // ~50 of these sit on the Apps page, and under the default strategy every
+  // card's bindings were re-checked on every event anywhere (plan.md §802/§808).
+  // The price is that state arriving from a subscription, a timer or an
+  // EventSource no longer redraws the card by itself: each such path calls
+  // markForCheck(), and service-card.component.spec.ts drives every one of them
+  // under this strategy, because a missed one is a card showing stale data.
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   private readonly operations = inject(OperationsService);
@@ -75,9 +84,20 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
   private readonly zone = inject(NgZone);
+  private readonly cdr = inject(ChangeDetectorRef);
   protected readonly translate = inject(TranslateService);
   protected readonly envLabel = humanizeEnvKey;
   protected readonly initials = serviceInitials;
+
+  /**
+   * Redraw this card when the wrapped request produces, fails or finishes. Every
+   * flag the template reads (`envLoading`, `backupsCreating`, …) is flipped from
+   * these callbacks, so they are exactly the points an OnPush view would miss.
+   */
+  private marking<T>(source: Observable<T>): Observable<T> {
+    const mark = () => this.cdr.markForCheck();
+    return source.pipe(tap({ next: mark, error: mark, complete: mark }), finalize(mark));
+  }
 
   @Input({ required: true }) service!: ServiceStatus;
   @Input() allServices: ServiceStatus[] = [];
@@ -283,6 +303,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   closeSettings(): void {
     this.settingsModalOpen = false;
+    this.cdr.markForCheck();
     this.restoreFocus();
   }
 
@@ -301,6 +322,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       .subscribe((event) => this.applyStartupActionResult(event));
 
     const url = await this.serviceState.createStartupLogUrl(this.service.name);
+    this.cdr.markForCheck();
     if (!url) {
       this.pushStartupLine(this.translate.t('serviceCard.startupLogs.unableToOpen'));
       this.startupPhase = 'error';
@@ -344,6 +366,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       }
       source.close();
       this.startupLogSource = undefined;
+      this.cdr.markForCheck();
       if (this.startupPhase === 'running') {
         this.startupAutoCloseTimer = setTimeout(() => this.closeStartupLogs(), 2500);
       }
@@ -355,6 +378,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       }
       source.close();
       this.startupLogSource = undefined;
+      this.cdr.markForCheck();
     };
   }
 
@@ -362,6 +386,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     if (!this.startupLogsOpen || this.startupPhase !== 'streaming') {
       return;
     }
+    this.cdr.markForCheck();
     if (event.ok) {
       return; // container is coming up — let the log stream report the rest
     }
@@ -401,6 +426,9 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   }
 
   private pushStartupLine(line: string): void {
+    // Reached from the throttled flush (outside any template event), the
+    // action-result subscription and the stream's error handler.
+    this.cdr.markForCheck();
     this.startupLogLines.push(line);
     if (this.startupLogLines.length > 600) {
       this.startupLogLines.splice(0, this.startupLogLines.length - 600);
@@ -411,6 +439,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   closeStartupLogs(): void {
     this.teardownStartupLogs();
     this.startupLogsOpen = false;
+    this.cdr.markForCheck();
     this.restoreFocus();
   }
 
@@ -567,8 +596,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   loadEnv(): void {
     this.envLoading = true;
-    this.operations
-      .getServiceEnv(this.service.name)
+    this.marking(this.operations.getServiceEnv(this.service.name))
       .pipe(finalize(() => (this.envLoading = false)))
       .subscribe({
         next: (env) => {
@@ -617,8 +645,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   saveEnv(): void {
     this.envSaving = true;
-    this.operations
-      .updateServiceEnv(this.service.name, this.envValues)
+    this.marking(this.operations.updateServiceEnv(this.service.name, this.envValues))
       .pipe(finalize(() => (this.envSaving = false)))
       .subscribe({
         next: (response) => {
@@ -631,8 +658,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   loadAdminUser(): void {
     this.adminUserLoading = true;
-    this.operations
-      .getAutheliaAdminUser(this.service.name)
+    this.marking(this.operations.getAutheliaAdminUser(this.service.name))
       .pipe(finalize(() => (this.adminUserLoading = false)))
       .subscribe({
         next: (user) => {
@@ -646,13 +672,14 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   saveAdminUser(): void {
     this.adminUserSaving = true;
     const { username, displayName, email, password } = this.adminUserForm;
-    this.operations
-      .updateAutheliaAdminUser(this.service.name, {
+    this.marking(
+      this.operations.updateAutheliaAdminUser(this.service.name, {
         username,
         displayName,
         email,
         ...(password ? { password } : {}),
       })
+    )
       .pipe(finalize(() => (this.adminUserSaving = false)))
       .subscribe({
         next: (response) => {
@@ -666,8 +693,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   loadAppBackups(): void {
     this.backupsLoading = true;
-    this.operations
-      .listAppBackups(this.service.name)
+    this.marking(this.operations.listAppBackups(this.service.name))
       .pipe(finalize(() => (this.backupsLoading = false)))
       .subscribe({
         next: (response) => (this.appBackups = response.items),
@@ -677,8 +703,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   createAppBackup(): void {
     this.backupsCreating = true;
-    this.operations
-      .createAppBackup(this.service.name)
+    this.marking(this.operations.createAppBackup(this.service.name))
       .pipe(finalize(() => (this.backupsCreating = false)))
       .subscribe({
         next: (response) => {
@@ -705,8 +730,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       return;
     }
     this.backupBusyFile = entry.file;
-    this.operations
-      .restoreAppBackup(this.service.name, entry.file)
+    this.marking(this.operations.restoreAppBackup(this.service.name, entry.file))
       .pipe(finalize(() => (this.backupBusyFile = null)))
       .subscribe({
         next: (response) => {
@@ -737,8 +761,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       return;
     }
     this.backupBusyFile = entry.file;
-    this.operations
-      .deleteAppBackup(this.service.name, entry.file)
+    this.marking(this.operations.deleteAppBackup(this.service.name, entry.file))
       .pipe(finalize(() => (this.backupBusyFile = null)))
       .subscribe({
         next: (response) => {

@@ -1,5 +1,7 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ComponentFixture, TestBed, fakeAsync, flushMicrotasks, tick } from '@angular/core/testing';
+import { Subject, of } from 'rxjs';
+import { TranslateService } from '../../i18n/translate.service';
 import { ServiceCardComponent, serviceInitials } from './service-card.component';
 import { ConfirmService } from '../../core/confirm.service';
 import { OperationsService } from '../../core/operations.service';
@@ -876,5 +878,220 @@ describe('ServiceCardComponent dependency resolution', () => {
     fixture.detectChanges();
     expect(component.dependencies()).not.toBe(first);
     expect(component.dependencies().map((d) => d.name)).toEqual(['authelia']);
+  });
+});
+
+// OnPush (plan.md §802/§808): with ~50 cards on the Apps page, every card's
+// bindings were re-checked on every event anywhere. The cost of the strategy is
+// that a state change arriving from a subscription, a timer or an EventSource
+// no longer redraws the card by itself — each needs a markForCheck(), and a
+// missed one is a card that silently shows stale data. These tests drive each
+// asynchronous path and assert the DOM, with detectChanges() called only the way
+// the framework would (a plain pass, which skips an unmarked OnPush view).
+describe('ServiceCardComponent under OnPush', () => {
+  const entry = (): AppBackupEntry => ({
+    file: 'paperless-2026-10-01.tar.gz',
+    createdAt: '2026-10-01T10:00:00.000Z',
+    bytes: 423000,
+    manifest: { engine: 'postgres', dumpFailures: [] } as unknown as AppBackupEntry['manifest'],
+  });
+
+  /** Just enough EventSource to hand the card a stream it can be told to finish. */
+  class FakeEventSource {
+    static last: FakeEventSource;
+    listeners: Record<string, (e: MessageEvent) => void> = {};
+    onerror: (() => void) | null = null;
+    constructor(public url: string) {
+      FakeEventSource.last = this;
+    }
+    addEventListener(name: string, fn: (e: MessageEvent) => void) {
+      this.listeners[name] = fn;
+    }
+    close() {}
+  }
+
+  let fixture: ComponentFixture<ServiceCardComponent>;
+  let el: HTMLElement;
+  let operations: jasmine.SpyObj<OperationsService>;
+  let confirm: jasmine.SpyObj<ConfirmService>;
+  let translate: TranslateService;
+
+  const settled = () => {
+    fixture.detectChanges();
+    return el;
+  };
+
+  beforeEach(async () => {
+    localStorage.clear();
+    operations = jasmine.createSpyObj('OperationsService', [
+      'getServiceEnv',
+      'listAppBackups',
+      'createAppBackup',
+      'deleteAppBackup',
+      'getAutheliaAdminUser',
+      'updateServiceEnv',
+    ]);
+    operations.listAppBackups.and.returnValue(of({ items: [] }));
+    operations.getServiceEnv.and.returnValue(of({ fields: [] } as unknown as ServiceEnvStatus));
+    confirm = jasmine.createSpyObj('ConfirmService', ['ask']);
+
+    await TestBed.configureTestingModule({
+      imports: [ServiceCardComponent],
+      providers: [
+        { provide: OperationsService, useValue: operations },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+        { provide: ConfirmService, useValue: confirm },
+      ],
+    }).compileComponents();
+    translate = TestBed.inject(TranslateService);
+    translate.setLocale('en');
+    fixture = TestBed.createComponent(ServiceCardComponent);
+    el = fixture.nativeElement;
+    fixture.componentRef.setInput('service', service('paperless', 'running'));
+    fixture.componentRef.setInput('allServices', []);
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    translate.setLocale('en');
+    localStorage.clear();
+  });
+
+  const openSettings = () => {
+    (el.querySelector('.service-row-actions button:last-child') as HTMLButtonElement).click();
+    return settled();
+  };
+
+  it('is OnPush', () => {
+    expect((ServiceCardComponent as unknown as { ɵcmp: { onPush: boolean } }).ɵcmp.onPush).toBeTrue();
+  });
+
+  it('redraws when its inputs change', () => {
+    fixture.componentRef.setInput('service', service('paperless', 'stopped'));
+    expect(settled().querySelector('.service-row-actions')!.textContent).toContain('Start');
+  });
+
+  it('shows config fields that arrive after the settings dialog opened', () => {
+    const pending = new Subject<ServiceEnvStatus>();
+    operations.getServiceEnv.and.returnValue(pending as never);
+    openSettings();
+    expect(el.textContent).toContain('Loading');
+
+    pending.next({
+      fields: [
+        { key: 'ADMIN_EMAIL', required: false, secret: false, isSet: true, boolean: false, hidden: false, managed: false,
+          managedValue: null, value: 'a@b.c', defaultValue: null, suggestedValue: null, isPort: false, locked: false,
+          lockedReason: null, portInUse: false, suggestedPort: null },
+      ],
+    } as unknown as ServiceEnvStatus);
+    pending.complete();
+    expect(settled().textContent).toContain('Admin email');
+    expect(el.textContent).not.toContain('Loading');
+  });
+
+  it('shows snapshots that arrive late', () => {
+    const pending = new Subject<{ items: AppBackupEntry[] }>();
+    operations.listAppBackups.and.returnValue(pending as never);
+    openSettings();
+    pending.next({ items: [entry()] });
+    pending.complete();
+    expect(settled().textContent).not.toContain('No snapshots yet');
+    expect(el.querySelectorAll('.app-backup-row, .settings-section li, .settings-section .list-group-item').length).toBeGreaterThan(0);
+  });
+
+  it('shows Back up now as busy while it runs, and idle again afterwards', () => {
+    openSettings();
+    const pending = new Subject<unknown>();
+    operations.createAppBackup.and.returnValue(pending as never);
+    const button = Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Back up now'))!;
+    button.click();
+    expect(settled() && button.disabled).toBeTrue();
+
+    pending.next({ dumpFailures: [], message: 'done' });
+    pending.complete();
+    settled();
+    expect(button.disabled).toBeFalse();
+  });
+
+  it('follows a language switch', () => {
+    expect(el.querySelector('.service-row-actions')!.textContent).toContain('Settings');
+    translate.setLocale('pt-PT');
+    expect(settled().querySelector('.service-row-actions')!.textContent).not.toContain('Settings');
+  });
+
+  it('shows the startup phase when the log stream finishes', fakeAsync(() => {
+    const state = TestBed.inject(ServiceStateService) as jasmine.SpyObj<ServiceStateService>;
+    (state as unknown as { startupEvents$: unknown }).startupEvents$ = new Subject();
+    state.createStartupLogUrl = jasmine.createSpy().and.resolveTo('/stream');
+    const original = window.EventSource;
+    (window as unknown as { EventSource: unknown }).EventSource = FakeEventSource;
+    try {
+      fixture.componentRef.setInput('service', service('paperless', 'stopped'));
+      fixture.detectChanges();
+      void fixture.componentInstance.requestAction('start');
+      flushMicrotasks();
+      fixture.detectChanges();
+      expect(el.querySelector('.startup-logs-dialog')).not.toBeNull();
+
+      // The stream ends while nothing in the template was clicked: only a mark
+      // makes the OnPush card show the new phase.
+      FakeEventSource.last.listeners['done']({ data: JSON.stringify({ state: 'running', healthy: true }) } as MessageEvent);
+      fixture.detectChanges();
+      expect(el.querySelector('.startup-logs-dialog')!.textContent).toContain('up and healthy');
+
+      // ...and the 2.5 s auto-close that follows a good boot.
+      tick(2500);
+      fixture.detectChanges();
+      expect(el.querySelector('.startup-logs-dialog')).toBeNull();
+    } finally {
+      (window as unknown as { EventSource: unknown }).EventSource = original;
+    }
+  }));
+});
+
+// The point of OnPush, measured: 50 idle cards and a burst of change-detection
+// passes (what any event anywhere causes). `translate.t` runs once per
+// translated binding per check, so its call count is the work done.
+describe('ServiceCardComponent idle cost (plan.md §808)', () => {
+  @Component({
+    standalone: true,
+    imports: [ServiceCardComponent],
+    template: `@for (s of services; track s.name) {
+      <app-service-card [service]="s" [allServices]="services"></app-service-card>
+    }`,
+  })
+  class HostComponent {
+    services = Array.from({ length: 50 }, (_, i) => service(`app-${i}`, 'running'));
+  }
+
+  const callsDuring = async (onPush: boolean): Promise<number> => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [HostComponent],
+      providers: [
+        { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+        { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
+      ],
+    });
+    if (!onPush) {
+      TestBed.overrideComponent(ServiceCardComponent, { set: { changeDetection: ChangeDetectionStrategy.Default } });
+    }
+    await TestBed.compileComponents();
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.detectChanges();
+    const spy = spyOn(TestBed.inject(TranslateService), 't').and.callThrough();
+    for (let i = 0; i < 10; i++) fixture.detectChanges();
+    return spy.calls.count();
+  };
+
+  it('does no work on idle cards when change detection runs', async () => {
+    const onPush = await callsDuring(true);
+    const eager = await callsDuring(false);
+    console.log(`IDLE-COST onPush=${onPush} default=${eager}`);
+    expect(onPush).toBe(0);
+    expect(eager).toBeGreaterThan(1000);
   });
 });
