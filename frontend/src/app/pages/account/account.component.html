@@ -28,32 +28,20 @@
           <hr />
           <h2 class="h6">{{ 'account.disable.heading' | t }}</h2>
           <p class="text-body-secondary small">{{ 'account.disable.description' | t }}</p>
-          <form [formGroup]="disableForm" (ngSubmit)="disable()" class="row g-2 align-items-center">
-            <div class="col-12 col-sm-5">
+          <form [formGroup]="disableForm" (ngSubmit)="disable()" class="row g-2 align-items-end">
+            <div class="col-12 col-sm-6">
               <label class="form-label small mb-1" for="disable-code">{{ 'account.disable.codeLabel' | t }}</label>
+              <!-- No maxlength and no numeric keypad: a recovery code is longer and has letters. -->
               <input
                 id="disable-code"
                 class="form-control"
                 formControlName="code"
-                inputmode="numeric"
                 autocomplete="one-time-code"
-                placeholder="123456"
-                maxlength="6"
+                autocapitalize="none"
+                spellcheck="false"
               />
             </div>
-            <div class="col-auto text-body-secondary">{{ 'account.disable.orLabel' | t }}</div>
-            <div class="col-12 col-sm-5">
-              <label class="form-label small mb-1" for="disable-password">{{ 'account.disable.passwordLabel' | t }}</label>
-              <input
-                id="disable-password"
-                class="form-control"
-                type="password"
-                formControlName="password"
-                autocomplete="current-password"
-                [placeholder]="'account.disable.passwordPlaceholder' | t"
-              />
-            </div>
-            <div class="col-12 mt-2">
+            <div class="col-12 col-sm-auto">
               <button class="btn btn-outline-danger" type="submit" [disabled]="busy">
                 {{ (busy ? 'account.disable.submitting' : 'account.disable.submitButton') | t }}
               </button>

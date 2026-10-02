@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.2] — 2026-10-02
+
+### Changed
+
+- Turning off two-factor sign-in now needs a code from the app or a recovery code (never the account password) and asks for confirmation first
+
 ## [0.163.1] — 2026-10-02
 
 ### Fixed

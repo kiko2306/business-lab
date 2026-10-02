@@ -404,8 +404,8 @@ export class OperationsService {
     );
   }
 
-  /** The backend takes a current 6-digit code XOR the account password. */
-  disableTotp(proof: { code: string } | { password: string }): Observable<{ enabled: false }> {
+  /** A current 6-digit code or an unused recovery code; the password is not accepted (plan.md §819). */
+  disableTotp(proof: { code: string }): Observable<{ enabled: false }> {
     return this.http.post<{ enabled: false }>(`${API_BASE_URL}/auth/totp/disable`, proof, {
       context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
     });

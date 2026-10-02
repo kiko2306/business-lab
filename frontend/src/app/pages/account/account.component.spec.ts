@@ -5,6 +5,7 @@ import { of, throwError } from 'rxjs';
 import { AccountComponent } from './account.component';
 import { OperationsService } from '../../core/operations.service';
 import { ToastService } from '../../core/toast.service';
+import { ConfirmService } from '../../core/confirm.service';
 import { TotpActivateResponse, TotpSetupResponse, TotpStatus } from '../../core/models';
 
 describe('AccountComponent', () => {
@@ -12,6 +13,7 @@ describe('AccountComponent', () => {
   let component: AccountComponent;
   let operations: jasmine.SpyObj<OperationsService>;
   let toast: jasmine.SpyObj<ToastService>;
+  let confirm: jasmine.SpyObj<ConfirmService>;
 
   const disabledStatus: TotpStatus = { enabled: false, enrolledAt: null, recoveryCodesRemaining: 0 };
   const enabledStatus: TotpStatus = {
@@ -37,6 +39,8 @@ describe('AccountComponent', () => {
       'disableTotp',
     ]);
     toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
+    confirm = jasmine.createSpyObj('ConfirmService', ['ask']);
+    confirm.ask.and.resolveTo(true);
     operations.getTotpStatus.and.returnValue(of(disabledStatus));
 
     await TestBed.configureTestingModule({
@@ -44,6 +48,7 @@ describe('AccountComponent', () => {
       providers: [
         { provide: OperationsService, useValue: operations },
         { provide: ToastService, useValue: toast },
+        { provide: ConfirmService, useValue: confirm },
         // No ban panel in these tests: it's gated on settings:manage (§546).
         { provide: AuthService, useValue: { hasCapability: () => false } },
         provideRouter([]),
@@ -134,24 +139,50 @@ describe('AccountComponent', () => {
     expect(host.querySelector('button.btn-outline-danger')?.textContent).toContain('Disable');
   });
 
-  it('does not call the API to disable when neither a code nor a password is given', () => {
+  // plan.md §819: turning 2FA off took the account password alone and one click,
+  // so a phished password removed the second factor. A code (or a recovery
+  // code, for a lost phone) is required, and the person is asked first.
+  it('does not ask or call the API to disable when no code is given', async () => {
     operations.getTotpStatus.and.returnValue(of(enabledStatus));
     fixture.detectChanges();
 
-    component.disable();
+    await component.disable();
 
+    expect(confirm.ask).not.toHaveBeenCalled();
     expect(operations.disableTotp).not.toHaveBeenCalled();
-    expect(component['errorMessage']).toContain('current 6-digit code or your account password');
+    expect(component['errorMessage']).toContain('recovery code');
   });
 
-  it('disables with a code and reloads status', () => {
+  it('offers no password field when turning 2FA off', () => {
+    operations.getTotpStatus.and.returnValue(of(enabledStatus));
+    fixture.detectChanges();
+    openPanel();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it('asks first, naming what changes, and does nothing if declined', async () => {
+    operations.getTotpStatus.and.returnValue(of(enabledStatus));
+    confirm.ask.and.resolveTo(false);
+    fixture.detectChanges();
+
+    component['disableForm'].setValue({ code: '654321' });
+    await component.disable();
+
+    const options = confirm.ask.calls.mostRecent().args[0];
+    expect(options.danger).toBeTrue();
+    expect(options.message).toContain('recovery codes stop working');
+    expect(operations.disableTotp).not.toHaveBeenCalled();
+  });
+
+  it('disables with a code once confirmed, and reloads status', async () => {
     operations.getTotpStatus.and.returnValue(of(enabledStatus));
     operations.disableTotp.and.returnValue(of({ enabled: false }));
     fixture.detectChanges();
     operations.getTotpStatus.and.returnValue(of(disabledStatus));
 
-    component['disableForm'].setValue({ code: ' 654321 ', password: '' });
-    component.disable();
+    component['disableForm'].setValue({ code: ' 654321 ' });
+    await component.disable();
 
     expect(operations.disableTotp).toHaveBeenCalledWith({ code: '654321' });
     expect(toast.success).toHaveBeenCalled();
@@ -159,14 +190,14 @@ describe('AccountComponent', () => {
     expect(component['status']?.enabled).toBe(false);
   });
 
-  it('disables with the account password when no code is entered', () => {
+  it('sends a recovery code as typed, so a lost phone still has a way out', async () => {
     operations.getTotpStatus.and.returnValue(of(enabledStatus));
     operations.disableTotp.and.returnValue(of({ enabled: false }));
     fixture.detectChanges();
 
-    component['disableForm'].setValue({ code: '', password: 'hunter2hunter2' });
-    component.disable();
+    component['disableForm'].setValue({ code: 'abcd-efgh-ijkl' });
+    await component.disable();
 
-    expect(operations.disableTotp).toHaveBeenCalledWith({ password: 'hunter2hunter2' });
+    expect(operations.disableTotp).toHaveBeenCalledWith({ code: 'abcd-efgh-ijkl' });
   });
 });

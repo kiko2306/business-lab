@@ -74,12 +74,11 @@ export const schemas = {
   totpActivate: Joi.object({
     code: Joi.string().trim().pattern(/^\d{6}$/).required(),
   }),
-  // Disabling TOTP: re-verify with a current 6-digit code OR the account
-  // password. Exactly one is required.
+  // Disabling TOTP: a current 6-digit code or an unused recovery code. Not the
+  // account password: a phished one would remove the second factor (§819).
   totpDisable: Joi.object({
-    code: Joi.string().trim().pattern(/^\d{6}$/),
-    password: Joi.string().min(1).max(128),
-  }).xor('code', 'password'),
+    code: Joi.string().trim().min(6).max(32).required(),
+  }),
   serviceNameParam: Joi.object({
     name: serviceNameSchema.required(),
   }),

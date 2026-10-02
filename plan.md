@@ -37011,3 +37011,33 @@ run, so Assessment B reset it with SQL between runs; the auth limiter (20 per 15
 login/refresh/TOTP) 429'd the first passes. Neither is a product finding. The page has no
 password-change section, contrary to what the brief assumed. Not verified: screen-reader output
 (the accessibility tree came back null), a real authenticator scan, the Banned IPs panel.
+
+## 820. Account: turning 2FA off needs a code, and asks first (§819 fix 1, P1)
+
+`POST /api/auth/totp/disable` accepted a current code **or the account password**, from one click.
+A phished password therefore removed the second factor — the one thing 2FA exists to survive.
+Decided with the user: a current authenticator code **or an unused recovery code**, plus a confirm
+dialog; the password is no longer accepted at all.
+
+- **Backend.** `disableProofValid` (`utils/totpDisableProof.ts`) is the check, extracted so it can be
+  tested without Express: a 6-digit code is verified against the sealed secret, anything else is
+  looked up as an unused recovery code by hash. The recovery code is *checked, not spent* — the
+  route deletes every recovery code in the same breath. The Joi schema is now just `code`, 6–32
+  characters, so a client still sending `password` gets a 400 rather than a quiet downgrade.
+  Tests failed first on the missing module, then on `JWT_SECRET` (the seal needs it; assembled in
+  the test, not a literal, as `totpSecret.test.ts` does).
+- **Page.** The password field and the "or" are gone; the single field takes either kind of code
+  (no `maxlength`, no numeric keypad: a recovery code is longer and has letters). Submitting asks
+  through the shared confirm dialog (§815, now a real modal) and says what changes: sign-in needs
+  only the password again, recovery codes stop working, it can be set up again. Nothing is asked or
+  sent when the field is empty.
+- **Also done here, because the browser suite caught the dependency:** `e2e/tests/two-factor.spec.ts`
+  found the disable box by its `123456` placeholder, which is gone (the critique noted it reads as
+  a value in dark mode); it finds it by label and answers the dialog. `docs/two-factor.md` no
+  longer says "or your account password". The browser E2E passes, 2FA journey included.
+
+**Lost phone and no recovery code** is not made worse by this page: the page was never the way out
+of that, and the host-side recovery in `docs/two-factor.md` is unchanged. **Rejected:** requiring
+password *and* code (the stricter option offered) — it makes disabling impossible for someone with
+neither phone nor recovery codes while adding no protection a code does not already give.
+Backend 1331 tests, frontend 309 specs, build clean.

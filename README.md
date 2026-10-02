@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -234,8 +234,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       so decide a phone-only rule first (bigger hit area, not bigger look), test it on one page,
       then apply it through the shared theme.
 - [ ] **Account: fix the critique's findings (plan.md §819)** — in order, test first, one
-      commit and version bump each: (1) disabling 2FA asks for confirmation and never accepts
-      the password alone (backend `routes/auth.ts` plus the page); (2) errors sit beside the field
+      commit and version bump each: (1) done (§820) — on `beta`, Turn it off asks for a
+      code or recovery code (no password field), then a confirm; a wrong code is refused and 2FA stays
+      on; a recovery code works; (2) errors sit beside the field
       with `role="alert"`, the backend's wrong-code messages say what to do and arrive translated;
       (3) the recovery-codes screen leads with "save these now", drops the duplicate alert, neutral
       ink for the codes, and "Done" waits for a copy or download; (4) open the 2FA panel by

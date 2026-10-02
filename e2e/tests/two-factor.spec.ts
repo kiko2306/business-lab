@@ -64,7 +64,9 @@ test('enrol, sign in with a code, then disable TOTP', async ({ page }) => {
   const disableForm = page.locator('form', {
     has: page.getByRole('button', { name: 'Disable two-factor authentication' }),
   });
-  await disableForm.getByPlaceholder('123456').fill(freshToken(secret));
+  await disableForm.getByLabel('Code from your app, or a recovery code').fill(freshToken(secret));
   await disableForm.getByRole('button', { name: 'Disable two-factor authentication' }).click();
+  // Turning it off is confirmed first (plan.md §819).
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Turn off' }).click();
   await expect(page.getByText('Off', { exact: true })).toBeVisible();
 });

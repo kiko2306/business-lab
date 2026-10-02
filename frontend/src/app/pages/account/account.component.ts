@@ -7,6 +7,7 @@ import { extractErrorMessage } from '../../core/api';
 import { TotpStatus } from '../../core/models';
 import { OperationsService } from '../../core/operations.service';
 import { ToastService } from '../../core/toast.service';
+import { ConfirmService } from '../../core/confirm.service';
 import { PanelComponent } from '../../components/panel/panel.component';
 import { AuthService } from '../../core/auth.service';
 import { CrowdsecBansComponent } from './crowdsec-bans.component';
@@ -28,6 +29,7 @@ type View = 'loading' | 'status' | 'enrolling' | 'recovery-codes';
 export class AccountComponent implements OnInit {
   private readonly operations = inject(OperationsService);
   private readonly toast = inject(ToastService);
+  private readonly confirm = inject(ConfirmService);
   private readonly formBuilder = inject(FormBuilder);
   private readonly sanitizer = inject(DomSanitizer);
   protected readonly translate = inject(TranslateService);
@@ -53,12 +55,11 @@ export class AccountComponent implements OnInit {
     code: ['', [Validators.required, Validators.minLength(6), Validators.maxLength(6)]],
   });
 
-  // A current 6-digit code OR the account password — the backend accepts
-  // either, so neither field is individually required; disable() checks that
-  // at least one is filled.
+  // A current 6-digit code or a recovery code — never the account password: a
+  // phished password would remove the second factor (plan.md §819). Not
+  // individually `required`, so disable() can say what is wanted in words.
   protected readonly disableForm = this.formBuilder.nonNullable.group({
     code: [''],
-    password: [''],
   });
 
   ngOnInit(): void {
@@ -160,19 +161,28 @@ export class AccountComponent implements OnInit {
     );
   }
 
-  disable(): void {
-    const { code, password } = this.disableForm.getRawValue();
-    const trimmedCode = code.trim();
-    if (!trimmedCode && !password) {
-      this.errorMessage = this.translate.t('account.errors.enterCodeOrPassword');
+  async disable(): Promise<void> {
+    const code = this.disableForm.getRawValue().code.trim();
+    if (!code) {
+      this.errorMessage = this.translate.t('account.errors.enterCode');
+      return;
+    }
+
+    // One click used to remove the second factor. Say what changes first.
+    const confirmed = await this.confirm.ask({
+      title: this.translate.t('account.disable.confirmTitle'),
+      message: this.translate.t('account.disable.confirmMessage'),
+      confirmText: this.translate.t('account.disable.confirmText'),
+      danger: true,
+    });
+    if (!confirmed) {
       return;
     }
 
     this.errorMessage = '';
     this.busy = true;
-    const proof = trimmedCode ? { code: trimmedCode } : { password };
     this.operations
-      .disableTotp(proof)
+      .disableTotp({ code })
       .pipe(finalize(() => (this.busy = false)))
       .subscribe({
         next: () => {

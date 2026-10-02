@@ -31,6 +31,7 @@ import {
   verifyTotp,
 } from '../utils/totp';
 import { openSecret, sealSecret } from '../utils/totpSecret';
+import { disableProofValid } from '../utils/totpDisableProof';
 
 const router = Router();
 
@@ -598,7 +599,7 @@ router.post(
 );
 
 // POST /api/auth/totp/disable — turn 2FA off after re-verifying with a current
-// code or the account password.
+// authenticator code or an unused recovery code (never the password: §819).
 router.post(
   '/totp/disable',
   authLimiter,
@@ -606,7 +607,7 @@ router.post(
   validateBody(schemas.totpDisable),
   async (req: Request, res: Response) => {
     const userId = req.user!.id;
-    const { code, password } = req.body;
+    const { code } = req.body as { code: string };
     try {
       const result = await query<TotpUserRow>(
         'SELECT password_hash, totp_secret, totp_enabled FROM users WHERE id = $1',
@@ -620,12 +621,9 @@ router.post(
         return res.status(400).json({ error: 'Two-factor authentication is not enabled.' });
       }
 
-      const verified = password
-        ? await verifyPassword(password, row.password_hash)
-        : Boolean(row.totp_secret && verifyTotp(code, openSecret(row.totp_secret)));
-      if (!verified) {
+      if (!(await disableProofValid(userId, row.totp_secret, code))) {
         await writeAuditLog({ userId, action: 'totp_disable', resource: 'auth', result: 'failure' });
-        return res.status(400).json({ error: 'Provide a current 6-digit code or your account password.' });
+        return res.status(400).json({ error: 'That code did not work. Use the 6-digit code from your phone, or one of your recovery codes.' });
       }
 
       await withTransaction(async (client) => {

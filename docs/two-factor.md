@@ -51,9 +51,11 @@ re-enter the password.
 
 ## Turn it off
 
-On **Account security**, in the enabled state, enter **either** a current
-6-digit code **or** your account password, then **Disable two-factor
-authentication**. The secret and all recovery codes are deleted.
+On **Account security**, in the enabled state, enter a current 6-digit code
+from your app **or** one of your unused recovery codes, then **Disable
+two-factor authentication** and confirm. The account password is deliberately
+not accepted: it is the first factor, and one that has been phished would
+otherwise remove the second. The secret and all recovery codes are deleted.
 
 ## Lost the authenticator (and the recovery codes)
 
