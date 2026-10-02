@@ -11,3 +11,5 @@
 .current-token span {
   font-weight: 600;
 }
+
+.field-select { max-width: 26rem; }

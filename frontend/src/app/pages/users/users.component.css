@@ -34,3 +34,10 @@
 .app-access-grid > .form-text {
   grid-column: 1 / -1;
 }
+
+/* Widths that were inline `style="max-width: …"`: DESIGN.md keeps layout out of
+   style attributes, and a class can be overridden at a breakpoint. */
+.field-filter { max-width: 200px; }
+.field-password { max-width: 240px; }
+.field-email { max-width: 320px; }
+

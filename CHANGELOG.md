@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.162.6] — 2026-10-02
+
+### Fixed
+
+- Every Bootstrap link, secondary, info and outline colour now meets 4.5:1 in light and dark; the Users page's search and password fields are named (plan.md §811)
+
 ## [0.162.5] — 2026-10-02
 
 ### Performance

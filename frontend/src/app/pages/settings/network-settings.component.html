@@ -63,8 +63,7 @@
     <label class="form-label fw-semibold" for="cfAccountModel">{{ 'networkSettings.accountModelLabel' | t }}</label>
     <select
       id="cfAccountModel"
-      class="form-select"
-      style="max-width: 26rem"
+      class="form-select field-select"
       [disabled]="savingAccountModel"
       [ngModel]="configuredSettings?.accountModel"
       (ngModelChange)="saveAccountModel($event)"

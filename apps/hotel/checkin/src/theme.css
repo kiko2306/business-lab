@@ -33,6 +33,7 @@
   --app-ink-danger: #b02a37;
   --app-ink-warning: #7a5a00;
   --app-ink-secondary: #5c636a;
+  --app-ink-info: #0a6c82;
   /* Text on a filled ink (an outline button's hover). */
   --app-ink-on: #ffffff;
 
@@ -72,6 +73,7 @@
   --app-ink-danger: #ea868f;
   --app-ink-warning: #ffda6a;
   --app-ink-secondary: #cbd5e1;
+  --app-ink-info: #6edff6;
   --app-ink-on: #0f172a;
 
   --bs-body-bg: #1e293b;
@@ -124,16 +126,32 @@ a {
 .text-success { color: var(--app-ink-success) !important; }
 .text-danger { color: var(--app-ink-danger) !important; }
 .text-warning { color: var(--app-ink-warning) !important; }
+.text-info { color: var(--app-ink-info) !important; }
+.text-secondary { color: var(--app-ink-secondary) !important; }
+
+/* `link-*` utilities draw their colour from the same fixed per-hue values, so
+   they fail the same way (4.2:1 light, 3.25:1 dark, warning 1.5:1 light). Hover
+   and focus keep the ink and let the underline carry the state. */
+.link-primary, .link-primary:hover, .link-primary:focus { color: var(--app-ink-primary) !important; }
+.link-secondary, .link-secondary:hover, .link-secondary:focus { color: var(--app-ink-secondary) !important; }
+.link-success, .link-success:hover, .link-success:focus { color: var(--app-ink-success) !important; }
+.link-danger, .link-danger:hover, .link-danger:focus { color: var(--app-ink-danger) !important; }
+.link-warning, .link-warning:hover, .link-warning:focus { color: var(--app-ink-warning) !important; }
+.link-info, .link-info:hover, .link-info:focus { color: var(--app-ink-info) !important; }
 
 .btn-outline-primary { --app-ink: var(--app-ink-primary); }
 .btn-outline-secondary { --app-ink: var(--app-ink-secondary); }
 .btn-outline-danger { --app-ink: var(--app-ink-danger); }
 .btn-outline-warning { --app-ink: var(--app-ink-warning); }
+.btn-outline-success { --app-ink: var(--app-ink-success); }
+.btn-outline-info { --app-ink: var(--app-ink-info); }
 
 .btn-outline-primary,
 .btn-outline-secondary,
 .btn-outline-danger,
-.btn-outline-warning {
+.btn-outline-warning,
+.btn-outline-success,
+.btn-outline-info {
   --bs-btn-color: var(--app-ink);
   --bs-btn-border-color: var(--app-ink);
   --bs-btn-hover-color: var(--app-ink-on);

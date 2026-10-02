@@ -36741,3 +36741,45 @@ Chromium against the stub, not on a phone.
    archive, so a "by 14:00" comparison can set a live hour against an archive hour; and
    `wsir_vnd_pedidos` is unfiltered, so a stale order inflates Forecast. Each needs a real day
    read both ways.
+
+## 811. `/impeccable audit` on the dashboard: 17/20, and the two classes §807's spec did not list
+
+Run after §801–§810 (previous audit 18/20). The score dropped for a measurement reason, not a code
+one: the earlier audit estimated theming from the tokens; this one measured **11 shell pages × 2
+colour modes** in a real browser (every panel opened once, backgrounds alpha-composited), and
+found what the tokens could not show. **Light mode: zero text under 4.5:1 on any page.** Dark mode:
+three failures — `text-secondary` on Apps' "Stopped" tile (2.84:1) and two `link-primary` links on
+Settings (3.25:1) — plus an unnamed control on Users. Every page: exactly one `<h1>`, no skipped
+level, its own title, no overflow at 1280px, no console error beyond the test stack's missing-Docker
+503. Phone width and touch targets were not re-scanned (§803 measured them; nothing here touched
+them).
+
+Two process notes, because they cost real time. The first scan reported eight "failures" on Home;
+they were a measurement artefact — the tile icons sit on a 12 % tint and the script treated it as
+an opaque fill. And the same script re-collapsed the panels it had just opened (three passes of a
+toggle), so it hung for ~14 minutes on the Apps page. Both are fixed in the script, which is not
+committed.
+
+**The pattern, not the instances.** Both findings had one cause: §807's `theme-contrast.spec.ts`
+checked the classes I had *counted in the templates*, and `a11y-labels.spec.ts` rendered the Users
+page with no users and no app options, so its editors never existed to be checked. A spec that
+covers the cases its author thought of finds the cases its author thought of. Fixing the two
+instances would have bought one audit; widening the specs buys the rest.
+
+- **`theme-contrast.spec.ts` now enumerates the family**: six hues × `btn-outline-*`, `text-*` and
+  `link-*`, on both surfaces, both modes. That immediately found more than the audit did:
+  `outline-success` (not covered by §807 at all), `text-info`/`link-info`/`outline-info` (1.8–2:1
+  in light), `link-warning` (1.5:1), and `text-secondary` and every `link-*` in light (4.2–4.4:1).
+  The shared theme gains `--app-ink-info`, the `text-secondary`/`text-info` rules, the `link-*` set
+  (hover and focus keep the ink; the underline carries the state), and `outline-success`/`-info`.
+- **`a11y-labels.spec.ts` opens every Users editor** with a user and an app option present: the
+  new-user and per-user app filters and the reset-password field. Run against the old template it
+  failed for the right reason — `input[type=search]` and `input[type=password]` unnamed, three
+  once the access editor opened — and passes against the fix (`aria-label` from the same string as
+  each placeholder).
+- **Every inline `style="max-width: …"`** (five: four on Users, one in network settings) became a
+  class, per DESIGN.md. The audit counted one; a grep found five.
+
+278 dashboard specs. The shared-theme change syncs to Tally and the hotel apps; Tally's 139 and
+both builds still pass. **Not claimed:** the hotel apps themselves (admin, check-in, pulse) share
+the theme but have no harness, so the ink rules reach them unmeasured.

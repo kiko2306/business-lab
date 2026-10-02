@@ -154,6 +154,53 @@ describe('page form controls carry an accessible name', () => {
     expect(unnamedControls(element)).toEqual([]);
   });
 
+  // The first version rendered the Users page with no users and no app options,
+  // so none of its editors existed to be checked — the audit then found a
+  // placeholder-only search box and password field (plan.md §811).
+  it('Users: names every editor, with users and apps present and each editor open', async () => {
+    operations.listAppAccessOptions.and.returnValue(
+      of({ items: [{ serviceName: 'paperless', label: 'Paperless', hostname: null, requiredGroups: [] }] }) as never
+    );
+    operations.listUsers.and.returnValue(
+      of({
+        items: [{ id: 7, username: 'ana', email: 'a@b.pt', created_at: '2026-01-01', roles: ['user'], capabilities: [], appAccess: [], active: true }],
+      }) as never
+    );
+    await TestBed.configureTestingModule({
+      imports: [UsersComponent],
+      providers: [
+        provideRouter([]),
+        { provide: OperationsService, useValue: operations },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+        { provide: SettingsService, useValue: { getMailSettings: () => of({ configured: false }) } },
+        { provide: AuthService, useValue: { user$: of(null), hasCapability: () => of(false) } },
+        { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(UsersComponent);
+    fixture.detectChanges();
+    // Panels start collapsed, so the user list is not in the DOM until opened.
+    for (const toggle of Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.panel__toggle'))) {
+      (toggle as HTMLButtonElement).click();
+    }
+    fixture.detectChanges();
+    const users = fixture.componentInstance as unknown as {
+      startPasswordReset(id: number): void;
+      startAccessEdit(user: unknown): void;
+      items: unknown[];
+    };
+    users.startPasswordReset(7);
+    fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('input[type="password"]')).not.toBeNull();
+    expect(unnamedControls(element)).toEqual([]);
+
+    users.startAccessEdit(users.items[0]);
+    fixture.detectChanges();
+    expect(element.querySelectorAll('input[type="search"]').length).toBeGreaterThan(1);
+    expect(unnamedControls(element)).toEqual([]);
+  });
+
   it('Users: names the new-account username and email fields', async () => {
     const element = await render(UsersComponent, [
       { provide: SettingsService, useValue: { getMailSettings: () => of({ configured: false }) } },

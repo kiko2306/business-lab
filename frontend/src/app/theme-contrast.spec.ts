@@ -25,19 +25,20 @@ function painted(el: Element): string {
   return 'rgb(255, 255, 255)';
 }
 
-// What the dashboard's templates actually use (counted from src/app).
+// Every hue Bootstrap defines for each of the three utility families, not the
+// handful the dashboard happens to use today. The first version listed what I
+// had counted in the templates, and the next audit found `text-secondary` and
+// `link-primary` — one use each, both ~3:1 in dark — because they were not on
+// the list (plan.md §811). Enumerating the family is what stops a fourth audit
+// finding a fourth class.
+const HUES = ['primary', 'secondary', 'success', 'danger', 'warning', 'info'];
 const CLASSES = [
-  'btn btn-sm btn-outline-secondary',
-  'btn btn-sm btn-outline-primary',
-  'btn btn-sm btn-outline-danger',
-  'btn btn-sm btn-outline-warning',
-  'text-danger',
-  'text-success',
-  'text-warning',
-  'text-primary',
+  ...HUES.map((h) => `btn btn-sm btn-outline-${h}`),
+  ...HUES.map((h) => `text-${h}`),
+  ...HUES.map((h) => `link-${h}`),
 ];
 
-describe('theme contrast on the dashboard (plan.md §806.9)', () => {
+describe('theme contrast on the dashboard (plan.md §807, §811)', () => {
   let host: HTMLElement;
   afterEach(() => {
     host?.remove();
@@ -51,12 +52,12 @@ describe('theme contrast on the dashboard (plan.md §806.9)', () => {
         host = document.createElement('div');
         host.innerHTML =
           surface === 'card'
-            ? `<div class="card"><div class="card-body">${CLASSES.map((c) => `<span class="${c}">x</span>`).join('')}</div></div>`
-            : CLASSES.map((c) => `<span class="${c}">x</span>`).join('');
+            ? `<div class="card"><div class="card-body">${CLASSES.map((c) => (c.startsWith('link-') ? `<a href="#" class="${c}">x</a>` : `<span class="${c}">x</span>`)).join('')}</div></div>`
+            : CLASSES.map((c) => (c.startsWith('link-') ? `<a href="#" class="${c}">x</a>` : `<span class="${c}">x</span>`)).join('');
         document.body.appendChild(host);
 
         const failures: string[] = [];
-        for (const el of Array.from(host.querySelectorAll('span'))) {
+        for (const el of Array.from(host.querySelectorAll('span, a'))) {
           const r = ratio(getComputedStyle(el).color, painted(el));
           if (r < 4.5) failures.push(`${el.className} — ${r.toFixed(2)}:1`);
         }
