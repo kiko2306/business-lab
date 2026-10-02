@@ -213,7 +213,17 @@ Surfaces never critiqued. Per item: `/impeccable critique` against a real render
 score in a new plan section, then fix one page at a time, test first, own commit and version
 bump. Delete the item when its fixes land (a fix still needing a `beta` look gets its own item).
 
-- [ ] **Critique: Users (plan.md §812)** — `pages/users`; the biggest page; §811 only named its editors.
+- [ ] **Users: fix the critique's findings (plan.md §813)** — in order, test first, one
+      commit and version bump each: (1) P0 table overflow at 1280 and 390 (`users.component.css`
+      nowrap, email wrap, `data-label` on editor rows; a Playwright spec asserting no horizontal
+      overflow at both widths in EN and pt-PT, with a 70-character email); (2) the delete dialog's
+      focus move, trap, restore and the global Enter; (3) consequence text for delete, revoke and
+      reset password; (4) open Accounts by default and one line per person; (5) plain role names
+      and presets. The P2 focus-ring and control-border contrast belongs to the shared theme and
+      is its own item below. On `beta`, after each: open Users on a phone with a long email.
+- [ ] **Shared theme: focus rings and control borders under 3:1 (plan.md §813.6)** — extend
+      `theme-contrast.spec.ts` to measure the focus ring and unchecked checkbox/input borders on
+      both surfaces in both modes, watch it fail, then fix the shared theme; check Tally follows.
 - [ ] **Critique: Account (2FA) (plan.md §812)** — `pages/account`; every user sees it; check enrol, recovery codes and disable on a phone.
 - [ ] **Critique: Sign-in flow (login, setup, recovery, set-password) (plan.md §812)** — `pages/login, setup, recovery, set-password`; public, first contact, phone-heavy; critique as one flow.
 - [ ] **Critique: Updates (plan.md §812)** — `pages/self-update`; the operator must trust it not to break the box: progress, failure and rollback wording.

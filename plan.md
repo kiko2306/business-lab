@@ -36814,3 +36814,41 @@ still in development, so a critique now would judge a moving target. Add them ba
 settles; none has a spec harness (§811), so that critique needs a measured render.
 
 Nothing is changed by this section; each README item below is one critique-then-fix run.
+
+## 813. Critique round 2, Users page: 20/40, and the layout is broken at both widths
+
+First run of §812. Dual-agent (design review, and detector plus measured render), against the
+`docker-compose.test.yml` stack, seeded with ten users, four pending invites and a 70-character
+email; 1280 and 390, dark and light, EN and pt-PT. Score **20/40** (every heuristic a 2). Detector:
+0 CLI findings, and the overlay's five hits were shell or false positives — the measured render
+found everything that mattered, which is the argument for §812's "real render, not source".
+Snapshot in `.impeccable/critique/` (not committed). Nothing fixed yet.
+
+**Findings, in fix order.**
+1. **P0 — the table does not fit.** 1280: `.table-responsive` is 1353 wide in a 1222 box (1486 in
+   pt-PT); Delete is clipped. 390: the whole document is 610 wide, the Email cell 576, "Reset
+   password" centres at x≈401, and a real Playwright click on it fails ("`span` intercepts pointer
+   events"). Cause: `users.component.css:1-4` `td, th { white-space: nowrap }` defeats the
+   `.table-stack` card layout, a long email has no `overflow-wrap`, and the colspan editor rows
+   carry no `data-label`.
+2. **P1 — the delete dialog is not modal.** Focus does not move in, 9 of 9 Tab/Shift+Tab presses
+   land behind it, Esc closes it but focus is not restored, and `document:keydown.enter` confirms
+   from anywhere on the page (read from source; not run, it would delete a user).
+3. **P1 — high-stakes actions state no consequence.** Reset password is a bare typed field with
+   its 8-character rule checked only after Save, as a toast; delete says "cannot be undone" but
+   not what goes; revoking access shows no diff.
+4. **P1 — the page hides itself.** Two collapsed panels, then 11+ checkboxes per admin row.
+5. **P2 — jargon.** "SSO user", "Webmaster" and eight raw Features; presets with one-line
+   descriptions would replace them.
+6. **P2 — not Users-specific, measured.** Focus rings 1.3–2.2:1 (Bootstrap's translucent ring),
+   unchecked checkbox and input borders 1.3–1.5:1 (WCAG 1.4.11), 16px checkboxes, every button
+   ≤31px tall. This is the shared theme (§807's family), so it is fixed there once, not on Users.
+
+Minor: pending invite is a small amber badge with no age and a mail failure is only a toast;
+created date hard-coded `dd/MM/yyyy`; delete-self's reason is a `title` tooltip; ten buttons
+named "Edit access" with no person attached.
+
+**Harness notes.** The app's CSP (`script-src 'self'`) blocks the detector overlay, so Assessment
+B injected it with `bypassCSP` — a harness workaround, not a finding. A bare `docker compose down`
+of the test stack is refused by the repo guard (it cannot tell the test project from the root
+one), so the test containers were removed by name.
