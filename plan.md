@@ -36651,3 +36651,19 @@ the link present for an admin and for a two-shop viewer, absent for the sole-sho
 **Not proven in a browser.** The redirect is Angular's `Router.navigate` against a spied router
 in Karma; it was not driven through a real Authelia-fronted session with a granted non-admin
 identity, which the test stack cannot produce. A README beta item carries that.
+
+### 809.1 — the redirect, proved in a real browser
+
+§809 ended with "the redirect is Karma against a spied router, not a real session". The real
+Angular router can be driven without Authelia by stubbing `/api/me` and `/api/stores` in a real
+Chromium against the production build; what the test stack cannot produce is a *granted
+non-admin identity through the proxy*, and that part stays a beta check. Measured:
+
+| viewer | opens `/` | opens `/shops/abc` "← All shops" link | after Back |
+|---|---|---|---|
+| non-admin, 1 shop | **redirected to `/shops/abc`** | **absent** | left the app (no bounce) |
+| admin, 1 shop | stays on the list | present | — |
+| non-admin, 2 shops | stays on the list | present | — |
+
+The "no bounce" row is the one `replaceUrl` exists for: Back from the redirected shop page left
+the app entirely rather than returning to a list that would redirect again.
