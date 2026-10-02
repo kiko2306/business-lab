@@ -207,6 +207,24 @@ two — the guarantees are.
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
 
+### Critique round 2 (plan.md §812)
+
+Surfaces never critiqued. Per item: `/impeccable critique` against a real render, log the
+score in a new plan section, then fix one page at a time, test first, own commit and version
+bump. Delete the item when its fixes land (a fix still needing a `beta` look gets its own item).
+
+- [ ] **Critique: Users (plan.md §812)** — `pages/users`; the biggest page; §811 only named its editors.
+- [ ] **Critique: Account (2FA) (plan.md §812)** — `pages/account`; every user sees it; check enrol, recovery codes and disable on a phone.
+- [ ] **Critique: Sign-in flow (login, setup, recovery, set-password) (plan.md §812)** — `pages/login, setup, recovery, set-password`; public, first contact, phone-heavy; critique as one flow.
+- [ ] **Critique: Updates (plan.md §812)** — `pages/self-update`; the operator must trust it not to break the box: progress, failure and rollback wording.
+- [ ] **Critique: Utils (plan.md §812)** — `pages/utils`.
+- [ ] **Critique: Content (social) (plan.md §812)** — `pages/social`; route `/content`.
+- [ ] **Critique: Small pages (audit logs, access denied, unsubscribe) (plan.md §812)** — `pages/audit-logs, access-denied, unsubscribe`; one critique, three pages.
+- [ ] **Critique: Hotel check-in (plan.md §812)** — `apps/hotel/checkin`; guest-facing; no spec harness, so render and measure in the critique.
+- [ ] **Critique: Hotel pulse (plan.md §812)** — `apps/hotel/pulse`; owner-facing like Tally; no spec harness.
+- [ ] **Critique: Hotel admin (plan.md §812)** — `apps/hotel/admin`; no spec harness.
+- [ ] **Critique: Price-compare (plan.md §812)** — `apps/price-compare/app/public`; plain JS, not Angular; no spec harness.
+
 ### Dashboard critique fixes (plan.md §776)
 
 Done one page at a time, test first, each its own commit and version bump. A finished

@@ -36783,3 +36783,36 @@ instances would have bought one audit; widening the specs buys the rest.
 278 dashboard specs. The shared-theme change syncs to Tally and the hotel apps; Tally's 139 and
 both builds still pass. **Not claimed:** the hotel apps themselves (admin, check-in, pulse) share
 the theme but have no harness, so the ink rules reach them unmeasured.
+
+## 812. Critique round 2: every surface §776 and §806 did not reach
+
+§776 critiqued Home, Apps, Backups and Settings and left "Users, Updates, Account, Audit logs,
+Utils, Social (not critiqued)" for later. §806–§810 then took Tally's web UI through four
+critiques (24 → 28/40). A route-by-route check against `app.routes.ts` and `apps/*` shows what
+has **never** had a critique:
+
+| Surface | Where | Size | Notes |
+|---|---|---|---|
+| Users | `pages/users` | 304 lines | most editors; §811 only fixed its labels |
+| Account (2FA) | `pages/account` | 188 | every user sees it; security flow |
+| Sign-in flow | `pages/login`, `setup`, `recovery`, `set-password` | 314 | first contact, public, phone-heavy |
+| Updates | `pages/self-update` | 77 | the one page the operator must trust to not break the box |
+| Utils | `pages/utils` | 101 | |
+| Content | `pages/social` | 78 | route `/content`, §254 |
+| Small pages | `audit-logs`, `access-denied`, `unsubscribe` | 78/67/28 | one critique, three pages |
+| Hotel check-in | `apps/hotel/checkin` | — | guest-facing; §620–§625 rebuild |
+| Hotel pulse | `apps/hotel/pulse` | — | owner-facing, like Tally |
+| Hotel admin | `apps/hotel/admin` | — | |
+| Price-compare | `apps/price-compare/app/public` | — | plain JS, not Angular |
+
+Not repeated: Home, Apps, Backups, Settings (§776, since fixed), Tally (§806–§810).
+
+**Method** — the §776/§806 loop, per surface: `/impeccable critique` (source plus a real render
+this time, since §776's source-only pass left contrast and layout unmeasured), findings logged
+here as a new section with the score, then fixes one page at a time, test first, each its own
+commit and version bump. Order is by who sees it and how bad a miss would be: Users, Account,
+sign-in flow, Updates, Utils, Content, small pages, then the hotel apps and price-compare.
+The hotel apps and price-compare have no spec harness (§811), so their fixes need a measured
+render in the critique itself rather than a theme-spec guarantee.
+
+Nothing is changed by this section; each README item below is one critique-then-fix run.
