@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.6] — 2026-10-02
+
+### Changed
+
+- On a phone, buttons are 44px tall and checkboxes have a 44px tappable row; desktop density is unchanged (dashboard, Tally and the hotel apps share the rule)
+
 ## [0.163.5] — 2026-10-02
 
 ### Account

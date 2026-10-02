@@ -37107,3 +37107,22 @@ saying "enrolment" and a subtitle naming CrowdSec.
   **Rejected:** hiding the key name `startEnrolment` — keys are not user-visible.
 - 326 frontend specs, build clean, E2E passes. `docs/two-factor.md` keeps "TOTP": it is an
   operator doc about the protocol.
+
+## 824. Touch targets: 44px on a phone, today's density on a desktop (§813.6)
+
+[x] done. Measured on Users: every button <=31px, 87 checkboxes at 16px.
+
+- **Rule.** One `@media (max-width: 767.98px)` block in the shared theme (`styles.css`, synced to
+  Tally and the hotel apps): `.btn` gets `min-height: 44px` and `inline-flex` centring (Bootstrap's
+  inline-block would leave the label at the top). A checkbox row (`.form-check`, not switches)
+  is 44px tall, the label fills it, so tapping anywhere on the row toggles; the box itself is 24px.
+  Every app checkbox has a `for` label, so the row is the hit area.
+- **Spec.** `touch-targets.spec.ts` copies the page's own stylesheets into a 390px and a 1280px
+  iframe, where the media query evaluates for real, and measures buttons, text centring, the
+  label hit point, the switch, and that 1280px is unchanged. Four cases failed first, 333 pass;
+  Tally 139 specs pass, both builds clean (the `.form-floating>~label` warning is Bootstrap's own
+  and predates this).
+- **Rejected:** a bigger invisible hit area (`::after` inset) for buttons: 8px gaps between
+  neighbours would overlap two 44px targets. `pointer: coarse` instead of width: not testable
+  in Karma, and a narrow desktop window is the same layout problem.
+- **Not verified:** a real render of Users on a phone — README beta item.

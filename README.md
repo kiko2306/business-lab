@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.5** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.6** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -229,10 +229,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       Tab through Users, Settings and Backups in dark and light: every control shows a solid blue
       ring (no mouse-click ring on buttons), and inputs, selects and unticked boxes have a visible
       edge. Open a Tally shop view and check the same there.
-- [ ] **Touch targets: 16px checkboxes and buttons under 44px (plan.md §813.6)** — measured on
-      the Users page (every button ≤31px, 87 checkboxes at 16px); a density change on every page,
-      so decide a phone-only rule first (bigger hit area, not bigger look), test it on one page,
-      then apply it through the shared theme.
+- [ ] **Beta-test touch targets on a phone (plan.md §824)** — on `beta`, at 390px wide (browser
+      device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
+      label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
+      no row of buttons overflows. At 1280px nothing looks different from before.
 - [ ] **Account: fix the critique's findings (plan.md §819)** — in order, test first, one
       commit and version bump each: (1) done (§820) — on `beta`, Turn it off asks for a
       code or recovery code (no password field), then a confirm; a wrong code is refused and 2FA stays

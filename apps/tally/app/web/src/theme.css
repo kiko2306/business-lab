@@ -318,3 +318,46 @@ a {
     flex-wrap: wrap;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Touch targets (plan.md §813.6, §824).
+
+   A phone gets 44px targets; a desktop pointer keeps today's density. The
+   Users page measured every button <=31px and 87 checkboxes at 16px.
+   Flex centres the label inside the taller button: Bootstrap's inline-block
+   .btn would leave the text at the top. A checkbox's hit area is its whole
+   row (the label is always `for` the box), and the box itself grows to 24px
+   so it also stands alone at WCAG 2.5.8. Switches keep their own geometry.
+   --------------------------------------------------------------------------- */
+@media (max-width: 767.98px) {
+  .btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .form-check:not(.form-switch) {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 44px;
+    padding-left: 0;
+    margin-bottom: 0;
+  }
+
+  .form-check:not(.form-switch) .form-check-input {
+    float: none;
+    flex: none;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin: 0;
+  }
+
+  .form-check:not(.form-switch) .form-check-label {
+    flex: 1;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+}
