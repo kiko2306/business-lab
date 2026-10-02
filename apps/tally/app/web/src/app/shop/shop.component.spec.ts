@@ -175,10 +175,10 @@ describe('ShopComponent table drill-down', () => {
     const toggle = element.querySelector('tbody tr button') as HTMLButtonElement;
     expect(toggle).not.toBeNull();
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    expect(toggle.getAttribute('aria-controls')).toBe('table-7-lines');
 
     toggle.click();
     fixture.detectChanges();
+    expect(toggle.getAttribute('aria-controls')).toBe('table-7-lines');
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(element.querySelector('#table-7-lines')).not.toBeNull();
   });

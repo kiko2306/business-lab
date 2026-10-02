@@ -6,12 +6,17 @@ import { t } from './i18n';
  * neither "(0)" nor "ECONNRESET" answers it. A 4xx with a message is the
  * server speaking to the user on purpose, so that one is kept.
  */
-export function describeFailure(err: { status: number; error?: { error?: string } | null }, fallback: string): string {
+export function describeFailure(
+  err: { status: number; error?: { error?: string } | null },
+  fallback: string,
+  /** What a 5xx means on this page: the shop page's is about the shop, the list's is not. */
+  serverDown = t('The shop did not answer. Try again in a moment.')
+): string {
   if (err.status === 0) {
     return t('Could not reach the server. Check the connection and try again.');
   }
   if (err.status >= 500) {
-    return t('The shop did not answer. Try again in a moment.');
+    return serverDown;
   }
   return err.error?.error ?? fallback;
 }

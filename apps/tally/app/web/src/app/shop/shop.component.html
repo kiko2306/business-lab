@@ -1,7 +1,7 @@
 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
   <div>
     @if (canListShops) {
-      <a routerLink="/" class="small text-decoration-none">&larr; {{ 'All shops' | t }}</a>
+      <a routerLink="/" class="small text-decoration-none" [class.invisible]="!listKnown">&larr; {{ 'All shops' | t }}</a>
     }
     <h1 class="h4 mb-0">{{ store?.name ?? ('Shop' | t) }}</h1>
   </div>
@@ -26,7 +26,7 @@
         [value]="date || runningDate || ''"
         [max]="runningDate ?? ''"
         [min]="earliestDate"
-        (change)="pickDate($any($event.target).value)" />
+        (change)="pickDate($any($event.target).value); $any($event.target).value = date || runningDate || ''" />
     </label>
     @if (date) {
       <button class="btn btn-sm btn-outline-primary" type="button" (click)="pickDate('')">{{ 'Running day' | t }}</button>
@@ -60,7 +60,7 @@
       <p class="mb-1 small">{{ lastSeenText }}</p>
     }
     <p class="mb-0 small">
-      {{ 'The shop\'s till computer is not connected, so there are no live figures to show. Nothing is displayed rather than showing the last known numbers as though they were current. It reconnects by itself once the till computer and the shop\'s network are back.' | t }}
+      {{ 'Check that the till computer is switched on and connected to the internet. Figures return on their own once it is.' | t }}
     </p>
   </div>
 } @else if (loading && !overview) {
@@ -93,6 +93,7 @@
         </div>
       </div>
       }
+      @if (!noTableShop) {
       <div class="col-6">
         <div class="card stat-card h-100">
           <div class="card-body">
@@ -101,6 +102,7 @@
           </div>
         </div>
       </div>
+      }
     </div>
   } @else {
   <!-- The answer, then everything else. This page used to open with eleven
@@ -156,6 +158,7 @@
         </div>
       </div>
       }
+      @if (!noTableShop) {
       <div class="col-6 col-sm-4">
         <div class="card stat-card h-100">
           <div class="card-body">
@@ -164,6 +167,7 @@
           </div>
         </div>
       </div>
+      }
     </div>
   }
 
@@ -260,7 +264,7 @@
   }
 
   <ul class="nav nav-tabs mb-3" [attr.aria-label]="'Show' | t">
-    @if (!viewingArchive) {
+    @if (!viewingArchive && !noTableShop) {
       <li class="nav-item">
         <button class="nav-link" [class.active]="tab === 'tables'" [attr.aria-pressed]="tab === 'tables'" type="button" (click)="setTab('tables')">
           {{ 'Tables' | t }}
@@ -275,7 +279,12 @@
   </ul>
 
   @if (tab === 'tables') {
-    @if (!tables) {
+    @if (!tables && tabFailed) {
+      <p class="text-body-secondary">
+        {{ 'Could not load this view.' | t }}
+        <button type="button" class="btn btn-link p-0 align-baseline" (click)="retryTab()">{{ 'Try again' | t }}</button>
+      </p>
+    } @else if (!tables) {
       <p class="text-body-secondary">{{ 'Loading…' | t }}</p>
     } @else if (!tables.tables.length) {
       <p class="text-body-secondary mb-0">{{ 'No tables open. {n} free.' | t: { n: tables.free } }}</p>
@@ -301,7 +310,7 @@
                        headers, and a row is not focusable. -->
                   <button type="button" class="btn btn-link p-0 table-toggle" (click)="toggleTable(t.table)"
                           [attr.aria-expanded]="openTable === t.table"
-                          [attr.aria-controls]="'table-' + t.table + '-lines'">
+                          [attr.aria-controls]="openTable === t.table ? 'table-' + t.table + '-lines' : null">
                     {{ t.table }}
                   </button>
                 </td>
@@ -353,7 +362,12 @@
       </div>
     }
   } @else {
-    @if (!soldItems) {
+    @if (!soldItems && tabFailed) {
+      <p class="text-body-secondary">
+        {{ 'Could not load this view.' | t }}
+        <button type="button" class="btn btn-link p-0 align-baseline" (click)="retryTab()">{{ 'Try again' | t }}</button>
+      </p>
+    } @else if (!soldItems) {
       <p class="text-body-secondary">{{ 'Loading…' | t }}</p>
     } @else {
       <p class="text-body-secondary small">
@@ -385,7 +399,7 @@
             <!-- track $index, not `item.code ?? item.description`: Angular 18 compiles a
            `??` inside `track` to a temp variable it never declares, so the whole
            tab threw ReferenceError at runtime while the build stayed green (§680). -->
-            @for (item of soldItems.items; track $index) {
+            @for (item of visibleItems; track $index) {
               <tr>
                 <td [attr.data-label]="'Item' | t">
                   {{ item.description }}
@@ -401,6 +415,11 @@
           </tbody>
         </table>
       </div>
+      @if (soldItems.items.length > 10) {
+        <button type="button" class="btn btn-link p-0 mt-2" (click)="showAllItems = !showAllItems">
+          {{ showAllItems ? ('Show top 10' | t) : ('Show all {n}' | t: { n: soldItems.items.length }) }}
+        </button>
+      }
       }
     }
   }

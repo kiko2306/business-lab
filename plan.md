@@ -36667,3 +36667,77 @@ non-admin identity through the proxy*, and that part stays a beta check. Measure
 
 The "no bounce" row is the one `replaceUrl` exists for: Back from the redirected shop page left
 the app entirely rather than returning to a list that would redirect again.
+
+## 810. Tally: the fourth critique (28/40) — what the web side could fix, and two things it could not
+
+The fourth run scored **28/40** (24 → 27 → 27 → 28). The measurable layer is now clean — B found
+no element under 4.5:1 in either mode, every touch target 44px, every control named, no console
+errors — so what is left is mostly what the figures *mean*. The user chose the web-side P1 plus
+the P2s and browser-found items, and a README item for the day-close issue rather than a blind
+C# edit.
+
+**Coming back to the app.** The manifest is `standalone` and iOS home-screen apps have no
+pull-to-refresh, so the hero could be an hour old with only 13px grey "As of" text saying so; the
+only triggers were a 30 s timer and the `online` event. `visibilitychange` and `pageshow` now
+re-read, through one `poll()` the timer shares — which also stops polling while the page is
+hidden (a background tab was relaying ~10 SQL queries to the till PC every 30 s for nobody), and
+keeps polling a *dated* view while the shop is offline, since the panel's copy promised it would
+reconnect by itself and the timer only ever re-read the running day. Proved in a touch browser:
+one overview request per foreground.
+
+**Numbers that were wrong or silent.** A closed-day hero named no day ("Invoiced"); it says
+"Invoiced on 26/09" now. The whole-day comparison treated a shut reference day as €0 — "▲ €1,240
+more than last Saturday" — and returns "no figures" instead. `?date=2026-02-30` was accepted
+because `Date.parse` rolls it to 2 March; the check round-trips the ISO string now (the server's
+`readDate` already did, which is why it only showed up as a blank picker). A typed out-of-range
+date left the rejected value sitting in the picker; the control is reset. "Running day" now
+returns the reader to the tab they left rather than Items.
+
+**A shop with no tables** showed "Here now" (a permanent 0), opened on a "No tables open. 0
+free." tab, and offered an empty Tables tab. It now hides the tile, opens on Items unless the URL
+or the reader chose a tab, and offers no Tables tab. This is gated on a *running* day: a closed
+day reports zero tables for every shop, so "no tables" there means nothing.
+
+**Reading it on a phone.** The items table is capped at ten rows with "Show all N", since stacked
+cards make each item four lines; the chart above it already shows the top ten. Per-hour values
+lived only in `title` attributes, which do not exist on touch — tapping a column now reads its
+figure in the line under the chart (the exact table stays the text alternative for a screen
+reader; the columns stay `aria-hidden`, so this is a pointer convenience, not the only route).
+
+**Failure states.** A tab that failed left "Loading…" beside the alert for ever; it now says so
+and offers "Try again". The Shops list failure said "The shop did not answer" about a *list* and
+drew an empty header row — `describeFailure` takes the 5xx wording per page, and the table is
+withheld on error. The offline panel stopped explaining a design decision and says what to do:
+"Check that the till computer is switched on and connected to the internet. Figures return on
+their own once it is."
+
+**Smaller.** The "← All shops" link reserves its space until it is known whether to show it, so
+a sole-shop viewer no longer sees it flash and the page shift; `aria-controls` is only set while a
+row is open (it pointed at an element that did not exist); Delete sits in its own button group,
+apart from Open; a viewer's list drops the Version column (an operator's concern); Portuguese
+"às 14:00" became "até às 14:00", which is what the English "by 14:00" means.
+
+139 Tally specs. Not claimed: the hourly tap and the foreground refresh were seen in a touch
+Chromium against the stub, not on a phone.
+
+**Not fixed, deliberately — both need the till, which this host does not have.**
+
+1. **Day close (A's P1, code path verified).** `ResolveDayAsync` returns `DateTime.Today` when
+   `wsir_vnd_vendas` is empty; a request whose date equals that day takes the *live* path
+   (`ReadOverviewAsync` line ~79), and the frontend maps "pick the running day" to the live view,
+   with the picker's `max` set to that day. If Wintouch empties the live table at close (§682's
+   premise, unconfirmed on a real shop), the archive for that day is unreachable and the hero reads
+   "Nothing rung up yet today" at exactly the moment the owner wants tonight's total. The fix is in
+   the C# agent — return the archive overview, flagged `archive: true`, when the live table is
+   empty and the day has archived documents — and there is no `dotnet` here to build or test it.
+   An agent change ships to every shop's Windows machine through the installer, so it is a README
+   item with the proposed change and the fixture to add, to be confirmed against a real day close
+   first.
+2. **Figure semantics, read from `ShopReader.cs`, not verified against data:** average ticket's
+   numerator is net of refunds while its denominator counts sales documents only; discounts,
+   customers and consumptions are computed differently live and archived (`valororiginal - total`
+   vs `desclin`; per-document `MAX(numclientes)` vs the header's), so a day may read differently
+   before and after close; hourly buckets use the line `EntryDate` live and the header's in the
+   archive, so a "by 14:00" comparison can set a live hour against an archive hour; and
+   `wsir_vnd_pedidos` is unfiltered, so a stale order inflates Forecast. Each needs a real day
+   read both ways.

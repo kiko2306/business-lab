@@ -67,3 +67,25 @@ describe('charts (plan.md §806.5)', () => {
     });
   });
 });
+
+describe('hourly chart on touch (plan.md §810)', () => {
+  // The per-hour values lived in `title` attributes, which do not exist on a
+  // phone, so only the peak could ever be read there.
+  it('shows a column’s value when it is tapped', () => {
+    const fixture = TestBed.createComponent(HourlyChartComponent);
+    fixture.componentInstance.data = [{ hour: 9, total: 400 }, { hour: 10, total: 800 }];
+    fixture.detectChanges();
+    const cols = fixture.nativeElement.querySelectorAll('.hourly-col') as NodeListOf<HTMLElement>;
+    cols[0].click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.hourly-readout').textContent).toContain('09:00');
+    expect(fixture.nativeElement.querySelector('.hourly-readout').textContent).toContain('400');
+  });
+
+  it('reads out the peak until something is tapped', () => {
+    const fixture = TestBed.createComponent(HourlyChartComponent);
+    fixture.componentInstance.data = [{ hour: 9, total: 400 }, { hour: 10, total: 800 }];
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.hourly-readout').textContent).toContain('10:00');
+  });
+});

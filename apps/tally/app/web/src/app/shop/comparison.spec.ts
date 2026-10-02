@@ -124,3 +124,18 @@ describe('describeComparison on a running day', () => {
     expect(describeComparison(1200, null, saturday, 'en', 14)!.text).toBe('No figures for last Saturday');
   });
 });
+
+// A reference day that was shut is "no figures", not "€0": the whole-day path
+// used to compare a €1,240 day against nothing and call it "€1,240 more than
+// last Saturday" (plan.md §810).
+describe('comparableTotal for a shut reference day', () => {
+  const shut = overview(0, []);
+
+  it('is null for a whole-day comparison against a day with no takings and no hours', () => {
+    expect(comparableTotal(shut, null)).toBeNull();
+  });
+
+  it('still answers a genuine €0 day that had trading hours', () => {
+    expect(comparableTotal(overview(0, [{ hour: 9, total: 0 }]), null)).toBe(0);
+  });
+});

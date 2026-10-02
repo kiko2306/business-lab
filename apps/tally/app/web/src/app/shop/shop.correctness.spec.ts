@@ -130,7 +130,7 @@ describe('ShopComponent correctness (plan.md §806.6)', () => {
       const panel = element.querySelector('.alert-warning')!.textContent!;
       expect(panel).toContain('Last seen');
       expect(panel).not.toContain('agent');
-      expect(panel).toContain('by itself');
+      expect(panel).toContain('on their own');
     });
 
     it('does not claim a last-seen time it does not have', async () => {

@@ -226,6 +226,6 @@ export class StoresComponent implements OnInit {
       return;
     }
     sessionStorage.removeItem('tally-reauth');
-    this.error = describeFailure(err, t('Request failed ({status})', { status: err.status }));
+    this.error = describeFailure(err, t('Request failed ({status})', { status: err.status }), t('The list could not be loaded. Try again in a moment.'));
   }
 }

@@ -51,7 +51,7 @@
       {{ 'No shops yet. An administrator adds them and grants you access.' | t }}
     }
   </div>
-} @else {
+} @else if (!error || stores.length) {
   <div class="table-responsive table-stack-wrap">
     <table class="table table-stack align-middle">
       <thead>
@@ -59,7 +59,9 @@
           <th scope="col">{{ 'Shop' | t }}</th>
           <th scope="col">{{ 'Status' | t }}</th>
           <th scope="col">{{ 'Agent' | t }}</th>
-          <th scope="col">{{ 'Version' | t }}</th>
+          @if (isAdmin) {
+            <th scope="col">{{ 'Version' | t }}</th>
+          }
           <th scope="col">{{ 'Last seen' | t }}</th>
           <th scope="col" class="text-end">{{ 'Actions' | t }}</th>
         </tr>
@@ -90,6 +92,7 @@
                 <span class="badge text-bg-danger">{{ 'Offline' | t }}</span>
               }
             </td>
+            @if (isAdmin) {
             <td [attr.data-label]="'Version' | t">
               @if (store.agentVersion) {
                 <code
@@ -102,6 +105,7 @@
                 —
               }
             </td>
+            }
             <td [attr.data-label]="'Last seen' | t">
               {{ store.lastSeenAt ? (store.lastSeenAt | date: 'short') : '—' }}
             </td>
@@ -116,9 +120,16 @@
                 <button class="btn btn-outline-secondary" type="button" (click)="toggleActive(store)">
                   {{ (store.isActive ? 'Deactivate' : 'Activate') | t }}
                 </button>
-                <button class="btn btn-outline-danger" type="button" (click)="remove(store)">{{ 'Delete' | t }}</button>
                 }
               </div>
+              @if (isAdmin) {
+                <!-- Apart from Open: a thumb aiming for Open on a phone should not
+                     land on Delete (a confirm() guards it, but it is not the
+                     neighbour to have). -->
+                <div class="btn-group btn-group-sm ms-2">
+                  <button class="btn btn-outline-danger" type="button" (click)="remove(store)">{{ 'Delete' | t }}</button>
+                </div>
+              }
             </td>
           </tr>
 

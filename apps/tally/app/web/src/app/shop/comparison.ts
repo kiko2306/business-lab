@@ -48,6 +48,11 @@ export function comparableTotal(reference: Overview | null, uptoHour: number | n
     return null;
   }
   if (uptoHour === null) {
+    // A day with no takings and no trading hours was shut, not a €0 day: the
+    // whole-day path used to call that "€1,240 more than last Saturday".
+    if (reference.totals.invoiced === 0 && !(reference.hourly ?? []).length) {
+      return null;
+    }
     return reference.totals.invoiced;
   }
   if (!reference.hourly?.length) {

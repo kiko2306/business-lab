@@ -31,7 +31,7 @@ export interface HourlyDatum {
            twenty-four anonymous role=img elements never were. -->
       <div class="hourly" role="img" [attr.aria-label]="summary">
         @for (d of data; track d.hour) {
-          <div class="hourly-col" [attr.title]="label(d)" aria-hidden="true">
+          <div class="hourly-col" [attr.title]="label(d)" aria-hidden="true" (click)="selected = d">
             <div class="hourly-track">
               <div class="hourly-fill" [style.height.%]="percent(d.total)"></div>
             </div>
@@ -58,8 +58,15 @@ export interface HourlyDatum {
           }
         </tbody>
       </table>
-      <p class="small text-body-secondary mt-2 mb-0">
-        {{ 'Peak {v} at {h}:00' | t: { v: format(peak), h: pad(peakHour) } }}
+      <!-- Per-hour values were only in title attributes, which do not exist on a
+           phone. Tapping a column reads its figure here; the exact table is
+           still the text alternative for a screen reader. -->
+      <p class="hourly-readout small text-body-secondary mt-2 mb-0">
+        @if (selected) {
+          {{ pad(selected.hour) }}:00 · {{ format(selected.total) }}
+        } @else {
+          {{ 'Peak {v} at {h}:00' | t: { v: format(peak), h: pad(peakHour) } }}
+        }
       </p>
     }
   `,
@@ -67,6 +74,8 @@ export interface HourlyDatum {
 })
 export class HourlyChartComponent {
   @Input() data: HourlyDatum[] = [];
+  /** The column the reader tapped, or null to show the peak. */
+  selected: HourlyDatum | null = null;
   /** Differs for a closed day, where "yet" and "today" would suggest it is still going. */
   @Input() emptyText = t('No takings yet today.');
 

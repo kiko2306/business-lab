@@ -65,6 +65,18 @@ export class ShopComponent implements OnInit, OnDestroy {
     return this.overviewError || this.tabError;
   }
   openTable: number | null = null;
+  /** Whether the reader (or the URL) picked a tab, so a default must not override it. */
+  private tabChosen = false;
+  /** The tab to go back to when returning from a closed day. */
+  private tabBeforeArchive: Tab | null = null;
+  /** A tab failure the reader can retry. */
+  get tabFailed(): boolean {
+    return !!this.tabError;
+  }
+  retryTab(): void {
+    this.loadTab();
+  }
+  showAllItems = false;
   /** "€412 more than last Saturday", or null until the reference day resolves. */
   comparison: Comparison | null = null;
   /** The six Wintouch counters: reference, not the answer, so they start folded. */
@@ -79,6 +91,8 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   private readonly onOnline = () => this.refresh(true);
+  /** Coming back to the app: a standalone phone app has no pull-to-refresh, so the hero would stay as old as the last tick. */
+  private readonly onForeground = () => this.poll();
   /** The reference day never changes once read, so it is read once per day, not every 30 s. */
   private readonly referenceDays = new Map<string, Overview>();
 
@@ -89,6 +103,8 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.readStateFromUrl();
     this.title.setTitle(`${t('Shop')} · Tally`);
     window.addEventListener('online', this.onOnline);
+    document.addEventListener('visibilitychange', this.onForeground);
+    window.addEventListener('pageshow', this.onForeground);
     this.loadStore();
     this.api.me().subscribe({ next: (identity) => (this.identity = identity), error: () => undefined });
     this.api.agentPackage().subscribe({ next: (pkg) => (this.agentPackage = pkg), error: () => undefined });
@@ -98,12 +114,26 @@ export class ShopComponent implements OnInit, OnDestroy {
     // figures are read live from the shop on every call — there is no cache to
     // go stale, only this interval.
     // A closed day cannot change, so only the running day is re-read.
-    this.timer = setInterval(() => { if (!this.date) this.refresh(true); }, 30_000);
+    this.timer = setInterval(() => this.poll(), 30_000);
   }
 
   ngOnDestroy(): void {
     if (this.timer) clearInterval(this.timer);
     window.removeEventListener('online', this.onOnline);
+    document.removeEventListener('visibilitychange', this.onForeground);
+    window.removeEventListener('pageshow', this.onForeground);
+  }
+
+  /**
+   * One re-read, from the timer or from the page coming back. Never while the
+   * page is hidden — a background tab was relaying ~10 SQL queries to the till
+   * PC every 30 s for nobody. A closed day cannot change, so only the running
+   * day is re-read, except while the shop is offline, when the panel has to
+   * notice it reconnecting whatever day is on screen.
+   */
+  private poll(): void {
+    if (document.hidden) return;
+    if (!this.date || this.offline) this.refresh(true);
   }
 
   private loadStore(): void {
@@ -120,6 +150,11 @@ export class ShopComponent implements OnInit, OnDestroy {
   /** The list is not offered to someone whose only shop this is — see access.ts. */
   get canListShops(): boolean {
     return !isSoleShopViewer(this.identity, this.allStores);
+  }
+
+  /** Until both are known the link's space is reserved, so it does not flash and shift the page. */
+  get listKnown(): boolean {
+    return this.identity !== null && this.allStores !== null;
   }
 
   /** The shop's wall-clock day, from the clock seam. */
@@ -140,7 +175,10 @@ export class ShopComponent implements OnInit, OnDestroy {
    * Windows machine in the shop to come back empty.
    */
   private dayAllowed(day: string): boolean {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(Date.parse(`${day}T00:00:00Z`))) return false;
+    // Round-trips rather than trusting Date.parse, which rolls 2026-02-30 forward to 2 March.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+    const parsed = new Date(`${day}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== day) return false;
     const tomorrow = new Date(this.clock.now());
     tomorrow.setDate(tomorrow.getDate() + 1);
     return day >= this.earliestDate && day <= (this.runningDate ?? localDay(tomorrow));
@@ -160,7 +198,10 @@ export class ShopComponent implements OnInit, OnDestroy {
       this.date = date;
     }
     const tab = query?.get('tab');
-    if (tab === 'tables' || tab === 'items') this.tab = tab;
+    if (tab === 'tables' || tab === 'items') {
+      this.tab = tab;
+      this.tabChosen = true;
+    }
     // Open tables are the running moment; a closed day has none to show.
     if (this.date && this.tab === 'tables') this.tab = 'items';
   }
@@ -176,6 +217,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   /** Only the tab's own payload: the overview on screen is already current. */
   setTab(tab: Tab): void {
     this.tab = tab;
+    this.tabChosen = true;
     this.writeStateToUrl();
     this.loadTab();
   }
@@ -216,8 +258,15 @@ export class ShopComponent implements OnInit, OnDestroy {
   pickDate(value: string): void {
     if (value && !this.dayAllowed(value)) return;
     this.date = !value || value === this.runningDate ? '' : value;
-    // Open tables are the running moment; a closed day has none to show.
-    if (this.date && this.tab === 'tables') this.tab = 'items';
+    // Open tables are the running moment; a closed day has none to show — and
+    // coming back to the running day puts the reader on the tab they left.
+    if (this.date) {
+      if (this.tabBeforeArchive === null) this.tabBeforeArchive = this.tab;
+      if (this.tab === 'tables') this.tab = 'items';
+    } else if (this.tabBeforeArchive) {
+      this.tab = this.tabBeforeArchive;
+      this.tabBeforeArchive = null;
+    }
     this.overview = null;
     this.soldItems = null;
     this.comparison = null;
@@ -246,6 +295,12 @@ export class ShopComponent implements OnInit, OnDestroy {
         this.refreshing = false;
         if (!quiet) this.statusNote = t('Updated at {time}', { time: this.clock.now().toLocaleTimeString(numberLocale) });
         this.loadComparison(overview);
+        // A shop with no tables has nothing to show on Tables, so it opens on
+        // Items unless the reader or the URL asked otherwise.
+        if (this.noTableShop && this.tab === 'tables' && !this.tabChosen) {
+          this.tab = 'items';
+          this.loadTab();
+        }
       },
       error: (err) => {
         if (day !== this.date) return;
@@ -341,7 +396,9 @@ export class ShopComponent implements OnInit, OnDestroy {
   /** What the hero says its figure is — and when the agent's day is not today, which day. */
   get heroLabel(): string {
     const o = this.overview;
-    if (o?.archive) return t('Invoiced');
+    if (o?.archive) {
+      return o.businessDate ? t('Invoiced on {date}', { date: this.shortDate(o.businessDate) }) : t('Invoiced');
+    }
     if (o?.businessDate && o.businessDate !== this.today) {
       return t('Taken on {date}', { date: this.shortDate(o.businessDate) });
     }
@@ -403,6 +460,11 @@ export class ShopComponent implements OnInit, OnDestroy {
     return t ? t.occupied + t.awaitingPayment : 0;
   }
 
+  /** A running day on which the shop reports no tables at all. Not meaningful for a closed day, which never has any. */
+  get noTableShop(): boolean {
+    return !!this.overview && !this.overview.archive && this.tablesTotal === 0;
+  }
+
   get tablesTotal(): number {
     const t = this.overview?.tables;
     return t ? t.occupied + t.free + t.awaitingPayment : 0;
@@ -411,6 +473,12 @@ export class ShopComponent implements OnInit, OnDestroy {
   /** Share of tables with customers right now; only meaningful for the running day. */
   get occupancy(): number {
     return this.tablesTotal ? (100 * this.tablesInUse) / this.tablesTotal : 0;
+  }
+
+  /** The table shows ten rows until asked: stacked on a phone, every item is a four-line card. */
+  get visibleItems() {
+    const all = this.soldItems?.items ?? [];
+    return this.showAllItems ? all : all.slice(0, 10);
   }
 
   /** Top ten only — a long tail of one-offs buries the items that matter. */

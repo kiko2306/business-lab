@@ -224,6 +224,32 @@ item is deleted.
       it must expand, announce its state, and return focus sensibly. Confirm the
       Shops page shows "Request failed" alone when the API is unreachable (stop
       the tally container) rather than also claiming there are no shops.
+- [ ] **Tally agent: the closed day the live table swallows (plan.md §810)** — in
+      `apps/tally/app/agent/ShopReader.cs`, `ResolveDayAsync` falls back to
+      `DateTime.Today` when `wsir_vnd_vendas` is empty, and `ReadOverviewAsync`
+      then takes the *live* path for that date, so if Wintouch empties the live
+      table at day close the day's archive is unreachable and the hero reads
+      "Nothing rung up yet" at the moment tonight's total is wanted. **First
+      confirm the premise on a real shop** (read the overview just before and just
+      after a day close; is the table empty?). If so: when the live table is empty
+      and the archive has F documents for that day, return the archive overview
+      with `archive: true`, and add a "closed before midnight" fixture. Needs
+      `dotnet`, which the dev host does not have; the agent installer ships it to
+      every shop, so it is not an edit to make blind.
+- [ ] **Tally agent: do live and archived days agree? (plan.md §810)** — read one
+      real day through both paths and compare: average ticket (net numerator over
+      a sales-only denominator), discounts / customers / consumptions (defined
+      differently live and archived), the hour buckets (line `EntryDate` live vs
+      header `entrydate` archived, which can put a "by 14:00" comparison's two
+      sides in different hours), and whether stale `wsir_vnd_pedidos` rows inflate
+      Forecast. Any disagreement is a defect in what the owner is told.
+- [ ] **Tally: the fourth critique's web fixes (plan.md §810)** — on `beta`, on a
+      phone: switch away from the app for a few minutes and back — the figures must
+      refresh on return, not on the next 30 s tick; tap a column of the hourly
+      chart and read its figure; on a closed day the hero names the date; a shop
+      with no tables opens on Items with no empty Tables tab; the items table
+      shows ten rows with "Show all"; with the till PC switched off, the panel
+      says to check it and recovers on its own — also while viewing a past day.
 - [ ] **Tally: the third critique's fixes (plan.md §806.8)** — on `beta`: shortly
       after midnight (or any time the shop's trading day is not today's date)
       the hero must say "Taken on dd/MM", not "today"; mid-afternoon the
