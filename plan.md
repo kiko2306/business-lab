@@ -37333,3 +37333,44 @@ day only as far as the hour it has reached") failed on a clean tree on 2026-10-0
 the last complete hour. `shop.component.spec.ts` now provides the `Clock` seam pinned to the
 fixture's own moment (14:30), as `shop.third.spec.ts` and `shop.fourth.spec.ts` already did. 139 of 139
 pass; spec-only, no version bump.
+
+## 834. Critique round 2, Updates page: 21/40, and a failure says nothing about the box (§812)
+
+[x] done (critique only). Fourth run of §812: `pages/self-update` (route `/updates`), dual-agent (A
+design review, B detector and measured render) on the `docker-compose.test.yml` stack, the API
+mocked with `page.route` so no real update or git operation ran; 13 states at 1280 and 390, dark and
+light, EN and pt-PT. **21/40**. Detector CLI 0 findings; the in-page overlay found `nested-cards`,
+`gpt-thin-border-wide-shadow` (panel, status card, confirm dialog), `undersized-ui-text` (10.5px
+badges) and `body-text-viewport-edge`. Snapshot in `.impeccable/critique/` (not committed). Nothing
+fixed yet.
+
+**Held up under measurement:** no overflow at either width, enabled text contrast >= 4.53, buttons
+44px on a phone, focus ring 2px solid, `alertdialog` with a name, Tab trap and Esc, no English UI
+strings in pt-PT apart from what the server sends, reload mid-update restores state from the API.
+
+**Findings, in fix order.**
+1. **P1 — a failed update says nothing about the box.** `selfUpdate.lastUpdateFailed` prints the
+   backend's raw tool output (`self-update.component.html:52`, up to ~4.4k characters; the page is
+   6101px tall at 390 with the buttons off-screen) and never says the old version still runs or what
+   to do. Worse, when apps fail to update the run still ends `done` — they are only logged
+   (`backend/src/services/selfUpdate.ts:540-545`) — so the page can say "Up to date".
+2. **P1 — no rollback story.** Terminal states are `done` and `error`; no rollback code exists, and
+   the confirm mentions no backup.
+3. **P1 — backend English reaches pt-PT.** `errorMessage`, `detail`, `lastCheckError.message`, the
+   reconcile message; the toast prefers the backend string.
+4. **P1 — progress is silent.** No live region, focus falls to `body` after Esc, Check now, confirm
+   and the run's end, no step count, no "you can leave this page open", disabled buttons give no reason.
+5. **P2 — trust at a glance.** The only panel opens collapsed; the 10.5px badge counts commits ("3
+   updates"); "Up to date" can sit beside a failure; the routine confirm is danger-red.
+
+Minor: three names for one page ("Updates", "Updates & version control", "Business Lab" panel,
+`self-update` in code; `/self-update` redirects to `/home`); `selfUpdate.progress.error`/`.done` are
+dead strings; two near-identical restarting texts.
+
+**Severity call.** A tagged findings 1 and 2 P0; they are P1 here (misleading and a feature gap, not
+task-blocking). The apps-fail-reads-done bug is the closest to P0.
+
+**Harness notes.** The page has no progress bar, log pane or rolled-back state, so those states in the
+brief did not exist. Not verified: a real restart and reconnect, screen-reader output, the dialog's
+edge contrast against the live page behind it (1.77:1 against the backdrop alone). The test stack was
+removed by name afterwards.

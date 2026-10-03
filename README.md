@@ -257,7 +257,17 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       characters." is under new passwords, the cursor starts in the first field, `/recovery` inputs
       are 44px; (5) §832 — the card is centred (equal space either side at every width) and all four
       pages look like the same card, `/recovery` included.
-- [ ] **Critique: Updates (plan.md §812)** — `pages/self-update`; the operator must trust it not to break the box: progress, failure and rollback wording.
+- [ ] **Updates page: fix the critique's findings (plan.md §834)** — in order, test first, one
+      commit and version bump each: (1) a failed update says, in a fixed translated headline, that the
+      dashboard is still on its version and the apps are running, with the raw output behind a
+      scroll-capped "Technical details" disclosure; the backend reports the failed phase and the
+      apps that failed so a run with failed apps no longer reads "Up to date"; (2) a rollback story,
+      or a plain statement that the old version keeps running plus a backup line in the confirm
+      (decide which first); (3) backend failure text mapped to codes and translated for pt-PT, the
+      toast too; (4) a `role="status"` step line ("Step 3 of 5"), "you can leave this page open",
+      focus restored, a reason for each disabled button; (5) the panel open by default, a status
+      line as the hero, badges at least 12px, status derived from the latest run, a primary confirm
+      button. On `beta`, after each: run an update on the test box and read what the page says at each step.
 - [ ] **Critique: Utils (plan.md §812)** — `pages/utils`.
 - [ ] **Critique: Content (social) (plan.md §812)** — `pages/social`; route `/content`.
 - [ ] **Critique: Small pages (audit logs, access denied, unsubscribe) (plan.md §812)** — `pages/audit-logs, access-denied, unsubscribe`; one critique, three pages.
