@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.17] — 2026-10-03
+
+### Changed
+
+- Updates: progress is a live status line with a step count and a leave-this-page-open note, focus stays on the page through each step, and disabled buttons point at the progress
+
 ## [0.163.16] — 2026-10-03
 
 ### Changed

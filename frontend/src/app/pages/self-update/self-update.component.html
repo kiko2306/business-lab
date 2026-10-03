@@ -23,7 +23,7 @@
                  meaningful to a non-technical reader — removed rather than
                  translated (found during an audit, plan.md §791, §794). -->
             <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.statusLabel' | t }}</dt>
-            <dd class="col-sm-8">
+            <dd id="update-status" tabindex="-1" class="col-sm-8">
               <span *ngIf="check.commitsBehind === 0" class="badge text-bg-success">{{ 'selfUpdate.upToDate' | t }}</span>
               <span *ngIf="check.commitsBehind > 0" class="badge text-bg-warning">
                 {{ (check.commitsBehind === 1 ? 'selfUpdate.updatesAvailable.one' : 'selfUpdate.updatesAvailable.other') | t:{ count: check.commitsBehind } }}
@@ -49,10 +49,12 @@
             <pre class="failure-details font-monospace small mt-2 mb-0">{{ err.message }}</pre>
           </details>
         </div>
-        <div class="alert alert-info small mt-3 mb-0" *ngIf="runInProgress && s.latestRun as run">
+        <div id="update-progress" class="alert alert-info small mt-3 mb-0" role="status" tabindex="-1" *ngIf="runInProgress && s.latestRun as run">
+          <strong *ngIf="stepOf(run.state) as step" class="me-1">{{ 'selfUpdate.step' | t:{ step: step, total: totalSteps } }}.</strong>
           {{ ('selfUpdate.progress.' + run.state) | t }}<span *ngIf="run.detail">: {{ detailText(run.detail) }}</span>
+          <span class="d-block mt-1">{{ 'selfUpdate.keepOpen' | t }}</span>
         </div>
-        <div class="alert alert-danger small mt-3 mb-0" role="alert" *ngIf="!runInProgress && s.latestRun?.state === 'error'">
+        <div id="update-failed" tabindex="-1" class="alert alert-danger small mt-3 mb-0" role="alert" *ngIf="!runInProgress && s.latestRun?.state === 'error'">
           <strong class="d-block">{{ failureHeadlineKey(s.latestRun!) | t }}</strong>
           <details class="mt-2" *ngIf="s.latestRun?.errorMessage">
             <summary>{{ 'selfUpdate.failed.details' | t }}</summary>
@@ -60,23 +62,27 @@
           </details>
         </div>
         <ng-container *ngIf="appsFailedOf(s.latestRun) as failedApps">
-          <div class="alert alert-warning apps-failed small mt-3 mb-0" role="alert" *ngIf="failedApps.length">
+          <div id="update-apps-failed" tabindex="-1" class="alert alert-warning apps-failed small mt-3 mb-0" role="alert" *ngIf="failedApps.length">
             {{ (failedApps.length === 1 ? 'selfUpdate.appsFailed.one' : 'selfUpdate.appsFailed.other') | t:{ count: failedApps.length, apps: failedApps.join(', ') } }}
           </div>
         </ng-container>
 
         <div class="d-flex gap-2 mt-3">
           <button
+            id="check-now"
             type="button"
             class="btn btn-sm btn-outline-secondary"
+            [attr.aria-describedby]="runInProgress ? 'update-progress' : null"
             [disabled]="checking || runInProgress"
             (click)="checkNow()"
           >
             {{ (checking ? 'selfUpdate.checking' : 'selfUpdate.checkNowButton') | t }}
           </button>
           <button
+            id="update-now"
             type="button"
             class="btn btn-sm btn-primary"
+            [attr.aria-describedby]="runInProgress ? 'update-progress' : null"
             [disabled]="checking || triggering || runInProgress"
             (click)="updateNow()"
           >

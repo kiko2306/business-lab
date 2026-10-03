@@ -96,6 +96,43 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
     return detail === 'frontend' || detail === 'backend' ? this.translate.t('selfUpdate.target.' + detail) : detail;
   }
 
+  /** Steps a full run can pass through, in order; a run that needs fewer simply finishes early. */
+  private static readonly STEPS: readonly SelfUpdateRunState[] = [
+    'pulling',
+    'building',
+    'updating_apps',
+    'restarting_frontend',
+    'restarting_backend',
+  ];
+  protected readonly totalSteps = SelfUpdateComponent.STEPS.length;
+
+  protected stepOf(state: SelfUpdateRunState): number | null {
+    const index = SelfUpdateComponent.STEPS.indexOf(state);
+    return index === -1 ? null : index + 1;
+  }
+
+  /**
+   * A press disables its button, which drops focus to <body>, so after each
+   * step it goes where the person's attention is (plan.md §834 fix 4).
+   */
+  private refocus(id: string): void {
+    setTimeout(() => document.getElementById(id)?.focus());
+  }
+
+  /** When a run ends, move focus to what it says — but never steal it from somewhere else on the page. */
+  private focusResult(): void {
+    setTimeout(() => {
+      const active = document.activeElement;
+      if (active && active !== document.body && active.id !== 'update-progress') {
+        return;
+      }
+      const target = ['update-failed', 'update-apps-failed', 'update-status']
+        .map((id) => document.getElementById(id))
+        .find((el) => el !== null);
+      target?.focus();
+    });
+  }
+
   protected get runInProgress(): boolean {
     const state = this.status?.latestRun?.state;
     return !!state && IN_PROGRESS_STATES.includes(state);
@@ -130,10 +167,12 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
         if (this.status) {
           this.status = { ...this.status, check };
         }
+        this.refocus('check-now');
       },
       error: (error) => {
         this.checking = false;
         this.toast.error(this.translate.t(selfUpdateErrorKey(error, 'selfUpdate.errors.checkFailed')));
+        this.refocus('check-now');
       },
     });
   }
@@ -151,6 +190,7 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
         }
         if (check.commitsBehind === 0) {
           this.toast.success(this.translate.t('selfUpdate.toast.alreadyUpToDate'));
+          this.refocus('update-now');
           return;
         }
         this.confirmAndTrigger(check.commitsBehind);
@@ -158,6 +198,7 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
       error: (error) => {
         this.checking = false;
         this.toast.error(this.translate.t(selfUpdateErrorKey(error, 'selfUpdate.errors.checkFailed')));
+        this.refocus('update-now');
       },
     });
   }
@@ -175,6 +216,7 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
       })
       .then((confirmed) => {
         if (!confirmed) {
+          this.refocus('update-now');
           return;
         }
         this.triggering = true;
@@ -185,10 +227,12 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
               this.status = { ...this.status, latestRun: run };
             }
             this.startPolling();
+            this.refocus('update-progress');
           },
           error: (error) => {
             this.triggering = false;
             this.toast.error(this.translate.t(selfUpdateErrorKey(error, 'selfUpdate.errors.startFailed')));
+            this.refocus('update-now');
           },
         });
       });
@@ -217,6 +261,7 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
             // The raw message is in the page's Technical details, not a toast.
             this.toast.error(this.translate.t('selfUpdate.toast.updateFailed'));
           }
+          this.focusResult();
         }
       });
   }

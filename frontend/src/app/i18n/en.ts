@@ -527,6 +527,8 @@ export const en: Record<string, string> = {
   'selfUpdate.errors.alreadyRunning': 'An update is already running. This page will follow it.',
   'selfUpdate.target.frontend': 'the dashboard screens',
   'selfUpdate.target.backend': 'the dashboard engine',
+  'selfUpdate.step': 'Step {{step}} of {{total}}',
+  'selfUpdate.keepOpen': 'You can leave this page open: it follows the update and reconnects on its own when the dashboard restarts.',
   'selfUpdate.checkNowButton': 'Check now',
   'selfUpdate.checking': 'Checking…',
   'selfUpdate.updateNowButton': 'Update now',

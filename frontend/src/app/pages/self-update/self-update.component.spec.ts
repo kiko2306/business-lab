@@ -421,4 +421,116 @@ describe('SelfUpdateComponent', () => {
 
     expect(toast.error).toHaveBeenCalledWith('The update failed.');
   }));
+
+  // plan.md §838 (§834 fix 4): the progress was one silent line, focus fell to
+  // <body> after every press, and a restart looked like a frozen page.
+  describe('following an update', () => {
+    const host = () => fixture.nativeElement as HTMLElement;
+    const settle = () => new Promise((resolve) => setTimeout(resolve));
+    const running = (state: SelfUpdateRun['state'], detail: string | null = null) =>
+      ({ ...upToDateStatus, latestRun: { ...runningRun, state, detail } }) as SelfUpdateStatus;
+    const show = (status: SelfUpdateStatus) => {
+      operations.getSelfUpdateStatus.and.returnValue(of(status));
+      fixture.detectChanges();
+      openPanel();
+    };
+    const progress = () => host().querySelector('#update-progress') as HTMLElement | null;
+
+    afterEach(() => TestBed.inject(TranslateService).setLocale('en'));
+
+    it('is a status region, so a screen reader hears each step', () => {
+      show(running('building'));
+
+      expect(progress()?.getAttribute('role')).toBe('status');
+    });
+
+    for (const [state, step] of [['pulling', 1], ['building', 2], ['updating_apps', 3], ['restarting_frontend', 4], ['restarting_backend', 5]] as const) {
+      it(`says "Step ${step} of 5" in ${state}`, () => {
+        show(running(state));
+
+        expect(progress()?.textContent).toContain(`Step ${step} of 5`);
+      });
+    }
+
+    it('gives no step number while it is only checking', () => {
+      show(running('checking'));
+
+      expect(progress()?.textContent).not.toContain('Step');
+    });
+
+    it('says the page can stay open, and that it reconnects on its own', () => {
+      show(running('building'));
+
+      expect(progress()?.textContent).toContain('You can leave this page open');
+    });
+
+    it('says none of that when nothing is running', () => {
+      show(upToDateStatus);
+
+      expect(progress()).toBeNull();
+    });
+
+    it('says it in Portuguese for a pt-PT reader', () => {
+      TestBed.inject(TranslateService).setLocale('pt-PT');
+      show(running('building'));
+
+      expect(progress()?.textContent).toContain('Passo 2 de 5');
+      expect(progress()?.textContent).toContain('Pode deixar esta página aberta');
+    });
+
+    it('points the disabled buttons at the progress line, so they are not silent', () => {
+      show(running('building'));
+
+      for (const id of ['check-now', 'update-now']) {
+        const button = host().querySelector('#' + id) as HTMLButtonElement;
+        expect(button.disabled).toBeTrue();
+        expect(button.getAttribute('aria-describedby')).toBe('update-progress');
+      }
+    });
+
+    it('leaves the buttons undescribed when nothing is running', () => {
+      show(upToDateStatus);
+
+      expect((host().querySelector('#update-now') as HTMLElement).hasAttribute('aria-describedby')).toBeFalse();
+    });
+
+    it('puts focus on the progress line once the update starts, not on <body>', async () => {
+      show(upToDateStatus);
+      operations.checkForSelfUpdate.and.returnValue(of(behindStatus.check!));
+      confirm.ask.and.returnValue(Promise.resolve(true));
+      operations.triggerSelfUpdate.and.returnValue(of(runningRun));
+      operations.getSelfUpdateStatus.and.returnValue(of({ ...behindStatus, latestRun: runningRun }));
+
+      component.updateNow();
+      await settle();
+      fixture.detectChanges();
+      await settle();
+
+      expect(document.activeElement?.id).toBe('update-progress');
+    });
+
+    it('puts focus back on Update now when the confirm is declined', async () => {
+      show(upToDateStatus);
+      operations.checkForSelfUpdate.and.returnValue(of(behindStatus.check!));
+      confirm.ask.and.returnValue(Promise.resolve(false));
+
+      component.updateNow();
+      await settle();
+      fixture.detectChanges();
+      await settle();
+
+      expect(document.activeElement?.id).toBe('update-now');
+    });
+
+    it('puts focus back on Check now after a check', async () => {
+      show(upToDateStatus);
+      operations.checkForSelfUpdate.and.returnValue(of(upToDateStatus.check!));
+
+      component.checkNow();
+      fixture.detectChanges();
+      await settle();
+
+      expect(document.activeElement?.id).toBe('check-now');
+    });
+  });
 });

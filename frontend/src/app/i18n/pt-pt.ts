@@ -527,6 +527,8 @@ export const ptPT: Record<string, string> = {
   'selfUpdate.errors.alreadyRunning': 'Já está a decorrer uma atualização. Esta página vai acompanhá-la.',
   'selfUpdate.target.frontend': 'os ecrãs do painel',
   'selfUpdate.target.backend': 'o motor do painel',
+  'selfUpdate.step': 'Passo {{step}} de {{total}}',
+  'selfUpdate.keepOpen': 'Pode deixar esta página aberta: acompanha a atualização e volta a ligar-se sozinha quando o painel reiniciar.',
   'selfUpdate.checkNowButton': 'Verificar agora',
   'selfUpdate.checking': 'A verificar…',
   'selfUpdate.updateNowButton': 'Atualizar agora',

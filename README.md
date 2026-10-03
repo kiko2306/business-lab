@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.16** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.17** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -268,8 +268,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       pt-PT too; (3) done (§837) — on `beta`, in pt-PT: Check now with the box offline shows a Portuguese
       toast, and the page's check-failed line keeps the git message behind "Detalhes técnicos"; during
       a real update the progress line names "os ecrãs do painel" / "o motor do painel", not the English
-      words; (4) a `role="status"` step line ("Step 3 of 5"), "you can leave this page open",
-      focus restored, a reason for each disabled button; (5) the panel open by default, a status
+      words; (4) done (§838) — on `beta`, during a real update: the line under the buttons reads "Step 2 of 5.
+      Getting the update ready…" with "You can leave this page open…", Tab lands on it after you confirm,
+      Check now and Update now are announced as described by it, and when the run ends focus lands on
+      the result; (5) the panel open by default, a status
       line as the hero, badges at least 12px, status derived from the latest run, a primary confirm
       button. On `beta`, after each: run an update on the test box and read what the page says at each step.
 - [ ] **Critique: Utils (plan.md §812)** — `pages/utils`.

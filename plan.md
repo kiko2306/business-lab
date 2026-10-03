@@ -37444,3 +37444,25 @@ the server's prose reached the screen in only four places, and none of them need
   schema and API change for text that is now shown only as technical detail.
 - 447 frontend specs (new: the helper, toasts in both languages, the 409, the disclosure, the target
   words), build clean.
+
+## 838. Updates: progress you can follow, and focus that stays on the page (§834 fix 4, P1)
+
+[x] done.
+
+- **A status region.** The progress line is `id="update-progress"`, `role="status"`, so each step is
+  announced. It leads with "Step N of 5." for the five phases a full run passes through (pulling,
+  building, updating apps, restarting the screens, restarting the engine) and none while only
+  checking. A run that needs fewer phases (a version-only change is pull-only) finishes early, so the
+  count is "of the longest run", not a promise. It also says the page can stay open and reconnects on
+  its own when the dashboard restarts: the restart wait is the moment the page looked frozen.
+- **Disabled is no longer silent.** While a run is going both buttons are `aria-describedby` the
+  progress line.
+- **Focus.** A press disables its button, which drops focus to `<body>`. It now returns to Check now
+  after a check, to Update now after a declined confirm, a check that found nothing, or a failed
+  start, and moves to the progress line when the update starts. When a run ends, focus moves to its
+  result (the failure alert, the failed-apps warning, or the status) only if it was on `<body>` or the
+  progress line, so it is never taken from somewhere else on the page.
+- **Rejected:** a progress bar with a percentage (the run has five unequal phases, so a percentage
+  would be invented), and an `aria-live` on the whole panel (it re-announces the version and the
+  timestamps).
+- 462 frontend specs (13 new, red first), build clean.
