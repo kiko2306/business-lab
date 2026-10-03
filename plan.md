@@ -37165,3 +37165,44 @@ saying "enrolment" and a subtitle naming CrowdSec.
   `whenStable`. 350 pass, build clean, E2E passes.
 - **Rejected:** a preset per role and a saved "template" entity: more state, and a preset that
   drifts from the boxes. Preset contents are a judgment call: change them in the one list.
+
+## 827. Critique round 2, sign-in flow: 20/40, and a locked-out person has no way out (§812)
+
+[x] done (critique only). Third run of §812: login, setup, recovery and set-password as one flow;
+dual-agent (A design review, B detector and measured render) on the `docker-compose.test.yml`
+stack, 1280 and 390, dark and light, EN and pt-PT. **20/40**. Detector CLI 0 findings; the in-page
+overlay found `kicker-above-heading` on login, setup and set-password, and on `/recovery`
+`gpt-thin-border-wide-shadow` and (390 only) `body-text-viewport-edge`. Snapshot in
+`.impeccable/critique/` (not committed). Nothing fixed yet.
+
+**Held up under measurement:** no overflow anywhere, text contrast >= 4.50, control edges >= 4.32:1,
+focus ring 2px solid at ~6:1, inputs and buttons >= 44px at 390, correct `autocomplete`, one `<h1>`,
+localised title and `lang`, inline field errors with `role=alert`/`aria-invalid`.
+
+**Findings, in fix order.**
+1. **P1 — a locked-out person has no path.** No forgot-password link; `/recovery` is linked only
+   from the signed-in shell and on a containerised install always answers 403 ("only from
+   localhost", `backend/src/routes/recovery.ts:30-33`); the real fix is `./start.sh recover`, and
+   nothing in the UI says so.
+2. **P1 — errors are silent, English in pt-PT, and say nothing to try.** The server alert has no
+   `role` (`login.component.html:20`); `extractErrorMessage` prefers the backend string over the
+   translated fallback (`login.component.ts:93,116`, `set-password.component.ts:59`); focus falls to
+   `body` after a wrong password or code. The 429 copy is English with no wait time (from source).
+3. **P2 — set-password and setup dead-end on failure.** A toast only; the escape link is 17px
+   tall; "ask for a new one" names no one; setup flags a password mismatch only as a top alert.
+4. **P2 — phone form friction.** No show-password, a disabled submit with no reason, the 8-character
+   rule only after an error, no username autofocus, a username asked though derivable from the
+   email, `/recovery` inputs 38px with no `type`/`autocomplete`.
+5. **P2/P3 — the card is off-centre and generic.** `.auth-page > .row { width: 100% }`
+   (`styles.css:194`) cancels the gutters: centred at x≈628 not 640 at 1280, 36px left and 60px right
+   at 390. `/recovery` is a different layout.
+
+Minor: login's "create the initial administrator" link is dead code (the guest guard redirects to
+`/setup`); no language or theme control before sign-in; the invitation lookup shares login's
+20-per-15-minutes limiter; `/recovery`'s Reset and Enable need no confirm.
+
+**Harness notes.** The test DB had no admin, so `/login` redirected to `/setup`; A mocked
+`setup-status` to render login and mocked the MFA step and a 410, B created the admin through the
+UI. B restarted the backend ~7 times (`restart`, not `down`) to reset the limiter. Not verified:
+the 429 copy, a real TOTP login, the `/recovery` POSTs, pt-PT MFA wrong-code text, a real screen
+reader. The test stack was removed by name afterwards.

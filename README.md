@@ -245,7 +245,15 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       your authenticator app" link and a Copy key button, focus lands on the step's heading, then on
       the status line after Cancel, Done and turning it off, and a line says leaving starts over.
       Run the full journey (set up, wrong code, activate, recovery codes, disable) on a phone.
-- [ ] **Critique: Sign-in flow (login, setup, recovery, set-password) (plan.md §812)** — `pages/login, setup, recovery, set-password`; public, first contact, phone-heavy; critique as one flow.
+- [ ] **Sign-in flow: fix the critique's findings (plan.md §827)** — in order, test first, one
+      commit and version bump each: (1) a "Locked out?" path on login in plain words, `/recovery`
+      hidden or explained where it cannot work, a lost-authenticator line on the MFA step; (2) errors
+      announced (`role="alert"`, focus moved), translated for pt-PT, and saying what to try (401, 410,
+      429, expired MFA token); (3) set-password and setup failures inline with a full-width Back to
+      sign in, setup's mismatch inline; (4) show-password, the 8-character rule up front, username
+      autofocus, `/recovery` inputs 44px with `type`/`autocomplete`; (5) the card centred and one
+      shared auth shell, `/recovery` inside it. On `beta`, after each: wrong password in pt-PT on a
+      phone, then follow the Locked out? line.
 - [ ] **Critique: Updates (plan.md §812)** — `pages/self-update`; the operator must trust it not to break the box: progress, failure and rollback wording.
 - [ ] **Critique: Utils (plan.md §812)** — `pages/utils`.
 - [ ] **Critique: Content (social) (plan.md §812)** — `pages/social`; route `/content`.
