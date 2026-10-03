@@ -543,8 +543,8 @@ export const ptPT: Record<string, string> = {
   'selfUpdate.toast.upToDate': 'O Business Lab está atualizado.',
   'selfUpdate.toast.updateFailed': 'A atualização falhou.',
   'selfUpdate.confirmUpdate.title': 'Atualizar o Business Lab',
-  'selfUpdate.confirmUpdate.message.one': 'Instalar 1 atualização agora?\nO painel ficará indisponível por breves instantes enquanto reinicia.',
-  'selfUpdate.confirmUpdate.message.other': 'Instalar {{count}} atualizações agora?\nO painel ficará indisponível por breves instantes enquanto reinicia.',
+  'selfUpdate.confirmUpdate.message.one': 'Instalar 1 atualização agora?\nO painel ficará indisponível por breves instantes enquanto reinicia, e as aplicações que mudaram também são atualizadas.\nNão é feita nenhuma cópia de segurança antes: se quiser um caminho de volta, faça uma na página Cópias de segurança antes de começar.',
+  'selfUpdate.confirmUpdate.message.other': 'Instalar {{count}} atualizações agora?\nO painel ficará indisponível por breves instantes enquanto reinicia, e as aplicações que mudaram também são atualizadas.\nNão é feita nenhuma cópia de segurança antes: se quiser um caminho de volta, faça uma na página Cópias de segurança antes de começar.',
   'selfUpdate.confirmUpdate.confirmText': 'Atualizar',
 
   'settings.title': 'Definições',

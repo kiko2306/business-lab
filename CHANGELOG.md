@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.15] — 2026-10-03
+
+### Changed
+
+- Updates: the confirm says that changed apps are updated too and that no backup is made first, pointing at the Backups page
+
 ## [0.163.14] — 2026-10-03
 
 ### Changed

@@ -37408,3 +37408,18 @@ remote and the run is `done`; README item.
 - 1343 backend tests (7 new), 434 frontend specs (new: headline per phase in both languages, the
   disclosure, the scroll cap, the apps warning), both builds clean. Needs a real failed run on the
   box to see it; README item.
+
+## 836. Updates: the confirm says what an update does and does not do (§834 fix 2, P1)
+
+[x] done. Direction chosen by the user: say it plainly, do not build a restore.
+
+The service has no rollback (terminal states are `done` and `error`), and no backup is taken before
+a run. The confirm named only the dashboard restart. It now also says that apps that changed are
+updated too, and "No backup is made first: if you want a way back, make one on the Backups page before
+you start" (EN and pt-PT, the page named as the nav names it). The other half of the plain statement,
+that after a failure the previous version keeps running, is §835's headline, worded by phase.
+**Rejected:** a "Restore previous version" action (touches the self-update backend and needs its own
+plan: a git reset plus rebuilding from the old tree can leave the apps and the dashboard on
+different versions); and an automatic pre-update backup (a Kopia run before every update is slow and
+this page cannot know the destination is configured). Both are open if wanted.
+Two specs (EN and pt-PT) red first; 436 pass, build clean.

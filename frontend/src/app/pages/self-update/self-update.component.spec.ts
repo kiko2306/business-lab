@@ -304,4 +304,37 @@ describe('SelfUpdateComponent', () => {
     }
     expect(Object.keys(en).filter((k) => k.startsWith('selfUpdate.failed.')).length).toBeGreaterThanOrEqual(5);
   });
+
+  // plan.md §836 (§834 fix 2): the confirm named the restart but not that apps
+  // are updated too, nor that nothing is backed up first. The service has no
+  // rollback, so the confirm says what the owner can do before pressing.
+  describe('the confirm says what an update does and does not do', () => {
+    const askedMessage = (): string => {
+      operations.getSelfUpdateStatus.and.returnValue(of(upToDateStatus));
+      fixture.detectChanges();
+      operations.checkForSelfUpdate.and.returnValue(of(behindStatus.check!));
+      confirm.ask.and.returnValue(Promise.resolve(false));
+      component.updateNow();
+      return (confirm.ask.calls.mostRecent().args[0] as { message: string }).message;
+    };
+
+    afterEach(() => TestBed.inject(TranslateService).setLocale('en'));
+
+    it('names the restart, that changed apps update too, and that no backup is made first', () => {
+      const message = askedMessage();
+
+      expect(message).toContain('briefly unavailable');
+      expect(message).toContain('apps that changed');
+      expect(message).toContain('No backup is made first');
+      expect(message).toContain('Backups page');
+    });
+
+    it('says it in Portuguese for a pt-PT reader', () => {
+      TestBed.inject(TranslateService).setLocale('pt-PT');
+      const message = askedMessage();
+
+      expect(message).toContain('Não é feita nenhuma cópia de segurança');
+      expect(message).toContain('Cópias de segurança');
+    });
+  });
 });

@@ -543,8 +543,8 @@ export const en: Record<string, string> = {
   'selfUpdate.toast.upToDate': 'Business Lab is up to date.',
   'selfUpdate.toast.updateFailed': 'The update failed.',
   'selfUpdate.confirmUpdate.title': 'Update Business Lab',
-  'selfUpdate.confirmUpdate.message.one': 'Install 1 update now?\nThe dashboard will be briefly unavailable while it restarts.',
-  'selfUpdate.confirmUpdate.message.other': 'Install {{count}} updates now?\nThe dashboard will be briefly unavailable while it restarts.',
+  'selfUpdate.confirmUpdate.message.one': 'Install 1 update now?\nThe dashboard will be briefly unavailable while it restarts, and apps that changed are updated too.\nNo backup is made first: if you want a way back, make one on the Backups page before you start.',
+  'selfUpdate.confirmUpdate.message.other': 'Install {{count}} updates now?\nThe dashboard will be briefly unavailable while it restarts, and apps that changed are updated too.\nNo backup is made first: if you want a way back, make one on the Backups page before you start.',
   'selfUpdate.confirmUpdate.confirmText': 'Update',
 
   'settings.title': 'Settings',
