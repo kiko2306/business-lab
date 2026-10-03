@@ -267,11 +267,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 Done one page at a time, test first, each its own commit and version bump. A finished
 item is deleted.
 
-- [ ] **Tally: two ShopComponent specs fail depending on the time of day (found at plan.md §831)** —
-      "compares a running day only as far as the hour it has reached" and "says how the day compares,
-      in words" fail on a clean tree (`./scripts/check.sh tally-web test`, 137 of 139 pass) at this
-      hour and passed earlier. Pin the clock in both specs (`jasmine.clock().mockDate`) so they
-      cannot depend on when they run.
 - [ ] **Tally: the hero figure and the comparison (plan.md §806, items 1-2)** —
       on `beta`, open a shop's day view on a phone: today's takings must be the
       largest thing on the page, readable at arm's length, with "€X more/less

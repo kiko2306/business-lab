@@ -3,6 +3,7 @@ import { ActivatedRoute, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { ShopComponent } from './shop.component';
 import { ApiService } from '../api.service';
+import { Clock } from '../clock';
 import { Overview } from '../models';
 
 const overview = (extra: Partial<Overview> = {}): Overview =>
@@ -53,6 +54,10 @@ describe('ShopComponent', () => {
       providers: [
         provideRouter([]),
         { provide: ApiService, useValue: api },
+        // Pinned to the fixture's own moment (14:30 on its businessDate): without it the
+        // component reads the real clock, and "a running day compared through the last
+        // complete hour" depended on what time of day the suite ran.
+        { provide: Clock, useValue: { now: () => new Date(2026, 9, 3, 14, 30) } },
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: new Map([['id', 'abc']]) } } },
       ],
     }).compileComponents();

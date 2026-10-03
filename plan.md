@@ -37324,3 +37324,12 @@ reader. The test stack was removed by name afterwards.
 - 416 frontend specs, build clean, E2E passes (one run of three failed `auth.setup.ts` at its 30s
   timeout and passed on the two reruns; cause not found). Tally still has the two time-of-day specs
   from the README item. **Not done:** a product-voice line on the card ("this is X's box").
+
+## 833. Tally: the shop spec no longer depends on the time of day (found at §831)
+
+[x] done. Two `ShopComponent` specs ("says how the day compares, in words", "compares a running
+day only as far as the hour it has reached") failed on a clean tree on 2026-10-03: the fixture's
+`businessDate` was the real today, so the component read the real clock and cut the comparison at
+the last complete hour. `shop.component.spec.ts` now provides the `Clock` seam pinned to the
+fixture's own moment (14:30), as `shop.third.spec.ts` and `shop.fourth.spec.ts` already did. 139 of 139
+pass; spec-only, no version bump.
