@@ -3,7 +3,7 @@ import { Component, inject, OnInit } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
-import { extractErrorMessage } from '../../core/api';
+import { authErrorKey } from '../../core/auth-errors';
 import { AuthService } from '../../core/auth.service';
 import { sanitizePastedText } from '../../core/input-sanitize';
 import { isMfaChallenge } from '../../core/models';
@@ -90,7 +90,8 @@ export class LoginComponent implements OnInit {
           void this.router.navigateByUrl('/home');
         },
         error: (error) => {
-          this.errorMessage = extractErrorMessage(error, this.translate.t('login.error.signInFailed'));
+          this.errorMessage = this.translate.t(authErrorKey(error, 'login'));
+          this.refocus('password');
         },
       });
   }
@@ -113,9 +114,31 @@ export class LoginComponent implements OnInit {
           void this.router.navigateByUrl('/home');
         },
         error: (error) => {
-          this.errorMessage = extractErrorMessage(error, this.translate.t('login.error.codeRejected'));
+          const key = authErrorKey(error, 'mfa');
+          if (key === 'login.error.mfaExpired') {
+            // The token is gone: a retry on this step can only fail again.
+            this.backToCredentials();
+            this.errorMessage = this.translate.t(key);
+            this.refocus('password');
+            return;
+          }
+          this.errorMessage = this.translate.t(key);
+          this.refocus('code');
         },
       });
+  }
+
+  /**
+   * After a failure the cursor goes back to the field to retype, with its text
+   * selected, once Angular has drawn the error. Without it focus fell to
+   * <body> and the first Tab left the page (plan.md §827).
+   */
+  private refocus(id: string): void {
+    setTimeout(() => {
+      const field = document.getElementById(id) as HTMLInputElement | null;
+      field?.focus();
+      field?.select();
+    });
   }
 
   toggleRecoveryCode(): void {

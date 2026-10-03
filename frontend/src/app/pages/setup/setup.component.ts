@@ -3,7 +3,7 @@ import { Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
-import { extractErrorMessage } from '../../core/api';
+import { authErrorKey } from '../../core/auth-errors';
 import { AuthService } from '../../core/auth.service';
 import { sanitizePastedText } from '../../core/input-sanitize';
 import { ToastService } from '../../core/toast.service';
@@ -71,7 +71,7 @@ export class SetupComponent {
           void this.router.navigateByUrl('/home');
         },
         error: (error) => {
-          this.errorMessage = extractErrorMessage(error, this.translate.t('setup.errors.setupFailed'));
+          this.errorMessage = this.translate.t(authErrorKey(error, 'setup'));
         },
       });
   }

@@ -37206,3 +37206,25 @@ Minor: login's "create the initial administrator" link is dead code (the guest g
 UI. B restarted the backend ~7 times (`restart`, not `down`) to reset the limiter. Not verified:
 the 429 copy, a real TOTP login, the `/recovery` POSTs, pt-PT MFA wrong-code text, a real screen
 reader. The test stack was removed by name afterwards.
+
+## 828. Sign-in: failures are announced, translated and say what to try (§827 fix 2, P1)
+
+[x] done. Order changed from §827's list at the user's call: errors first, the locked-out line next.
+
+- **No backend sentence reaches these pages.** `core/auth-errors.ts` maps a failure to an i18n key
+  per context (login, mfa, invitation, setup): network, 429 ("Wait 15 minutes"), 5xx, a wrong
+  username or password, a wrong code, a timed-out sign-in, a dead invitation link, a taken username.
+  `extractErrorMessage` is gone from login, setup and set-password. A spec walks every status and
+  context and asserts each key exists in both dictionaries.
+- **The one body read.** A 401 on the code step is a wrong code or a timed-out sign-in; auth.ts
+  gives no code field, so the helper matches "expired" in the message (commented there).
+  **Rejected:** a backend `code` field for this alone: a second change for one distinction. Open
+  if more such cases appear.
+- **A timed-out sign-in leaves the code step.** It returns to the credentials step with "This
+  sign-in timed out", since a retry there can only fail again.
+- **Announced and focused.** The three alerts carry `role="alert"`, the "Checking your link" wait
+  `role="status"`. After a failure the cursor goes to the password (text selected) or the code,
+  the pattern of §821. The invalid-link text now says "ask whoever invited you".
+- 372 frontend specs (new: helper, login failure states, setup and set-password specs, which did
+  not exist), build clean, E2E passes. Not done: the 429 wait time is the limiter's fixed 15
+  minutes, not read from `Retry-After`.

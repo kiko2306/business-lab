@@ -3,7 +3,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
-import { extractErrorMessage } from '../../core/api';
+import { authErrorKey } from '../../core/auth-errors';
 import { AuthService } from '../../core/auth.service';
 import { sanitizePastedText } from '../../core/input-sanitize';
 import { ToastService } from '../../core/toast.service';
@@ -55,8 +55,7 @@ export class SetPasswordComponent implements OnInit {
       .pipe(finalize(() => (this.loading = false)))
       .subscribe({
         next: (invite) => (this.invite = invite),
-        error: (error) =>
-          (this.linkError = extractErrorMessage(error, this.translate.t('setPassword.errors.invalidLink'))),
+        error: (error) => (this.linkError = this.translate.t(authErrorKey(error, 'invitation'))),
       });
   }
 
@@ -86,8 +85,7 @@ export class SetPasswordComponent implements OnInit {
           this.toast.success(this.translate.t('setPassword.toast.success'));
           void this.router.navigateByUrl('/home');
         },
-        error: (error) =>
-          this.toast.error(extractErrorMessage(error, this.translate.t('setPassword.errors.setFailed'))),
+        error: (error) => this.toast.error(this.translate.t(authErrorKey(error, 'invitation'))),
       });
   }
 }

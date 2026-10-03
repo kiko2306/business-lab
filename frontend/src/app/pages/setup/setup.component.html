@@ -11,7 +11,7 @@
             </p>
           </div>
 
-          <div *ngIf="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
+          <div *ngIf="errorMessage" class="alert alert-danger" role="alert">{{ errorMessage }}</div>
 
           <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
             <div class="mb-3">

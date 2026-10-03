@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.9] — 2026-10-03
+
+### Changed
+
+- Sign-in: a failed sign-in is announced, in your own language, says what to try, and puts the cursor back in the field (also set-password and setup)
+
 ## [0.163.8] — 2026-10-02
 
 ### Users

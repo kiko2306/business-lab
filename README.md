@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.8** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.9** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -246,10 +246,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       the status line after Cancel, Done and turning it off, and a line says leaving starts over.
       Run the full journey (set up, wrong code, activate, recovery codes, disable) on a phone.
 - [ ] **Sign-in flow: fix the critique's findings (plan.md §827)** — in order, test first, one
-      commit and version bump each: (1) a "Locked out?" path on login in plain words, `/recovery`
-      hidden or explained where it cannot work, a lost-authenticator line on the MFA step; (2) errors
-      announced (`role="alert"`, focus moved), translated for pt-PT, and saying what to try (401, 410,
-      429, expired MFA token); (3) set-password and setup failures inline with a full-width Back to
+      commit and version bump each: (2) done (§828) — on `beta`, in pt-PT on a phone: a wrong password reads in Portuguese, is
+      announced, and the cursor is back in the password with it selected; a wrong code on the 2FA step
+      does the same; (1) a "Locked out?" path on login in plain words, `/recovery`
+      hidden or explained where it cannot work, a lost-authenticator line on the MFA step; (3) set-password and setup failures inline with a full-width Back to
       sign in, setup's mismatch inline; (4) show-password, the 8-character rule up front, username
       autofocus, `/recovery` inputs 44px with `type`/`autocomplete`; (5) the card centred and one
       shared auth shell, `/recovery` inside it. On `beta`, after each: wrong password in pt-PT on a

@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
+import { TranslateService } from '../../i18n/translate.service';
 import { LoginComponent } from './login.component';
 import { AuthService } from '../../core/auth.service';
 import { ToastService } from '../../core/toast.service';
@@ -81,14 +83,14 @@ describe('LoginComponent', () => {
 
   it('shows an error and stays on the MFA step when the code is rejected', () => {
     authService.login.and.returnValue(of({ mfaRequired: true, mfaToken: 'mfa-token' } as MfaChallenge));
-    authService.completeMfaLogin.and.returnValue(throwError(() => new Error('That code was not accepted.')));
+    authService.completeMfaLogin.and.returnValue(throwError(() => new HttpErrorResponse({ status: 401, error: { error: 'That code is not valid.' } })));
     component['form'].setValue({ username: 'admin', password: 'password123' });
     component.submit();
 
     component['mfaForm'].setValue({ code: '000000' });
     component.submitMfa();
 
-    expect(component['errorMessage']).toBe('That code was not accepted.');
+    expect(component['errorMessage']).toContain('That code is not right');
     expect(component['stage']).toBe('mfa');
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
@@ -105,12 +107,12 @@ describe('LoginComponent', () => {
   });
 
   it('surfaces an error message and stops submitting when login fails', () => {
-    authService.login.and.returnValue(throwError(() => new Error('Unable to sign in.')));
+    authService.login.and.returnValue(throwError(() => new HttpErrorResponse({ status: 401, error: { error: 'Invalid username or password' } })));
     component['form'].setValue({ username: 'admin', password: 'wrong-password' });
 
     component.submit();
 
-    expect(component['errorMessage']).toBe('Unable to sign in.');
+    expect(component['errorMessage']).toContain('username or password is not right');
     expect(component['submitting']).toBe(false);
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
@@ -140,5 +142,92 @@ describe('LoginComponent', () => {
 
     expect(component['form'].controls.username.value).toBe('admin');
     expect(component['form'].controls.username.dirty).toBe(true);
+  });
+
+  // plan.md §827 (P1): the failure was a silent bar in the server's English,
+  // and focus fell to <body>, so the first Tab left the page.
+  describe('a failed sign-in', () => {
+    const host = () => fixture.nativeElement as HTMLElement;
+    const settle = () => new Promise((resolve) => setTimeout(resolve));
+    const wrongPassword = () =>
+      throwError(() => new HttpErrorResponse({ status: 401, error: { error: 'Invalid username or password' } }));
+
+    beforeEach(() => {
+      authService.isSetupRequired.and.returnValue(of(false));
+      fixture.detectChanges();
+    });
+
+    afterEach(() => TestBed.inject(TranslateService).setLocale('en'));
+
+    it('announces the failure', () => {
+      authService.login.and.callFake(wrongPassword);
+      component['form'].setValue({ username: 'admin', password: 'wrong-password' });
+      component.submit();
+      fixture.detectChanges();
+
+      expect(host().querySelector('.alert-danger')?.getAttribute('role')).toBe('alert');
+    });
+
+    it('says it in Portuguese for a pt-PT reader, never the server\'s English', () => {
+      TestBed.inject(TranslateService).setLocale('pt-PT');
+      authService.login.and.callFake(wrongPassword);
+      component['form'].setValue({ username: 'admin', password: 'wrong-password' });
+      component.submit();
+      fixture.detectChanges();
+
+      const text = host().querySelector('.alert-danger')?.textContent ?? '';
+      expect(text).not.toContain('Invalid username or password');
+      expect(text).toContain('palavra-passe');
+    });
+
+    it('puts the cursor in the password with its text selected, ready to retype', async () => {
+      authService.login.and.callFake(wrongPassword);
+      component['form'].setValue({ username: 'admin', password: 'wrong-password' });
+      component.submit();
+      fixture.detectChanges();
+      await settle();
+
+      const password = host().querySelector('#password') as HTMLInputElement;
+      expect(document.activeElement).toBe(password);
+      expect(password.selectionEnd! - password.selectionStart!).toBe('wrong-password'.length);
+    });
+
+    it('says to wait when the rate limiter answers', () => {
+      authService.login.and.returnValue(throwError(() => new HttpErrorResponse({ status: 429, error: { error: 'Too many requests, please try again later' } })));
+      component['form'].setValue({ username: 'admin', password: 'password123' });
+      component.submit();
+
+      expect(component['errorMessage']).toContain('15 minutes');
+    });
+
+    it('returns to the credentials step when the sign-in timed out, and says why', () => {
+      authService.login.and.returnValue(of({ mfaRequired: true, mfaToken: 'mfa-token' } as MfaChallenge));
+      authService.completeMfaLogin.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 401, error: { error: 'This login attempt has expired. Start again.' } })),
+      );
+      component['form'].setValue({ username: 'admin', password: 'password123' });
+      component.submit();
+      component['mfaForm'].setValue({ code: '123456' });
+      component.submitMfa();
+
+      expect(component['stage']).toBe('credentials');
+      expect(component['errorMessage']).toContain('timed out');
+    });
+
+    it('keeps the cursor in the code field after a wrong code', async () => {
+      authService.login.and.returnValue(of({ mfaRequired: true, mfaToken: 'mfa-token' } as MfaChallenge));
+      authService.completeMfaLogin.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 401, error: { error: 'That code is not valid.' } })),
+      );
+      component['form'].setValue({ username: 'admin', password: 'password123' });
+      component.submit();
+      fixture.detectChanges();
+      component['mfaForm'].setValue({ code: '000000' });
+      component.submitMfa();
+      fixture.detectChanges();
+      await settle();
+
+      expect(document.activeElement?.id).toBe('code');
+    });
   });
 });
