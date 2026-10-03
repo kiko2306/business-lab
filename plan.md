@@ -37423,3 +37423,24 @@ plan: a git reset plus rebuilding from the old tree can leave the apps and the d
 different versions); and an automatic pre-update backup (a Kopia run before every update is slow and
 this page cannot know the destination is configured). Both are open if wanted.
 Two specs (EN and pt-PT) red first; 436 pass, build clean.
+
+## 837. Updates: the server's English no longer reaches the screen (§834 fix 3, P1)
+
+[x] done. §834 proposed backend error codes translated on the client. The need turned out smaller:
+the server's prose reached the screen in only four places, and none of them needs a code.
+
+- **Toasts.** `core/self-update-errors.ts` maps a failed request to a key: unreachable server and the
+  limiter reuse the sign-in keys (`auth.error.network`, `auth.error.tooMany`), a 409 says an update is
+  already running, anything else is the action's own translated message. `extractErrorMessage` is gone
+  from the component; the poll's "run failed" toast is the translated "The update failed." (the raw
+  message is in the page's Technical details, §835).
+- **The failed-check line.** The translated "Last update check failed (time)" stays; the git message
+  moves into the same closed "Technical details" box with the scroll cap.
+- **The progress detail.** The two image targets arrive as the words `frontend` and `backend`; they
+  render as "the dashboard screens" / "the dashboard engine" (the jargon guard still holds: no
+  `frontend`/`backend` in any `selfUpdate.*` string). An app's name and count pass through.
+- **Not changed:** the failed run's `errorMessage` and the reconcile paragraph stay English, inside the
+  disclosure by design; the headline is the translated sentence. **Rejected:** backend error codes: a
+  schema and API change for text that is now shown only as technical detail.
+- 447 frontend specs (new: the helper, toasts in both languages, the 409, the disclosure, the target
+  words), build clean.

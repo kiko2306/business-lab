@@ -1,4 +1,5 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture, TestBed, discardPeriodicTasks, fakeAsync, tick } from '@angular/core/testing';
+import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { SelfUpdateComponent } from './self-update.component';
 import { OperationsService } from '../../core/operations.service';
@@ -177,11 +178,11 @@ describe('SelfUpdateComponent', () => {
   }));
 
   it('appends the run detail to the progress line when present', () => {
-    operations.getSelfUpdateStatus.and.returnValue(of({ ...behindStatus, latestRun: { ...runningRun, detail: 'backend' } }));
+    operations.getSelfUpdateStatus.and.returnValue(of({ ...behindStatus, latestRun: { ...runningRun, detail: 'nextcloud (1/3)' } }));
     fixture.detectChanges();
     openPanel();
 
-    expect(fixture.nativeElement.textContent).toContain('backend');
+    expect(fixture.nativeElement.textContent).toContain('nextcloud (1/3)');
   });
 
   // plan.md §835 (P1): a failure printed "Last update failed: <raw tool output>"
@@ -337,4 +338,87 @@ describe('SelfUpdateComponent', () => {
       expect(message).toContain('Cópias de segurança');
     });
   });
+
+  // plan.md §837 (§834 fix 3): the server's English reached the pt-PT screen in
+  // toasts, the check-failed line and the progress detail.
+  describe('nothing the server wrote in English reaches the screen', () => {
+    const host = () => fixture.nativeElement as HTMLElement;
+    const server = (status: number) => throwError(() => new HttpErrorResponse({ status, error: { error: 'fatal: unable to access the remote' } }));
+
+    afterEach(() => TestBed.inject(TranslateService).setLocale('en'));
+
+    it('says a failed check in the app\'s words, in Portuguese for a pt-PT reader', () => {
+      TestBed.inject(TranslateService).setLocale('pt-PT');
+      operations.getSelfUpdateStatus.and.returnValue(of(upToDateStatus));
+      fixture.detectChanges();
+      operations.checkForSelfUpdate.and.callFake(() => server(500));
+
+      component.checkNow();
+
+      const message = toast.error.calls.mostRecent().args[0] as string;
+      expect(message).not.toContain('fatal');
+      expect(message).toContain('verificar');
+    });
+
+    it('says an update is already running on a 409, not the server\'s sentence', () => {
+      operations.getSelfUpdateStatus.and.returnValue(of(upToDateStatus));
+      fixture.detectChanges();
+      operations.checkForSelfUpdate.and.returnValue(of(behindStatus.check!));
+      confirm.ask.and.returnValue(Promise.resolve(true));
+      operations.triggerSelfUpdate.and.callFake(() => server(409));
+
+      component.updateNow();
+
+      return Promise.resolve().then(() => Promise.resolve()).then(() => {
+        const message = toast.error.calls.mostRecent()?.args[0] as string;
+        expect(message).toContain('already running');
+      });
+    });
+
+    it('keeps the raw check error behind Technical details, with the translated line above it', () => {
+      operations.getSelfUpdateStatus.and.returnValue(
+        of({ ...upToDateStatus, lastCheckError: { message: 'fatal: unable to access', at: new Date().toISOString() } }),
+      );
+      fixture.detectChanges();
+      openPanel();
+
+      const alert = host().querySelector('.alert-warning') as HTMLElement;
+      expect(alert.textContent).toContain('Last update check failed');
+      const details = alert.querySelector('details') as HTMLDetailsElement;
+      expect(details.open).toBeFalse();
+      expect(details.textContent).toContain('fatal: unable to access');
+    });
+
+    it('names the two image targets in plain words in the progress line, in any language', () => {
+      TestBed.inject(TranslateService).setLocale('pt-PT');
+      operations.getSelfUpdateStatus.and.returnValue(of({ ...upToDateStatus, latestRun: { ...runningRun, state: 'building', detail: 'frontend' } }));
+      fixture.detectChanges();
+      openPanel();
+
+      const text = host().querySelector('.alert-info')?.textContent ?? '';
+      expect(text).not.toContain('frontend');
+      expect(text).toContain('ecrãs');
+    });
+
+    it('leaves an app name in the progress line as it is', () => {
+      operations.getSelfUpdateStatus.and.returnValue(of({ ...upToDateStatus, latestRun: { ...runningRun, state: 'updating_apps', detail: 'nextcloud (3/14)' } }));
+      fixture.detectChanges();
+      openPanel();
+
+      expect(host().querySelector('.alert-info')?.textContent).toContain('nextcloud (3/14)');
+    });
+  });
+
+  it('does not put the run\'s raw error in the toast when the poll sees a failed run', fakeAsync(() => {
+    operations.getSelfUpdateStatus.and.returnValue(of({ ...upToDateStatus, latestRun: { ...runningRun } }));
+    fixture.detectChanges();
+    operations.getSelfUpdateStatus.and.returnValue(
+      of({ ...upToDateStatus, latestRun: { ...runningRun, state: 'error', failedPhase: 'building', errorMessage: 'ERROR: failed to solve', finishedAt: '2026-09-04T10:05:00.000Z' } }),
+    );
+
+    tick(3000);
+    discardPeriodicTasks();
+
+    expect(toast.error).toHaveBeenCalledWith('The update failed.');
+  }));
 });

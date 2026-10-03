@@ -5,7 +5,7 @@ import { PanelComponent } from '../../components/panel/panel.component';
 import { OperationsService } from '../../core/operations.service';
 import { ConfirmService } from '../../core/confirm.service';
 import { ToastService } from '../../core/toast.service';
-import { extractErrorMessage } from '../../core/api';
+import { selfUpdateErrorKey } from '../../core/self-update-errors';
 import { SelfUpdateRun, SelfUpdateRunState, SelfUpdateStatus } from '../../core/models';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
@@ -87,6 +87,15 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
     return run.finishedAt === null;
   }
 
+  /**
+   * The progress line's detail: the two image targets arrive as the words
+   * `frontend` and `backend`, which mean nothing to the owner; an app's name
+   * and its count pass through as they are.
+   */
+  protected detailText(detail: string): string {
+    return detail === 'frontend' || detail === 'backend' ? this.translate.t('selfUpdate.target.' + detail) : detail;
+  }
+
   protected get runInProgress(): boolean {
     const state = this.status?.latestRun?.state;
     return !!state && IN_PROGRESS_STATES.includes(state);
@@ -109,7 +118,7 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
           this.startPolling();
         }
       },
-      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('selfUpdate.errors.loadStatus'))),
+      error: (error) => this.toast.error(this.translate.t(selfUpdateErrorKey(error, 'selfUpdate.errors.loadStatus'))),
     });
   }
 
@@ -124,7 +133,7 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         this.checking = false;
-        this.toast.error(extractErrorMessage(error, this.translate.t('selfUpdate.errors.checkFailed')));
+        this.toast.error(this.translate.t(selfUpdateErrorKey(error, 'selfUpdate.errors.checkFailed')));
       },
     });
   }
@@ -148,7 +157,7 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         this.checking = false;
-        this.toast.error(extractErrorMessage(error, this.translate.t('selfUpdate.errors.checkFailed')));
+        this.toast.error(this.translate.t(selfUpdateErrorKey(error, 'selfUpdate.errors.checkFailed')));
       },
     });
   }
@@ -179,7 +188,7 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
           },
           error: (error) => {
             this.triggering = false;
-            this.toast.error(extractErrorMessage(error, this.translate.t('selfUpdate.errors.startFailed')));
+            this.toast.error(this.translate.t(selfUpdateErrorKey(error, 'selfUpdate.errors.startFailed')));
           },
         });
       });
@@ -205,7 +214,8 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
           if (status.latestRun?.state === 'done') {
             this.toast.success(this.translate.t('selfUpdate.toast.upToDate'));
           } else if (status.latestRun?.state === 'error') {
-            this.toast.error(status.latestRun.errorMessage || this.translate.t('selfUpdate.toast.updateFailed'));
+            // The raw message is in the page's Technical details, not a toast.
+            this.toast.error(this.translate.t('selfUpdate.toast.updateFailed'));
           }
         }
       });

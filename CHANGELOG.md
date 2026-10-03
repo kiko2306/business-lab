@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.16] — 2026-10-03
+
+### Changed
+
+- Updates: toasts, the failed-check line and the progress detail no longer show the server's English; the raw text sits behind Technical details
+
 ## [0.163.15] — 2026-10-03
 
 ### Changed
