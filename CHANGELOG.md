@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.18] — 2026-10-03
+
+### Changed
+
+- Updates: the page opens with its panel open, leads with one status line that reads the latest run as well as the check, badges are 13px, and a routine update's confirm is no longer danger red
+
 ## [0.163.17] — 2026-10-03
 
 ### Changed

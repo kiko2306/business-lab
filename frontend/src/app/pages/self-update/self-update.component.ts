@@ -133,6 +133,36 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * The one line the page leads with (plan.md §839). Read from the latest run
+   * as well as the cached check: the check alone said "Up to date" beside a
+   * failed run, because a failure past the pull leaves HEAD equal to the remote.
+   */
+  protected get overallStatus(): { key: string; kind: 'success' | 'warning' | 'danger' | 'info' | 'secondary'; params?: Record<string, number> } | null {
+    const s = this.status;
+    if (!s) {
+      return null;
+    }
+    if (this.runInProgress) {
+      return { key: 'selfUpdate.updating', kind: 'info' };
+    }
+    const run = s.latestRun;
+    if (run?.state === 'error') {
+      return { key: 'selfUpdate.status.failed', kind: 'danger' };
+    }
+    const failedApps = run?.appsFailed?.length ?? 0;
+    if (failedApps > 0) {
+      return { key: failedApps === 1 ? 'selfUpdate.status.appsFailed.one' : 'selfUpdate.status.appsFailed.other', kind: 'warning', params: { count: failedApps } };
+    }
+    if (s.check) {
+      const behind = s.check.commitsBehind;
+      return behind > 0
+        ? { key: behind === 1 ? 'selfUpdate.updatesAvailable.one' : 'selfUpdate.updatesAvailable.other', kind: 'warning', params: { count: behind } }
+        : { key: 'selfUpdate.upToDate', kind: 'success' };
+    }
+    return { key: 'selfUpdate.notCheckedYet', kind: 'secondary' };
+  }
+
   protected get runInProgress(): boolean {
     const state = this.status?.latestRun?.state;
     return !!state && IN_PROGRESS_STATES.includes(state);
@@ -212,7 +242,6 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
           { count: commitsBehind }
         ),
         confirmText: this.translate.t('selfUpdate.confirmUpdate.confirmText'),
-        danger: true,
       })
       .then((confirmed) => {
         if (!confirmed) {

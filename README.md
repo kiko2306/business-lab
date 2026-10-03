@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.17** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.18** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -257,32 +257,19 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       characters." is under new passwords, the cursor starts in the first field, `/recovery` inputs
       are 44px; (5) §832 — the card is centred (equal space either side at every width) and all four
       pages look like the same card, `/recovery` included.
-- [ ] **Updates page: fix the critique's findings (plan.md §834)** — in order, test first, one
-      commit and version bump each: (1) done (§835) — on `beta`, with the box offline (unplug it, or point the update branch at one
-      that does not exist) press Update now: a red headline says nothing changed and the apps run as
-      before, the git error is behind a closed "Technical details"; then reconnect and press it again:
-      it updates. A real failed build cannot be provoked from the page; its behaviour (the retry
-      rebuilds from the failed run's start, the headline says "downloaded but not installed") is
-      covered by unit tests only; (2) done (§836) — on `beta`, press Update now when an update is available: the confirm
-      says changed apps are updated too and that no backup is made first, naming the Backups page, in
-      pt-PT too; (3) done (§837) — on `beta`, in pt-PT: Check now with the box offline shows a Portuguese
-      toast, and the page's check-failed line keeps the git message behind "Detalhes técnicos"; during
-      a real update the progress line names "os ecrãs do painel" / "o motor do painel", not the English
-      words; (4) done (§838) — on `beta`, during a real update: the line under the buttons reads "Step 2 of 5.
-      Getting the update ready…" with "You can leave this page open…", Tab lands on it after you confirm,
-      Check now and Update now are announced as described by it, and when the run ends focus lands on
-      the result; (5) the panel open by default, a status
-      line as the hero, badges at least 12px, status derived from the latest run, a primary confirm
-      button. On `beta`, after each: run an update on the test box and read what the page says at each step.
-- [ ] **Critique: Utils (plan.md §812)** — `pages/utils`.
-- [ ] **Critique: Content (social) (plan.md §812)** — `pages/social`; route `/content`.
-- [ ] **Critique: Small pages (audit logs, access denied, unsubscribe) (plan.md §812)** — `pages/audit-logs, access-denied, unsubscribe`; one critique, three pages.
-
-### Dashboard critique fixes (plan.md §776)
-
-Done one page at a time, test first, each its own commit and version bump. A finished
-item is deleted.
-
+- [ ] **Updates page: fix the critique's findings (plan.md §834)** — all five done; this item is now
+      only the `beta` look, on a phone and a laptop, EN and pt-PT. (5) §839 — the page opens with the
+      panel open and leads with one badge: "Up to date" / "N updates available" / "Updating…" /
+      "Last update failed" (red) / "Updated, N apps need attention"; badges are 13px; the confirm's
+      Update button is blue, not red. The other four: (1) §835 — with the box offline press Update now:
+      the red headline says nothing changed, the git error is behind a closed "Technical details";
+      reconnect and press again: it updates (a real failed build cannot be provoked from the page; the
+      retry that rebuilds is unit-tested only); (2) §836 — the confirm says changed apps update too and
+      no backup is made first, naming the Backups page; (3) §837 — in pt-PT a failed Check now shows
+      a Portuguese toast and the check-failed line keeps the git message behind "Detalhes técnicos",
+      and the progress line says "os ecrãs do painel" / "o motor do painel"; (4) §838 — during a real
+      update the line reads "Step 2 of 5. Getting the update ready…" with "You can leave this page
+      open…", Tab lands on it after you confirm, and when the run ends focus lands on the result.
 - [ ] **Updates: apps that failed to update cannot be retried from the page (found at plan.md §835)** —
       a run where some apps failed still lands (`done`, `appsFailed` set); HEAD is then the remote, so
       Update now reports "up to date" and never retries those apps (`updateAllInstalledApps` runs only

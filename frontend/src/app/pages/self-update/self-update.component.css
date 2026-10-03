@@ -6,3 +6,10 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* Bootstrap sizes a badge at .75em of its parent, which inside the small
+   definition list was 10.5px, under the 11px floor and the AA-comfortable 12px
+   (plan.md §839). */
+.status-badge {
+  font-size: 0.8125rem;
+}

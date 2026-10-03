@@ -37466,3 +37466,26 @@ the server's prose reached the screen in only four places, and none of them need
   would be invented), and an `aria-live` on the whole panel (it re-announces the version and the
   timestamps).
 - 462 frontend specs (13 new, red first), build clean.
+
+## 839. Updates: the page earns trust at a glance (§834 fix 5, P2)
+
+[x] done. All five of §834's fixes are in; what is left of the README item is the `beta` look.
+
+- **Open.** The only panel on its own page is `[defaultOpen]="true"` (the input from §813); a person
+  who closes it keeps it closed.
+- **One status line, read from the run too.** `overallStatus` leads the card: Updating (info) while a
+  run is going; "Last update failed" (red) when the latest run errored; "Updated, N apps need
+  attention" (amber) when it landed with failed apps; else the check's "N updates available" /
+  "Up to date"; "Not checked yet" with nothing to go on. Read from the check alone it said "Up to
+  date" beside a failed run, because a failure past the pull leaves HEAD equal to the remote. The old
+  Status row is gone (its key `selfUpdate.statusLabel` deleted, with the dead `progress.done` and
+  `progress.error`); the running version and last-checked rows stay.
+- **Badges 13px.** `.status-badge` (Bootstrap's `.75em` of the small list was 10.5px, under the
+  detector's 11px floor); the stale badge too. A spec measures every badge >= 12px.
+- **The confirm is primary.** A routine update is not a destructive act; `danger: true` is gone (the
+  same red as Logout and delete said "something bad").
+- **Kept as it was:** the "3 updates" wording still counts commits (the page cannot say what changed;
+  only the backend knows the diff, and no changelog is available there). A "what is in this update"
+  line is open if wanted.
+- 473 frontend specs (11 new, red first; the older specs' panel helper and two expectations updated),
+  build clean, E2E passes.

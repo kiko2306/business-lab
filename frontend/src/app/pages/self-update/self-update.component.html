@@ -9,11 +9,16 @@
   <app-panel
     anchor="self-update"
     key="self-update"
+    [defaultOpen]="true"
     [title]="'selfUpdate.panel.title' | t"
     [subtitle]="'selfUpdate.panel.subtitle' | t"
   >
     <div class="card mb-3" *ngIf="status as s">
       <div class="card-body p-4">
+        <!-- One line to lead with, read from the latest run as well as the check (plan.md §839). -->
+        <p id="update-status" tabindex="-1" class="h5 mb-3" *ngIf="overallStatus as st">
+          <span class="badge status-badge" [ngClass]="'text-bg-' + st.kind">{{ st.key | t:st.params }}</span>
+        </p>
         <dl class="row mb-0 small">
           <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.runningVersion' | t }}</dt>
           <dd class="col-sm-8 font-monospace">v{{ s.appVersion }}</dd>
@@ -22,23 +27,11 @@
             <!-- The raw commit hashes this used to show here were never
                  meaningful to a non-technical reader — removed rather than
                  translated (found during an audit, plan.md §791, §794). -->
-            <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.statusLabel' | t }}</dt>
-            <dd id="update-status" tabindex="-1" class="col-sm-8">
-              <span *ngIf="check.commitsBehind === 0" class="badge text-bg-success">{{ 'selfUpdate.upToDate' | t }}</span>
-              <span *ngIf="check.commitsBehind > 0" class="badge text-bg-warning">
-                {{ (check.commitsBehind === 1 ? 'selfUpdate.updatesAvailable.one' : 'selfUpdate.updatesAvailable.other') | t:{ count: check.commitsBehind } }}
-              </span>
-            </dd>
-
             <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.lastChecked' | t }}</dt>
             <dd class="col-sm-8">
               {{ check.checkedAt | date: 'medium':undefined:translate.locale() }}
-              <span *ngIf="checkIsStale" class="badge text-bg-warning ms-1">{{ 'selfUpdate.stale' | t }}</span>
+              <span *ngIf="checkIsStale" class="badge status-badge text-bg-warning ms-1">{{ 'selfUpdate.stale' | t }}</span>
             </dd>
-          </ng-container>
-          <ng-container *ngIf="!s.check">
-            <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.statusLabel' | t }}</dt>
-            <dd class="col-sm-8 text-body-secondary">{{ 'selfUpdate.notCheckedYet' | t }}</dd>
           </ng-container>
         </dl>
 

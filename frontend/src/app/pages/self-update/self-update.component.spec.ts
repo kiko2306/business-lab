@@ -68,11 +68,15 @@ describe('SelfUpdateComponent', () => {
     component = fixture.componentInstance;
   });
 
+  // The only panel on the page starts open (plan.md §839), but a person can
+  // close it, so this clicks only if it is shut.
   function openPanel(): void {
     const toggle = (fixture.nativeElement as HTMLElement).querySelector(
       '.panel__toggle',
     ) as HTMLButtonElement | null;
-    toggle?.click();
+    if (toggle?.getAttribute('aria-expanded') !== 'true') {
+      toggle?.click();
+    }
     fixture.detectChanges();
   }
 
@@ -136,7 +140,8 @@ describe('SelfUpdateComponent', () => {
     component.updateNow();
 
     expect(operations.checkForSelfUpdate).toHaveBeenCalled();
-    expect(confirm.ask).toHaveBeenCalledWith(jasmine.objectContaining({ danger: true }));
+    expect(confirm.ask).toHaveBeenCalled();
+    expect((confirm.ask.calls.mostRecent().args[0] as { danger?: boolean }).danger).toBeFalsy();
     expect(operations.triggerSelfUpdate).not.toHaveBeenCalled();
   });
 
@@ -251,7 +256,7 @@ describe('SelfUpdateComponent', () => {
     it('no longer prints "Last update failed:" with the raw message', () => {
       show(failed('building'));
 
-      expect(host().textContent).not.toContain('Last update failed');
+      expect(host().textContent).not.toContain('Last update failed:');
     });
 
     it('does not show the failure for a run that landed', () => {
@@ -531,6 +536,107 @@ describe('SelfUpdateComponent', () => {
       await settle();
 
       expect(document.activeElement?.id).toBe('check-now');
+    });
+  });
+
+  // plan.md §839 (§834 fix 5): the page opened as one closed accordion, the
+  // status was a 10.5px badge read from the check alone ("Up to date" beside a
+  // failed run), and a routine update's confirm was danger red.
+  describe('the page earns trust at a glance', () => {
+    const host = () => fixture.nativeElement as HTMLElement;
+    const hero = () => host().querySelector('#update-status') as HTMLElement | null;
+    const withRun = (run: Partial<SelfUpdateRun>, status: SelfUpdateStatus = upToDateStatus) =>
+      ({ ...status, latestRun: { ...runningRun, finishedAt: '2026-09-04T10:05:00.000Z', ...run } }) as SelfUpdateStatus;
+    const show = (status: SelfUpdateStatus, open = true) => {
+      operations.getSelfUpdateStatus.and.returnValue(of(status));
+      fixture.detectChanges();
+      if (open) openPanel();
+    };
+
+    it('opens the panel without a click', () => {
+      show(upToDateStatus, false);
+
+      expect(host().querySelector('#update-now')).not.toBeNull();
+    });
+
+    it('still closes when the person closes it', () => {
+      show(upToDateStatus, false);
+      (host().querySelector('.panel__toggle') as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      expect(host().querySelector('#update-now')).toBeNull();
+    });
+
+    it('leads with one status line, with the running version beside it', () => {
+      show(upToDateStatus);
+
+      expect(hero()?.textContent).toContain('Up to date');
+      expect(host().textContent).toContain('v0.24.0');
+    });
+
+    it('says "Last update failed" in red, not "Up to date", when the latest run failed', () => {
+      show(withRun({ state: 'error', failedPhase: 'building', errorMessage: 'x' }));
+
+      expect(hero()?.textContent).toContain('Last update failed');
+      expect(hero()?.textContent).not.toContain('Up to date');
+      expect(hero()?.querySelector('.badge')?.classList).toContain('text-bg-danger');
+    });
+
+    it('says "Updated, 2 apps need attention" in amber when apps failed', () => {
+      show(withRun({ state: 'done', appsFailed: ['a', 'b'] }));
+
+      expect(hero()?.textContent).toContain('2 apps need attention');
+      expect(hero()?.querySelector('.badge')?.classList).toContain('text-bg-warning');
+    });
+
+    it('says how many updates are waiting when the latest run is clean', () => {
+      show(withRun({ state: 'done' }, behindStatus));
+
+      expect(hero()?.textContent).toContain('2 updates available');
+    });
+
+    it('says Updating while a run is going', () => {
+      show({ ...upToDateStatus, latestRun: runningRun });
+
+      expect(hero()?.textContent).toContain('Updating');
+    });
+
+    it('says Not checked yet when there is nothing to say', () => {
+      show({ ...upToDateStatus, check: null });
+
+      expect(hero()?.textContent).toContain('Not checked yet');
+    });
+
+    it('sets the badges at 12px or more', () => {
+      show(withRun({ state: 'done' }, {
+        ...upToDateStatus,
+        check: { ...upToDateStatus.check!, checkedAt: new Date(Date.now() - 12 * 3600_000).toISOString() },
+      }));
+
+      const badges = Array.from(host().querySelectorAll('.badge'));
+      expect(badges.length).toBeGreaterThanOrEqual(2);
+      for (const badge of badges) {
+        expect(parseFloat(getComputedStyle(badge).fontSize)).toBeGreaterThanOrEqual(12);
+      }
+    });
+
+    it('confirms a routine update with a primary button, not a danger red one', () => {
+      operations.getSelfUpdateStatus.and.returnValue(of(upToDateStatus));
+      fixture.detectChanges();
+      operations.checkForSelfUpdate.and.returnValue(of(behindStatus.check!));
+      confirm.ask.and.returnValue(Promise.resolve(false));
+
+      component.updateNow();
+
+      expect((confirm.ask.calls.mostRecent().args[0] as { danger?: boolean }).danger).toBeFalsy();
+    });
+
+    it('says it in Portuguese for a pt-PT reader', () => {
+      TestBed.inject(TranslateService).setLocale('pt-PT');
+      show(withRun({ state: 'error', failedPhase: 'building', errorMessage: 'x' }));
+
+      expect(hero()?.textContent).toContain('A última atualização falhou');
+      TestBed.inject(TranslateService).setLocale('en');
     });
   });
 });
