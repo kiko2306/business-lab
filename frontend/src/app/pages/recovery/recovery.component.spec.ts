@@ -67,4 +67,12 @@ describe('RecoveryComponent', () => {
     expect(host().querySelector('.recovery-unavailable')).toBeNull();
     expect((host().querySelector('button.btn-outline-warning') as HTMLButtonElement).disabled).toBeTrue();
   });
+
+  it('tells a password manager the username is a username', () => {
+    mount({ enabled: false, available: true });
+
+    const field = host().querySelector('#recovery-username') as HTMLInputElement;
+    expect(field.type).toBe('text');
+    expect(field.getAttribute('autocomplete')).toBe('username');
+  });
 });

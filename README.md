@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.11** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.12** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -253,8 +253,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       "Lost your authenticator?" naming `disable-2fa`, and `/recovery` (signed in) shows the commands in
       a blue notice with its buttons off; in pt-PT too; (3) done (§830) — on `beta`, open a used invite link: the alert says
       to ask whoever invited you and a full-width Back to sign in sits under it; on a good link a refused
-      password shows inside the card; on `/setup` a mismatch shows under the confirm field with Create held; (4) show-password, the 8-character rule up front, username
-      autofocus, `/recovery` inputs 44px with `type`/`autocomplete`; (5) the card centred and one
+      password shows inside the card; on `/setup` a mismatch shows under the confirm field with Create held; (4) done (§831) — on `beta`, on a phone: login, setup and set-password each
+      have a Show button that reveals the password and keeps what was typed, "At least 8 characters." is
+      under the new-password field, the cursor starts in the first field, and `/recovery` inputs are 44px; (5) the card centred and one
       shared auth shell, `/recovery` inside it. On `beta`, after each: wrong password in pt-PT on a
       phone, then follow the Locked out? line.
 - [ ] **Critique: Updates (plan.md §812)** — `pages/self-update`; the operator must trust it not to break the box: progress, failure and rollback wording.
@@ -267,6 +268,11 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 Done one page at a time, test first, each its own commit and version bump. A finished
 item is deleted.
 
+- [ ] **Tally: two ShopComponent specs fail depending on the time of day (found at plan.md §831)** —
+      "compares a running day only as far as the hour it has reached" and "says how the day compares,
+      in words" fail on a clean tree (`./scripts/check.sh tally-web test`, 137 of 139 pass) at this
+      hour and passed earlier. Pin the clock in both specs (`jasmine.clock().mockDate`) so they
+      cannot depend on when they run.
 - [ ] **Tally: the hero figure and the comparison (plan.md §806, items 1-2)** —
       on `beta`, open a shop's day view on a phone: today's takings must be the
       largest thing on the page, readable at arm's length, with "€X more/less

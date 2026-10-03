@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.12] — 2026-10-03
+
+### Changed
+
+- Sign-in: show-password buttons, the 8-character rule stated up front, the cursor starts in the first field, and text fields are 44px tall on a phone
+
 ## [0.163.11] — 2026-10-03
 
 ### Changed

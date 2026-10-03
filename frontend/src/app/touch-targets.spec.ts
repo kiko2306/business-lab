@@ -17,6 +17,8 @@ const MARKUP = `
   <button class="btn btn-primary" id="btn">Save</button>
   <button class="btn btn-outline-secondary btn-sm" id="btn-sm">Copy</button>
   <button class="btn btn-outline-danger btn-sm d-block" id="btn-block">Delete</button>
+  <input class="form-control" id="field" />
+  <input class="form-control form-control-sm" id="field-sm" />
   <div class="form-check" id="row">
     <input class="form-check-input" type="checkbox" id="box" />
     <label class="form-check-label" for="box" id="label">Admin</label>
@@ -51,6 +53,12 @@ describe('touch targets (plan.md §813.6)', () => {
       });
     }
 
+    for (const id of ['field', 'field-sm']) {
+      it(`makes the text field #${id} at least 44px tall`, () => {
+        expect(box(doc, id).height).toBeGreaterThanOrEqual(44);
+      });
+    }
+
     it('keeps button text centred in the taller button', () => {
       const button = doc.getElementById('btn-sm')!;
       const range = doc.createRange();
@@ -80,6 +88,7 @@ describe('touch targets (plan.md §813.6)', () => {
 
     it('keeps today\'s density: small buttons stay small, checkboxes stay 16px', () => {
       expect(box(doc, 'btn-sm').height).toBeLessThan(40);
+      expect(box(doc, 'field-sm').height).toBeLessThan(40);
       expect(box(doc, 'box').width).toBeLessThanOrEqual(17);
     });
   });

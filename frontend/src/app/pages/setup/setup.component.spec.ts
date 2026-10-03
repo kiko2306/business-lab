@@ -5,6 +5,7 @@ import { throwError } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateService } from '../../i18n/translate.service';
+import { en } from '../../i18n/en';
 import { SetupComponent } from './setup.component';
 
 // plan.md §827: a failed setup was a silent bar in the server's English.
@@ -79,5 +80,31 @@ describe('SetupComponent failures', () => {
   it('gives the way back to sign in a 44px target, not a 17px inline link', () => {
     const link = (fixture.nativeElement as HTMLElement).querySelector('a[href="/login"]') as HTMLElement;
     expect(link.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
+  });
+
+  // plan.md §827 fix 4: the rule appeared only after an error, the 128 meant
+  // nothing to a person, and a password could not be seen.
+  describe('choosing a password', () => {
+    const host = () => fixture.nativeElement as HTMLElement;
+
+    it('says the rule up front, and wires it to the field', () => {
+      const hint = host().querySelector('#setupPassword-hint') as HTMLElement;
+      expect(hint.textContent).toContain('At least 8 characters');
+      expect(host().querySelector('#setupPassword')?.getAttribute('aria-describedby')).toContain('setupPassword-hint');
+    });
+
+    it('no longer quotes the upper limit in the error', () => {
+      expect(en['setup.passwordError']).not.toContain('128');
+    });
+
+    it('lets both password fields be shown', () => {
+      expect(host().querySelector('button[aria-controls="setupPassword"]')).not.toBeNull();
+      expect(host().querySelector('button[aria-controls="confirmPassword"]')).not.toBeNull();
+    });
+
+    it('puts the cursor in the first field on arrival', async () => {
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(document.activeElement?.id).toBe('setupUsername');
+    });
   });
 });

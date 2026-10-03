@@ -114,4 +114,27 @@ describe('SetPasswordComponent with a dead link', () => {
       expect(toast.error).not.toHaveBeenCalled();
     });
   });
+
+  describe('choosing a password from a good link', () => {
+    const host = () => fixture.nativeElement as HTMLElement;
+    beforeEach(() => {
+      auth.getInvitation.and.returnValue(of({ username: 'ana', email: 'a@b.pt' }));
+      fixture.detectChanges();
+    });
+
+    it('says the rule up front, and wires it to the field', () => {
+      expect((host().querySelector('#spPassword-hint') as HTMLElement).textContent).toContain('At least 8 characters');
+      expect(host().querySelector('#spPassword')?.getAttribute('aria-describedby')).toContain('spPassword-hint');
+    });
+
+    it('lets both fields be shown', () => {
+      expect(host().querySelector('button[aria-controls="spPassword"]')).not.toBeNull();
+      expect(host().querySelector('button[aria-controls="spConfirm"]')).not.toBeNull();
+    });
+
+    it('puts the cursor in the password on arrival', async () => {
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(document.activeElement?.id).toBe('spPassword');
+    });
+  });
 });

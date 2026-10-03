@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
@@ -10,15 +10,16 @@ import { ToastService } from '../../core/toast.service';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
 import { FieldErrorDirective } from '../../components/field-error.directive';
+import { PasswordToggleDirective } from '../../components/password-toggle.directive';
 
 @Component({
   selector: 'app-setup',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective, PasswordToggleDirective],
   templateUrl: './setup.component.html',
   styleUrl: './setup.component.css'
 })
-export class SetupComponent {
+export class SetupComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
@@ -45,6 +46,11 @@ export class SetupComponent {
     event.preventDefault();
     this.form.controls[controlName].setValue(sanitized);
     this.form.controls[controlName].markAsDirty();
+  }
+
+  ngOnInit(): void {
+    // The person came here to type: put the cursor where they start (plan.md §827).
+    setTimeout(() => document.getElementById('setupUsername')?.focus());
   }
 
   protected get mismatch(): boolean {

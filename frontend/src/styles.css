@@ -323,7 +323,8 @@ a {
    Touch targets (plan.md §813.6, §824).
 
    A phone gets 44px targets; a desktop pointer keeps today's density. The
-   Users page measured every button <=31px and 87 checkboxes at 16px.
+   Users page measured every button <=31px and 87 checkboxes at 16px. Text
+   fields get the same floor (the recovery page's were 38px, plan.md §827).
    Flex centres the label inside the taller button: Bootstrap's inline-block
    .btn would leave the text at the top. A checkbox's hit area is its whole
    row (the label is always `for` the box), and the box itself grows to 24px
@@ -335,6 +336,11 @@ a {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .form-control,
+  .form-select {
+    min-height: 44px;
   }
 
   .form-check:not(.form-switch) {

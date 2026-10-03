@@ -38,15 +38,18 @@
 
             <div class="mb-4">
               <label class="form-label fw-semibold" for="password">{{ 'login.password.label' | t }}</label>
-              <input
-                id="password"
-                type="password"
-                class="form-control form-control-lg"
-                formControlName="password"
-                autocomplete="current-password"
-                maxlength="128"
-                (paste)="sanitizePaste($event, 'password', 128)"
-              />
+              <div class="input-group">
+                <input
+                  id="password"
+                  type="password"
+                  class="form-control form-control-lg"
+                  formControlName="password"
+                  autocomplete="current-password"
+                  maxlength="128"
+                  (paste)="sanitizePaste($event, 'password', 128)"
+                />
+                <button type="button" class="btn btn-outline-secondary" appPasswordToggle="password" #pwToggle="appPasswordToggle" [attr.aria-label]="'auth.password.toggleLabel' | t">{{ (pwToggle.shown ? 'auth.password.hide' : 'auth.password.show') | t }}</button>
+              </div>
               <div *ngIf="form.controls.password.touched && form.controls.password.invalid" class="text-danger small mt-1" appFieldError="password">
                 {{ 'login.password.error' | t }}
               </div>

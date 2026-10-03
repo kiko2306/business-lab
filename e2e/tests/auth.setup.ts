@@ -24,7 +24,7 @@ setup('create the first admin, or sign in, and save the session', async ({ page,
   } else {
     await page.goto('/login');
     await page.getByLabel('Email / username').fill(ADMIN.username);
-    await page.getByLabel('Password').fill(ADMIN.password);
+    await page.getByLabel('Password', { exact: true }).fill(ADMIN.password);
     await page.getByRole('button', { name: 'Sign in' }).click();
   }
 

@@ -10,6 +10,7 @@ import { ToastService } from '../../core/toast.service';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
 import { FieldErrorDirective } from '../../components/field-error.directive';
+import { PasswordToggleDirective } from '../../components/password-toggle.directive';
 
 /**
  * Public landing for a `/set-password?token=…` invite link (plan.md §158).
@@ -19,7 +20,7 @@ import { FieldErrorDirective } from '../../components/field-error.directive';
 @Component({
   selector: 'app-set-password',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective, PasswordToggleDirective],
   templateUrl: './set-password.component.html',
   styleUrl: './set-password.component.css',
 })
@@ -56,7 +57,11 @@ export class SetPasswordComponent implements OnInit {
       .getInvitation(this.token)
       .pipe(finalize(() => (this.loading = false)))
       .subscribe({
-        next: (invite) => (this.invite = invite),
+        next: (invite) => {
+          this.invite = invite;
+          // The person came here to type: put the cursor where they start (plan.md §827).
+          setTimeout(() => document.getElementById('spPassword')?.focus());
+        },
         error: (error) => (this.linkError = this.translate.t(authErrorKey(error, 'invitation'))),
       });
   }

@@ -273,4 +273,26 @@ describe('LoginComponent', () => {
       TestBed.inject(TranslateService).setLocale('en');
     });
   });
+
+  // plan.md §827 fix 4.
+  describe('on a phone', () => {
+    const host = () => fixture.nativeElement as HTMLElement;
+    beforeEach(() => {
+      authService.isSetupRequired.and.returnValue(of(false));
+      fixture.detectChanges();
+    });
+
+    it('offers to show the password', () => {
+      const toggle = host().querySelector('button[aria-controls="password"]') as HTMLButtonElement;
+      expect(toggle.textContent).toContain('Show');
+      toggle.click();
+      fixture.detectChanges();
+      expect((host().querySelector('#password') as HTMLInputElement).type).toBe('text');
+    });
+
+    it('puts the cursor in the username on arrival', async () => {
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(document.activeElement?.id).toBe('username');
+    });
+  });
 });

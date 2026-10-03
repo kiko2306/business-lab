@@ -48,15 +48,20 @@
 
             <div class="mb-3">
               <label class="form-label fw-semibold" for="setupPassword">{{ 'setup.passwordLabel' | t }}</label>
-              <input
-                id="setupPassword"
-                type="password"
-                class="form-control form-control-lg"
-                formControlName="password"
-                autocomplete="new-password"
-                maxlength="128"
-                (paste)="sanitizePaste($event, 'password', 128)"
-              />
+              <div class="input-group">
+                <input
+                  id="setupPassword"
+                  type="password"
+                  class="form-control form-control-lg"
+                  formControlName="password"
+                  autocomplete="new-password"
+                  maxlength="128"
+                  aria-describedby="setupPassword-hint"
+                  (paste)="sanitizePaste($event, 'password', 128)"
+                />
+                <button type="button" class="btn btn-outline-secondary" appPasswordToggle="setupPassword" #pwToggle="appPasswordToggle" [attr.aria-label]="'auth.password.toggleLabel' | t">{{ (pwToggle.shown ? 'auth.password.hide' : 'auth.password.show') | t }}</button>
+              </div>
+              <div class="form-text" id="setupPassword-hint">{{ 'auth.password.hint' | t }}</div>
               <div *ngIf="form.controls.password.touched && form.controls.password.invalid" class="text-danger small mt-1" appFieldError="setupPassword">
                 {{ 'setup.passwordError' | t }}
               </div>
@@ -64,15 +69,18 @@
 
             <div class="mb-4">
               <label class="form-label fw-semibold" for="confirmPassword">{{ 'setup.confirmPasswordLabel' | t }}</label>
-              <input
-                id="confirmPassword"
-                type="password"
-                class="form-control form-control-lg"
-                formControlName="confirmPassword"
-                autocomplete="new-password"
-                maxlength="128"
-                (paste)="sanitizePaste($event, 'confirmPassword', 128)"
-              />
+              <div class="input-group">
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  class="form-control form-control-lg"
+                  formControlName="confirmPassword"
+                  autocomplete="new-password"
+                  maxlength="128"
+                  (paste)="sanitizePaste($event, 'confirmPassword', 128)"
+                />
+                <button type="button" class="btn btn-outline-secondary" appPasswordToggle="confirmPassword" #confirmToggle="appPasswordToggle" [attr.aria-label]="'auth.password.toggleLabel' | t">{{ (confirmToggle.shown ? 'auth.password.hide' : 'auth.password.show') | t }}</button>
+              </div>
               <div *ngIf="form.controls.confirmPassword.touched && form.controls.confirmPassword.invalid" class="text-danger small mt-1" appFieldError="confirmPassword">
                 <span *ngIf="form.controls.confirmPassword.hasError('required')">{{ 'setup.confirmPasswordRequired' | t }}</span>
                 <span *ngIf="form.controls.confirmPassword.hasError('maxlength')">{{ 'setup.confirmPasswordTooLong' | t }}</span>

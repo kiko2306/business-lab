@@ -11,11 +11,12 @@ import { ToastService } from '../../core/toast.service';
 import { TranslateService } from '../../i18n/translate.service';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { FieldErrorDirective } from '../../components/field-error.directive';
+import { PasswordToggleDirective } from '../../components/password-toggle.directive';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective, PasswordToggleDirective],
   templateUrl: './login.component.html',
   styleUrl: './login.component.css'
 })
@@ -54,6 +55,8 @@ export class LoginComponent implements OnInit {
 
   ngOnInit(): void {
     this.authService.isSetupRequired().subscribe((required) => (this.setupRequired = required));
+    // The person came here to type: put the cursor where they start (plan.md §827).
+    setTimeout(() => document.getElementById('username')?.focus());
   }
 
   sanitizePaste(event: ClipboardEvent, controlName: 'username' | 'password', maxLength: number): void {

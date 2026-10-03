@@ -37271,3 +37271,31 @@ reader. The test stack was removed by name afterwards.
 - 386 frontend specs, build clean, E2E passes. Not done: the spent link still does not name the
   inviter (the backend does not return it; §827 fix 3 asked "name the inviter or say whoever invited
   you" and the latter is what the copy now says).
+
+## 831. Sign-in: show-password, the rule up front, autofocus, 44px fields (§827 fix 4, P2)
+
+[x] done.
+
+- **Show password.** `appPasswordToggle` (components/): a button naming the input's `id`, flips the
+  input's `type`, `aria-pressed` and `aria-controls`; focus stays on the button so the state is
+  announced, and the typed value is untouched. Login, setup (both fields) and set-password (both)
+  use it, inside an `input-group`. Its accessible name is static ("Show password") with the state in
+  `aria-pressed`. **Rejected:** moving focus back into the input after the click (a screen reader
+  would lose the pressed state), and a per-page copy of the toggle logic.
+- **The rule up front.** "At least 8 characters." under the password on setup and set-password,
+  wired by `aria-describedby` (the field-error directive appends to it). The error no longer quotes
+  the 128 ceiling, which meant nothing to a person.
+- **Autofocus** by script (the HTML attribute does not fire on a routed view): the username on login
+  and the first field on setup; the password once set-password's link is validated.
+- **Phone fields.** `.form-control` and `.form-select` get `min-height: 44px` in the shared theme's
+  phone rule (§824), synced to Tally and the hotel apps; `/recovery`'s username field gains
+  `type="text"` and `autocomplete="username"`.
+- **E2E caught a regression.** The toggle's label "Show password" also matches
+  `getByLabel('Password')` (substring), which broke the two-factor journey and would have broken
+  the live-stack setup; both selectors are now `exact: true`.
+- 402 frontend specs, build clean, E2E passes. **Not done:** setup still asks for a username as
+  well as an email (derivable, but it is the login name, so deriving it is a decision, not a
+  fix) and a disabled submit still gives no reason (every field already shows its own error once
+  touched). Tally: two specs, "compares a running day only as far as the hour it has reached" and
+  "says how the day compares, in words", fail on a clean tree at this time of day and are
+  unrelated; recorded as a README item.

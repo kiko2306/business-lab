@@ -38,7 +38,7 @@
       <div class="row g-2">
         <div class="col-12 col-md-4">
           <label class="form-label small mb-1" for="recovery-username">{{ 'recovery.resetPassword.usernameLabel' | t }}</label>
-          <input id="recovery-username" class="form-control" [placeholder]="'recovery.resetPassword.usernamePlaceholder' | t" [(ngModel)]="username" [disabled]="!available" />
+          <input id="recovery-username" class="form-control" type="text" autocomplete="username" [placeholder]="'recovery.resetPassword.usernamePlaceholder' | t" [(ngModel)]="username" [disabled]="!available" />
         </div>
         <div class="col-12 col-md-4">
           <label class="form-label small mb-1" for="recovery-password">{{ 'recovery.resetPassword.passwordLabel' | t }}</label>
