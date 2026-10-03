@@ -117,6 +117,10 @@ export interface SelfUpdateRunRow {
   toCommit: string | null;
   errorMessage: string | null;
   detail: string | null;
+  /** The phase an `error` run stopped in (plan.md §835); null for any other run. */
+  failedPhase: SelfUpdateRunState | null;
+  /** Apps whose update failed in a run that otherwise landed; always an array. */
+  appsFailed: string[];
   startedAt: string;
   finishedAt: string | null;
 }
@@ -155,6 +159,8 @@ export async function ensureSelfUpdateTable(): Promise<void> {
     )
   `);
   await query(`ALTER TABLE self_update_runs ADD COLUMN IF NOT EXISTS detail TEXT`);
+  await query(`ALTER TABLE self_update_runs ADD COLUMN IF NOT EXISTS failed_phase VARCHAR(30)`);
+  await query(`ALTER TABLE self_update_runs ADD COLUMN IF NOT EXISTS apps_failed TEXT`);
 }
 
 function requireRepoRoot(): string {
@@ -172,8 +178,19 @@ interface SelfUpdateRunDbRow {
   to_commit: string | null;
   error_message: string | null;
   detail: string | null;
+  failed_phase: string | null;
+  apps_failed: string | null;
   started_at: Date;
   finished_at: Date | null;
+}
+
+function parseAppsFailed(raw: string | null): string[] {
+  try {
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
 }
 
 function rowFromDb(row: SelfUpdateRunDbRow): SelfUpdateRunRow {
@@ -184,6 +201,8 @@ function rowFromDb(row: SelfUpdateRunDbRow): SelfUpdateRunRow {
     toCommit: row.to_commit,
     errorMessage: row.error_message,
     detail: row.detail,
+    failedPhase: (row.failed_phase as SelfUpdateRunState | null) ?? null,
+    appsFailed: parseAppsFailed(row.apps_failed),
     startedAt: row.started_at.toISOString(),
     finishedAt: row.finished_at ? row.finished_at.toISOString() : null,
   };
@@ -204,7 +223,17 @@ async function insertRun(state: SelfUpdateRunState, fromCommit: string | null): 
 
 async function updateRun(
   id: number,
-  fields: { state?: SelfUpdateRunState; toCommit?: string; errorMessage?: string; detail?: string | null; finished?: boolean }
+  fields: {
+    state?: SelfUpdateRunState;
+    toCommit?: string;
+    /** Only a resumed run sets this: it carries the failed run's base forward (plan.md §835). */
+    fromCommit?: string;
+    errorMessage?: string;
+    detail?: string | null;
+    finished?: boolean;
+    failedPhase?: SelfUpdateRunState;
+    appsFailed?: string[];
+  }
 ): Promise<void> {
   await query(
     `UPDATE self_update_runs
@@ -212,7 +241,10 @@ async function updateRun(
          to_commit = COALESCE($3, to_commit),
          error_message = COALESCE($4, error_message),
          detail = CASE WHEN $5 THEN $6 ELSE detail END,
-         finished_at = CASE WHEN $7 THEN NOW() ELSE finished_at END
+         finished_at = CASE WHEN $7 THEN NOW() ELSE finished_at END,
+         failed_phase = COALESCE($8, failed_phase),
+         apps_failed = COALESCE($9, apps_failed),
+         from_commit = COALESCE($10, from_commit)
      WHERE id = $1`,
     [
       id,
@@ -222,6 +254,9 @@ async function updateRun(
       fields.detail !== undefined,
       fields.detail ?? null,
       fields.finished ?? false,
+      fields.failedPhase ?? null,
+      fields.appsFailed ? JSON.stringify(fields.appsFailed) : null,
+      fields.fromCommit ?? null,
     ]
   );
 }
@@ -310,7 +345,7 @@ export async function triggerSelfUpdate(userId: number | null): Promise<SelfUpda
   const fromCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
   const run = await insertRun('checking', fromCommit);
 
-  void runSelfUpdateSequence(run.id, repoRoot, userId).catch((error: Error) => {
+  void runSelfUpdateSequence(run.id, repoRoot, userId, existing).catch((error: Error) => {
     logger.error('Self-update sequence failed unexpectedly', { error: error.message, runId: run.id });
   });
 
@@ -426,7 +461,8 @@ export async function ensureCoreSidecars(): Promise<void> {
 async function runSelfUpdateSequence(
   runId: number,
   repoRoot: string,
-  userId: number | null
+  userId: number | null,
+  previous: SelfUpdateRunRow | null
 ): Promise<void> {
   let check: SelfUpdateCheck;
   try {
@@ -436,22 +472,54 @@ async function runSelfUpdateSequence(
     check = await checkForUpdate();
   } catch (error) {
     const message = (error as Error).message || 'Checking for an update failed.';
-    await updateRun(runId, { state: 'error', errorMessage: message, finished: true });
+    await updateRun(runId, { state: 'error', errorMessage: message, failedPhase: 'checking', finished: true });
     logger.error('Self-update: checking for an update failed', { runId, error: message });
     return;
   }
 
-  if (check.commitsBehind === 0) {
+  // The pull lands before the build, so after a failure past it HEAD *is* the
+  // remote: "0 commits behind" then meant `done`, and nothing was ever rebuilt
+  // while the page read "Up to date" (plan.md §835). A run that failed after
+  // its pull (it recorded a to_commit that is still HEAD) is resumed from the
+  // commit it started at, so the same diff is classified and built again.
+  const resumeFrom =
+    check.commitsBehind === 0 &&
+    previous?.state === 'error' &&
+    previous.toCommit === check.currentCommit &&
+    previous.fromCommit &&
+    previous.fromCommit !== check.currentCommit
+      ? previous.fromCommit
+      : null;
+
+  if (check.commitsBehind === 0 && !resumeFrom) {
     await updateRun(runId, { state: 'done', toCommit: check.currentCommit, finished: true });
     return;
   }
+  const baseCommit = resumeFrom ?? check.currentCommit;
+
+  // The phase an exception is attributed to; the page words a failure by it.
+  let phase: SelfUpdateRunState = 'pulling';
+  const enter = async (state: SelfUpdateRunState) => {
+    phase = state;
+    await updateRun(runId, { state });
+  };
 
   try {
-    await updateRun(runId, { state: 'pulling' });
-    const branch = await getUpdateBranch();
-    await runGit(['-C', repoRoot, 'pull', '--ff-only', 'origin', branch], { timeout: 60_000 });
-    const toCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
-    await updateRun(runId, { toCommit });
+    let toCommit: string;
+    if (resumeFrom) {
+      // Already pulled by the run being resumed; carry its base forward so a
+      // second failure resumes from the same place.
+      toCommit = check.currentCommit;
+      await updateRun(runId, { state: 'pulling', fromCommit: resumeFrom, toCommit });
+    } else {
+      await updateRun(runId, { state: 'pulling' });
+      const branch = await getUpdateBranch();
+      await runGit(['-C', repoRoot, 'pull', '--ff-only', 'origin', branch], { timeout: 60_000 });
+      toCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
+      await updateRun(runId, { toCommit });
+    }
+    // The code is on disk from here: a failure is now "downloaded, not installed".
+    phase = 'building';
     // The panel's "commits behind" badge is served from `cachedCheck`, which
     // `checkForUpdate()` last set *before* this pull — left untouched, it
     // would keep reading as behind until the 6h sweeper or a manual "Check
@@ -468,7 +536,7 @@ async function runSelfUpdateSequence(
       branch: check.branch,
     };
 
-    const scope = await classifyDeploy(repoRoot, check.currentCommit, toCommit);
+    const scope = await classifyDeploy(repoRoot, baseCommit, toCommit);
     const buildTargets = [
       ...(scope.frontend ? ['frontend'] : []),
       ...(scope.backend ? ['backend'] : []),
@@ -490,7 +558,7 @@ async function runSelfUpdateSequence(
       resource: toCommit,
       metadata: {
         phase: 'classified',
-        fromCommit: check.currentCommit,
+        fromCommit: baseCommit,
         toCommit,
         build: buildTargets,
         apps: scope.apps === null ? 'all' : [...scope.apps],
@@ -505,7 +573,7 @@ async function runSelfUpdateSequence(
         userId,
         action: 'self_update_trigger',
         resource: toCommit,
-        metadata: { fromCommit: check.currentCommit, toCommit, scope: 'pull-only' },
+        metadata: { fromCommit: baseCommit, toCommit, scope: 'pull-only' },
       });
       await updateRun(runId, { state: 'done', finished: true });
       logger.info('Self-update: pull-only, nothing to rebuild or restart', { runId });
@@ -513,7 +581,7 @@ async function runSelfUpdateSequence(
     }
 
     if (buildTargets.length) {
-      await updateRun(runId, { state: 'building' });
+      await enter('building');
       // One target at a time (rather than a single multi-target call) so
       // `detail` can say which image is compiling right now — the classic
       // builder's on-disk cache makes this no slower than one combined call.
@@ -535,9 +603,11 @@ async function runSelfUpdateSequence(
     // per-app failure and moves on.
     let appResults: Awaited<ReturnType<typeof updateAllInstalledApps>> = [];
     if (willTouchApps) {
-      await updateRun(runId, { state: 'updating_apps' });
+      await enter('updating_apps');
       appResults = await updateAllInstalledApps(userId, scope.apps, (label) => updateRun(runId, { detail: label }));
-      await updateRun(runId, { detail: null });
+      // Recorded on the run, so a run that landed with some apps failed no
+      // longer reads as a plain "Up to date" (plan.md §835).
+      await updateRun(runId, { detail: null, appsFailed: appResults.filter((r) => !r.ok).map((r) => r.serviceName) });
       const appsFailed = appResults.filter((r) => !r.ok);
       if (appsFailed.length) {
         logger.warn(`Self-update: ${appsFailed.length}/${appResults.length} app(s) failed to update`, {
@@ -557,7 +627,7 @@ async function runSelfUpdateSequence(
     // image was already tagged in the `building` phase, so this just has to
     // make the container adopt it.
     if (scope.frontend) {
-      await updateRun(runId, { state: 'restarting_frontend' });
+      await enter('restarting_frontend');
       await runCommand(
         'docker',
         ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', '--no-deps', '--force-recreate', '--no-build', 'frontend'],
@@ -576,7 +646,7 @@ async function runSelfUpdateSequence(
       action: 'self_update_trigger',
       resource: toCommit,
       metadata: {
-        fromCommit: check.currentCommit,
+        fromCommit: baseCommit,
         toCommit,
         scope: { build: buildTargets, apps: scope.apps === null ? 'all' : [...scope.apps] },
         appsUpdated: appResults.length - appsFailed.length,
@@ -595,6 +665,7 @@ async function runSelfUpdateSequence(
     // that replaces this process — a row stuck here after a boot is still
     // legible as "got this far", and reconcileDanglingSelfUpdateRun closes it
     // out once the new process starts.
+    phase = 'restarting_backend';
     await updateRun(runId, { state: 'restarting_backend', finished: true });
     // `--no-deps` here too: `backend` depends_on the socket proxy and the
     // database, and a deploy must never bounce Postgres as a side effect of
@@ -607,8 +678,8 @@ async function runSelfUpdateSequence(
     child.unref();
   } catch (error) {
     const message = (error as Error).message || 'Self-update failed.';
-    await updateRun(runId, { state: 'error', errorMessage: message, finished: true });
-    logger.error('Self-update failed', { runId, error: message });
+    await updateRun(runId, { state: 'error', errorMessage: message, failedPhase: phase, finished: true });
+    logger.error('Self-update failed', { runId, error: message, phase });
   }
 }
 

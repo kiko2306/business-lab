@@ -49,9 +49,18 @@
         <div class="alert alert-info small mt-3 mb-0" *ngIf="runInProgress && s.latestRun as run">
           {{ ('selfUpdate.progress.' + run.state) | t }}<span *ngIf="run.detail">: {{ run.detail }}</span>
         </div>
-        <div class="alert alert-danger small mt-3 mb-0" *ngIf="!runInProgress && s.latestRun?.state === 'error'">
-          {{ 'selfUpdate.lastUpdateFailed' | t:{ message: s.latestRun?.errorMessage ?? '' } }}
+        <div class="alert alert-danger small mt-3 mb-0" role="alert" *ngIf="!runInProgress && s.latestRun?.state === 'error'">
+          <strong class="d-block">{{ failureHeadlineKey(s.latestRun!) | t }}</strong>
+          <details class="mt-2" *ngIf="s.latestRun?.errorMessage">
+            <summary>{{ 'selfUpdate.failed.details' | t }}</summary>
+            <pre class="failure-details font-monospace small mt-2 mb-0">{{ s.latestRun?.errorMessage }}</pre>
+          </details>
         </div>
+        <ng-container *ngIf="appsFailedOf(s.latestRun) as failedApps">
+          <div class="alert alert-warning apps-failed small mt-3 mb-0" role="alert" *ngIf="failedApps.length">
+            {{ (failedApps.length === 1 ? 'selfUpdate.appsFailed.one' : 'selfUpdate.appsFailed.other') | t:{ count: failedApps.length, apps: failedApps.join(', ') } }}
+          </div>
+        </ng-container>
 
         <div class="d-flex gap-2 mt-3">
           <button

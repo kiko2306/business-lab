@@ -6,7 +6,7 @@ import { OperationsService } from '../../core/operations.service';
 import { ConfirmService } from '../../core/confirm.service';
 import { ToastService } from '../../core/toast.service';
 import { extractErrorMessage } from '../../core/api';
-import { SelfUpdateRunState, SelfUpdateStatus } from '../../core/models';
+import { SelfUpdateRun, SelfUpdateRunState, SelfUpdateStatus } from '../../core/models';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
 
@@ -35,6 +35,7 @@ const IN_PROGRESS_STATES: SelfUpdateRunState[] = [
   standalone: true,
   imports: [CommonModule, PanelComponent, TranslatePipe],
   templateUrl: './self-update.component.html',
+  styleUrl: './self-update.component.css',
 })
 export class SelfUpdateComponent implements OnInit, OnDestroy {
   private readonly operations = inject(OperationsService);
@@ -54,6 +55,36 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.pollSubscription?.unsubscribe();
+  }
+
+  /**
+   * What the box is left in depends on how far the run got (plan.md §835), so
+   * the headline is worded by the phase it stopped in rather than by the raw
+   * tool output, which only goes behind the details disclosure.
+   */
+  protected failureHeadlineKey(run: SelfUpdateRun): string {
+    switch (run.failedPhase) {
+      case 'checking':
+      case 'pulling':
+        return 'selfUpdate.failed.headline.start';
+      case 'building':
+      case 'updating_apps':
+        return 'selfUpdate.failed.headline.install';
+      case 'restarting_frontend':
+      case 'restarting_backend':
+        return 'selfUpdate.failed.headline.restart';
+      default:
+        return 'selfUpdate.failed.headline.unknown';
+    }
+  }
+
+  /** A run that landed with some apps failed; still shows while the dashboard restarts. */
+  protected appsFailedOf(run: SelfUpdateRun | null | undefined): string[] {
+    return run && !this.runInProgressFor(run) && run.state !== 'error' ? run.appsFailed ?? [] : [];
+  }
+
+  private runInProgressFor(run: SelfUpdateRun): boolean {
+    return run.finishedAt === null;
   }
 
   protected get runInProgress(): boolean {

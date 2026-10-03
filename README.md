@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.13** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.14** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -258,10 +258,12 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       are 44px; (5) §832 — the card is centred (equal space either side at every width) and all four
       pages look like the same card, `/recovery` included.
 - [ ] **Updates page: fix the critique's findings (plan.md §834)** — in order, test first, one
-      commit and version bump each: (1) a failed update says, in a fixed translated headline, that the
-      dashboard is still on its version and the apps are running, with the raw output behind a
-      scroll-capped "Technical details" disclosure; the backend reports the failed phase and the
-      apps that failed so a run with failed apps no longer reads "Up to date"; (2) a rollback story,
+      commit and version bump each: (1) done (§835) — on `beta`, with the box offline (unplug it, or point the update branch at one
+      that does not exist) press Update now: a red headline says nothing changed and the apps run as
+      before, the git error is behind a closed "Technical details"; then reconnect and press it again:
+      it updates. A real failed build cannot be provoked from the page; its behaviour (the retry
+      rebuilds from the failed run's start, the headline says "downloaded but not installed") is
+      covered by unit tests only; (2) a rollback story,
       or a plain statement that the old version keeps running plus a backup line in the confirm
       (decide which first); (3) backend failure text mapped to codes and translated for pt-PT, the
       toast too; (4) a `role="status"` step line ("Step 3 of 5"), "you can leave this page open",
@@ -277,6 +279,11 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 Done one page at a time, test first, each its own commit and version bump. A finished
 item is deleted.
 
+- [ ] **Updates: apps that failed to update cannot be retried from the page (found at plan.md §835)** —
+      a run where some apps failed still lands (`done`, `appsFailed` set); HEAD is then the remote, so
+      Update now reports "up to date" and never retries those apps (`updateAllInstalledApps` runs only
+      inside a run that has a diff). Decide whether Update now should re-run the apps recorded as failed
+      by the latest run, test it first, and check on `beta` by breaking one app's pull.
 - [ ] **Tally: the hero figure and the comparison (plan.md §806, items 1-2)** —
       on `beta`, open a shop's day view on a phone: today's takings must be the
       largest thing on the page, readable at arm's length, with "€X more/less

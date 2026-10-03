@@ -1,0 +1,8 @@
+/* A failed run's raw tool output can be thousands of characters: a scroll box,
+   not a page that stretches until the buttons are off-screen (plan.md §835). */
+.failure-details {
+  max-height: 12rem;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

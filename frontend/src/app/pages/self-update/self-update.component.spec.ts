@@ -5,6 +5,9 @@ import { OperationsService } from '../../core/operations.service';
 import { ConfirmService } from '../../core/confirm.service';
 import { ToastService } from '../../core/toast.service';
 import { SelfUpdateRun, SelfUpdateStatus } from '../../core/models';
+import { TranslateService } from '../../i18n/translate.service';
+import { en } from '../../i18n/en';
+import { ptPT } from '../../i18n/pt-pt';
 
 describe('SelfUpdateComponent', () => {
   let fixture: ComponentFixture<SelfUpdateComponent>;
@@ -32,6 +35,8 @@ describe('SelfUpdateComponent', () => {
     toCommit: null,
     errorMessage: null,
     detail: null,
+    failedPhase: null,
+    appsFailed: [],
     startedAt: '2026-09-04T10:01:00.000Z',
     finishedAt: null,
   };
@@ -177,5 +182,126 @@ describe('SelfUpdateComponent', () => {
     openPanel();
 
     expect(fixture.nativeElement.textContent).toContain('backend');
+  });
+
+  // plan.md §835 (P1): a failure printed "Last update failed: <raw tool output>"
+  // and nothing about the box, and a run where some apps failed read "Up to date".
+  describe('a failed update says what state the box is in', () => {
+    const host = () => fixture.nativeElement as HTMLElement;
+    const failed = (failedPhase: SelfUpdateRun['failedPhase'], errorMessage = 'fatal: could not read from remote repository') =>
+      ({ ...upToDateStatus, latestRun: { ...runningRun, state: 'error', failedPhase, errorMessage, finishedAt: '2026-09-04T10:05:00.000Z' } }) as SelfUpdateStatus;
+    const show = (status: SelfUpdateStatus) => {
+      operations.getSelfUpdateStatus.and.returnValue(of(status));
+      fixture.detectChanges();
+      openPanel();
+    };
+    const alertText = () => (host().querySelector('.alert-danger') as HTMLElement).textContent ?? '';
+
+    afterEach(() => TestBed.inject(TranslateService).setLocale('en'));
+
+    for (const [phase, words] of [
+      ['checking', 'Nothing changed'],
+      ['pulling', 'Nothing changed'],
+      ['building', 'still running the previous version'],
+      ['updating_apps', 'still running the previous version'],
+      ['restarting_frontend', 'could not restart'],
+      ['restarting_backend', 'could not restart'],
+      [null, 'interrupted'],
+    ] as const) {
+      it(`says "${words}" when the run stopped in ${phase}`, () => {
+        show(failed(phase));
+
+        expect(alertText()).toContain(words);
+      });
+    }
+
+    it('announces the failure', () => {
+      show(failed('building'));
+
+      expect(host().querySelector('.alert-danger')?.getAttribute('role')).toBe('alert');
+    });
+
+    it('keeps the raw output out of the headline, behind a closed disclosure', () => {
+      show(failed('building', 'ERROR: failed to solve: process "/bin/sh -c npm ci" did not complete'));
+
+      const details = host().querySelector('.alert-danger details') as HTMLDetailsElement;
+      expect(details.open).toBeFalse();
+      expect(details.querySelector('summary')?.textContent).toContain('Technical details');
+      expect(details.querySelector('pre')?.textContent).toContain('failed to solve');
+      expect((host().querySelector('.alert-danger strong') as HTMLElement).textContent).not.toContain('failed to solve');
+    });
+
+    it('caps a long log in a scroll box instead of stretching the page', () => {
+      show(failed('building', 'line\n'.repeat(400)));
+
+      const pre = host().querySelector('.alert-danger pre') as HTMLElement;
+      expect(getComputedStyle(pre).maxHeight).not.toBe('none');
+      expect(getComputedStyle(pre).overflowY).toBe('auto');
+    });
+
+    it('says it in Portuguese for a pt-PT reader, headline and disclosure', () => {
+      TestBed.inject(TranslateService).setLocale('pt-PT');
+      show(failed('building'));
+
+      expect(alertText()).toContain('versão anterior');
+      expect(alertText()).not.toContain('Technical details');
+    });
+
+    it('no longer prints "Last update failed:" with the raw message', () => {
+      show(failed('building'));
+
+      expect(host().textContent).not.toContain('Last update failed');
+    });
+
+    it('does not show the failure for a run that landed', () => {
+      show({ ...upToDateStatus, latestRun: { ...runningRun, state: 'done', finishedAt: '2026-09-04T10:05:00.000Z' } });
+
+      expect(host().querySelector('.alert-danger')).toBeNull();
+    });
+  });
+
+  describe('a run that landed with some apps failed', () => {
+    const host = () => fixture.nativeElement as HTMLElement;
+    const landed = (appsFailed: string[], state: SelfUpdateRun['state'] = 'done') =>
+      ({ ...upToDateStatus, latestRun: { ...runningRun, state, appsFailed, finishedAt: '2026-09-04T10:05:00.000Z' } }) as SelfUpdateStatus;
+    const show = (status: SelfUpdateStatus) => {
+      operations.getSelfUpdateStatus.and.returnValue(of(status));
+      fixture.detectChanges();
+      openPanel();
+    };
+
+    it('names the apps that did not update, announced', () => {
+      show(landed(['nextcloud', 'paperless']));
+
+      const warning = host().querySelector('.alert-warning.apps-failed') as HTMLElement;
+      expect(warning.getAttribute('role')).toBe('alert');
+      expect(warning.textContent).toContain('2 apps did not update');
+      expect(warning.textContent).toContain('nextcloud, paperless');
+    });
+
+    it('uses the singular for one app', () => {
+      show(landed(['nextcloud']));
+
+      expect((host().querySelector('.apps-failed') as HTMLElement).textContent).toContain('1 app did not update');
+    });
+
+    it('shows nothing when every app updated', () => {
+      show(landed([]));
+
+      expect(host().querySelector('.apps-failed')).toBeNull();
+    });
+
+    it('also shows after the dashboard restart, while the run still reads restarting_backend', () => {
+      show(landed(['nextcloud'], 'restarting_backend'));
+
+      expect(host().querySelector('.apps-failed')).not.toBeNull();
+    });
+  });
+
+  it('has the new failure strings in both languages, free of git and deploy jargon', () => {
+    for (const key of Object.keys(en).filter((k) => k.startsWith('selfUpdate.failed.') || k.startsWith('selfUpdate.appsFailed.'))) {
+      expect(ptPT[key]).withContext(`pt-PT ${key}`).toBeTruthy();
+    }
+    expect(Object.keys(en).filter((k) => k.startsWith('selfUpdate.failed.')).length).toBeGreaterThanOrEqual(5);
   });
 });

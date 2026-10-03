@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.14] — 2026-10-03
+
+### Changed
+
+- Updates: a failed update says what state the dashboard and apps are in, keeps the raw output behind Technical details, a retry after a failed build now rebuilds instead of reporting up to date, and a run with failed apps names them
+
 ## [0.163.13] — 2026-10-03
 
 ### Changed

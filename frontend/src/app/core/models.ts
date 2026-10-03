@@ -735,6 +735,10 @@ export interface SelfUpdateRun {
   toCommit: string | null;
   errorMessage: string | null;
   detail: string | null;
+  /** The phase an `error` run stopped in; null for any other run (plan.md §835). */
+  failedPhase: SelfUpdateRunState | null;
+  /** Apps that failed to update in a run that otherwise landed. */
+  appsFailed: string[];
   startedAt: string;
   finishedAt: string | null;
 }

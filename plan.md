@@ -37374,3 +37374,37 @@ task-blocking). The apps-fail-reads-done bug is the closest to P0.
 brief did not exist. Not verified: a real restart and reconnect, screen-reader output, the dialog's
 edge contrast against the live page behind it (1.77:1 against the backdrop alone). The test stack was
 removed by name afterwards.
+
+## 835. Updates: a failure says what state the box is in, and a retry really retries (§834 fix 1, P1)
+
+[x] done. Order per the user: failure truth first; all five of §834's fixes, rollback as "say it plainly".
+
+**A bug under the finding.** The pull lands *before* the build, so after a failed build HEAD is the
+remote. The next press of Update now found "0 commits behind", ended `done` without building anything,
+and the box stayed on the old image while the page read "Up to date". The headline could not honestly
+offer "try again" until that worked.
+- **Resume.** `runSelfUpdateSequence` takes the previous run. If that run is an `error` whose
+  `to_commit` is still HEAD (it failed after its pull), the new run skips the pull, classifies from
+  the failed run's `from_commit` and builds again; the resumed run carries that base forward
+  (`from_commit` is updated), so a second failure resumes from the same place. A run that failed
+  before its pull is not resumed (nothing was downloaded). Three tests, red first.
+- **The run records where it stopped.** New columns `failed_phase` and `apps_failed`
+  (`ADD COLUMN IF NOT EXISTS`, as `detail` was added); `failedPhase` is the phase an exception is
+  attributed to, and moves to `building` as soon as the pull succeeds ("downloaded, not installed").
+  `appsFailed` is always an array. A run where some apps failed still lands: it is recorded on the
+  run instead of only logged.
+
+**The page.** The headline is worded by `failedPhase` — start (nothing changed), install (downloaded,
+still on the previous version, press Update now), restart (installed, the dashboard could not restart:
+tell whoever installed your box), unknown (interrupted, e.g. a reconcile). It carries `role="alert"`;
+the raw output is a closed "Technical details" disclosure with a `max-height: 12rem` scroll box (the
+render was 6101px tall at 390 before). A landed run with failed apps shows an announced warning naming
+them ("Updated, but 2 apps did not update: …"). `selfUpdate.lastUpdateFailed` is deleted.
+
+**Not claimed.** The restart headline does not say the old version is running: a failed
+`--force-recreate` can leave the container down, so it says what is known. The raw message and the
+reconcile text are still English (fix 3). Failed apps cannot be retried from the page: HEAD is the
+remote and the run is `done`; README item.
+- 1343 backend tests (7 new), 434 frontend specs (new: headline per phase in both languages, the
+  disclosure, the scroll cap, the apps warning), both builds clean. Needs a real failed run on the
+  box to see it; README item.

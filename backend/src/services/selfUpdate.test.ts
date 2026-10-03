@@ -22,6 +22,8 @@ const db = vi.hoisted(() => {
     to_commit: string | null;
     error_message: string | null;
     detail: string | null;
+    failed_phase: string | null;
+    apps_failed: string | null;
     started_at: Date;
     finished_at: Date | null;
   }
@@ -37,6 +39,8 @@ const db = vi.hoisted(() => {
         to_commit: null,
         error_message: null,
         detail: null,
+        failed_phase: null,
+        apps_failed: null,
         started_at: new Date(),
         finished_at: null,
       };
@@ -44,7 +48,7 @@ const db = vi.hoisted(() => {
       return { rows: [row] };
     }
     if (sql.startsWith('UPDATE')) {
-      const [id, state, toCommit, errorMessage, detailFlag, detailValue, finished] = params as [
+      const [id, state, toCommit, errorMessage, detailFlag, detailValue, finished, failedPhase, appsFailed, fromCommit] = params as [
         number,
         string | null,
         string | null,
@@ -52,6 +56,9 @@ const db = vi.hoisted(() => {
         boolean,
         string | null,
         boolean,
+        string | null,
+        string | null,
+        string | null,
       ];
       const row = rows.find((r) => r.id === id);
       if (row) {
@@ -60,6 +67,9 @@ const db = vi.hoisted(() => {
         if (errorMessage) row.error_message = errorMessage;
         if (detailFlag) row.detail = detailValue;
         if (finished) row.finished_at = new Date();
+        if (failedPhase) row.failed_phase = failedPhase;
+        if (appsFailed) row.apps_failed = appsFailed;
+        if (fromCommit) row.from_commit = fromCommit;
       }
       return { rows: [] };
     }
@@ -432,6 +442,135 @@ describe('triggerSelfUpdate', () => {
       ([cmd, args]: [string, string[]]) => cmd === 'docker' && args.includes('up')
     );
     expect(restartCalls).toHaveLength(0);
+  });
+
+  // plan.md §835: the page said "Last update failed: <raw stderr>" and nothing
+  // about the box. What the box is left in depends on how far the run got, so
+  // the run now records the phase it stopped in.
+  describe('what a failed run records (plan.md §835)', () => {
+    const failAt = (what: 'fetch' | 'pull' | 'build') =>
+      backup.runCommand.mockImplementation(async (_cmd: string, args: string[]) => {
+        if (args.includes('rev-parse') && args.includes('HEAD')) return 'old111\n';
+        if (args.includes('rev-parse') && args.includes('origin/main')) return 'new222\n';
+        if (args.includes('rev-list')) return '1\n';
+        if (what === 'fetch' && args.includes('fetch')) throw new Error('fatal: unable to access');
+        if (what === 'pull' && args.includes('pull')) throw new Error('would be overwritten by merge');
+        if (what === 'build' && args.includes('build')) throw new Error('build failed');
+        return '';
+      });
+
+    for (const [what, phase] of [['fetch', 'checking'], ['pull', 'pulling'], ['build', 'building']] as const) {
+      it(`names ${phase} when the run fails there`, async () => {
+        failAt(what);
+        await triggerSelfUpdate(7);
+        await flush();
+
+        expect((await getSelfUpdateStatus()).latestRun).toMatchObject({ state: 'error', failedPhase: phase });
+      });
+    }
+
+    it('names no phase for a run that did not fail', async () => {
+      mockAnUpdateFrom('old111', 'new222', 1);
+      await triggerSelfUpdate(7);
+      await flush();
+
+      expect((await getSelfUpdateStatus()).latestRun?.failedPhase).toBeNull();
+    });
+
+    it('records the apps that failed to update on the run, which still lands', async () => {
+      mockAnUpdateFrom('old111', 'new222', 1, ['apps/guacamole/docker-compose.yml']);
+      executor.updateAllInstalledApps.mockResolvedValue([
+        { serviceName: 'nextcloud', ok: true },
+        { serviceName: 'guacamole', ok: false, error: 'pull failed' },
+      ]);
+      await triggerSelfUpdate(7);
+      await flush();
+
+      expect((await getSelfUpdateStatus()).latestRun).toMatchObject({ state: 'done', appsFailed: ['guacamole'] });
+    });
+
+    it('reports no failed apps as an empty list, never null', async () => {
+      mockAnUpdateFrom('old111', 'new222', 1);
+      await triggerSelfUpdate(7);
+      await flush();
+
+      expect((await getSelfUpdateStatus()).latestRun?.appsFailed).toEqual([]);
+    });
+  });
+
+  // The pull lands before the build, so after a failed build HEAD *is* the
+  // remote and the next run found "0 commits behind" and ended `done` without
+  // rebuilding anything: the box stayed on the old image while the page read
+  // "Up to date" (plan.md §835). A retry has to resume from the failed run.
+  describe('retrying after a failure past the pull (plan.md §835)', () => {
+    function buildThatFailsOnce(changedFiles: string[]) {
+      let head = 'old111';
+      let buildFails = true;
+      backup.runCommand.mockImplementation(async (_cmd: string, args: string[]) => {
+        if (args.includes('pull')) {
+          head = 'new222';
+          return '';
+        }
+        if (args.includes('rev-parse') && args.includes('HEAD')) return `${head}\n`;
+        if (args.includes('rev-parse') && args.includes('origin/main')) return 'new222\n';
+        if (args.includes('rev-list')) return head === 'new222' ? '0\n' : '1\n';
+        if (args.includes('diff') && args.includes('--name-only')) return changedFiles.join('\n') + '\n';
+        if (args.includes('build') && buildFails) throw new Error('build failed');
+        return '';
+      });
+      return { fixBuild: () => (buildFails = false) };
+    }
+    const calls = (word: string) => backup.runCommand.mock.calls.filter(([, args]: [string, string[]]) => args.includes(word));
+
+    it('rebuilds from the failed run\'s starting commit instead of reporting up to date', async () => {
+      const { fixBuild } = buildThatFailsOnce(['backend/src/index.ts']);
+      await triggerSelfUpdate(7);
+      await flush();
+      expect((await getSelfUpdateStatus()).latestRun).toMatchObject({ state: 'error', failedPhase: 'building' });
+
+      fixBuild();
+      backup.runCommand.mockClear();
+      await triggerSelfUpdate(7);
+      await flush();
+
+      expect(calls('build').length).toBeGreaterThan(0);
+      expect(calls('pull')).toHaveLength(0);
+      expect(calls('diff')[0][1]).toContain('old111..new222');
+      expect((await getSelfUpdateStatus()).latestRun).toMatchObject({ state: 'restarting_backend', fromCommit: 'old111' });
+    });
+
+    it('does not resume a run that failed before the pull: nothing was downloaded', async () => {
+      backup.runCommand.mockImplementation(async (_cmd: string, args: string[]) => {
+        if (args.includes('fetch')) throw new Error('offline');
+        if (args.includes('rev-parse') && args.includes('HEAD')) return 'abc123\n';
+        return '';
+      });
+      await triggerSelfUpdate(7);
+      await flush();
+
+      mockAnUpdateFrom('abc123', 'abc123', 0);
+      backup.runCommand.mockClear();
+      await triggerSelfUpdate(7);
+      await flush();
+
+      expect(calls('build')).toHaveLength(0);
+      expect((await getSelfUpdateStatus()).latestRun).toMatchObject({ state: 'done' });
+    });
+
+    it('stops resuming once the retry has succeeded', async () => {
+      const { fixBuild } = buildThatFailsOnce(['backend/src/index.ts']);
+      await triggerSelfUpdate(7);
+      await flush();
+      fixBuild();
+      await triggerSelfUpdate(7);
+      await flush();
+      // The backend restart row is finished; a third press is a plain "up to date".
+      backup.runCommand.mockClear();
+      await triggerSelfUpdate(7);
+      await flush();
+
+      expect(calls('build')).toHaveLength(0);
+    });
   });
 
   it('prunes dangling images and build cache after the build and after updating apps', async () => {
