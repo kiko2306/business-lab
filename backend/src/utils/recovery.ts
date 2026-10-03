@@ -24,6 +24,16 @@ export async function setRecoveryMode(enabled: boolean): Promise<void> {
   cacheExpiresAt = Date.now() + CACHE_TTL_MS;
 }
 
+/**
+ * What GET /recovery/status tells the page. `available` is whether this caller
+ * can use the HTTP endpoints at all: they gate on a loopback address, which with
+ * the backend in a container only a request from inside it has, so the page can
+ * say so instead of answering 403 to a locked-out person (plan.md §829).
+ */
+export function recoveryStatusBody(enabled: boolean, req: Request): { enabled: boolean; available: boolean } {
+  return { enabled, available: isLocalRequest(req) };
+}
+
 export function isLocalRequest(req: Request): boolean {
   const ip = req.ip || req.socket?.remoteAddress || '';
   return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';

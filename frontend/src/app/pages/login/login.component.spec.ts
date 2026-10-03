@@ -230,4 +230,47 @@ describe('LoginComponent', () => {
       expect(document.activeElement?.id).toBe('code');
     });
   });
+
+  // plan.md §829 (P1): a locked-out person had no forgot-password link, and the
+  // only way back in, a command on the box, was written down nowhere on screen.
+  describe('being locked out', () => {
+    const locked = () => (fixture.nativeElement as HTMLElement).querySelector('details.locked-out') as HTMLElement | null;
+
+    beforeEach(() => {
+      authService.isSetupRequired.and.returnValue(of(false));
+      fixture.detectChanges();
+    });
+
+    it('offers a Locked out? line on the credentials step, closed until asked', () => {
+      expect(locked()?.querySelector('summary')?.textContent).toContain('Locked out?');
+      expect(locked()?.hasAttribute('open')).toBeFalse();
+    });
+
+    it('tells staff to ask whoever runs the box, and the owner the command to run on it', () => {
+      const text = locked()?.textContent ?? '';
+      expect(text).toContain('Users page');
+      expect(text).toContain('./start.sh recover reset-password');
+    });
+
+    it('offers a lost-authenticator line on the code step, with the recovery code first', () => {
+      authService.login.and.returnValue(of({ mfaRequired: true, mfaToken: 'mfa-token' } as MfaChallenge));
+      component['form'].setValue({ username: 'admin', password: 'password123' });
+      component.submit();
+      fixture.detectChanges();
+
+      const text = locked()?.textContent ?? '';
+      expect(locked()?.querySelector('summary')?.textContent).toContain('Lost your authenticator?');
+      expect(text.indexOf('recovery codes')).toBeGreaterThan(-1);
+      expect(text).toContain('./start.sh recover disable-2fa');
+      expect(text).not.toContain('reset-password');
+    });
+
+    it('says it in Portuguese for a pt-PT reader', () => {
+      TestBed.inject(TranslateService).setLocale('pt-PT');
+      fixture.detectChanges();
+
+      expect(locked()?.querySelector('summary')?.textContent).toContain('Sem acesso?');
+      TestBed.inject(TranslateService).setLocale('en');
+    });
+  });
 });

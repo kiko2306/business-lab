@@ -37228,3 +37228,27 @@ reader. The test stack was removed by name afterwards.
 - 372 frontend specs (new: helper, login failure states, setup and set-password specs, which did
   not exist), build clean, E2E passes. Not done: the 429 wait time is the limiter's fixed 15
   minutes, not read from `Retry-After`.
+
+## 829. Sign-in: a locked-out person is told the way back in (§827 fix 1, P1)
+
+[x] done. Direction chosen by the user: say it in the UI (not a new auth path, not removing
+`/recovery`).
+
+- **Login says it.** A closed `<details class="locked-out">` under the form. Credentials step:
+  "Locked out?" — ask whoever runs the box to reset it on the Users page; if you run the box and cannot
+  sign in at all, run `./start.sh recover reset-password` on it. Code step: "Lost your
+  authenticator?" — use a recovery code; with none left, whoever runs the box runs
+  `./start.sh recover disable-2fa`. EN and pt-PT. The commands are the existing ones
+  (`docs/recovery-troubleshooting.md`): nothing new on the network, and `./start.sh` stays the one host
+  command.
+- **`/recovery` says where it cannot work.** The HTTP endpoints gate on a loopback caller
+  (`isLocalRequest`), which with the backend in a container only a request from inside it is: on
+  the normal install every browser got 403 "only from localhost". `GET /recovery/status` now also
+  returns `available` (`recoveryStatusBody`, unit-tested); the page shows the two commands in an
+  info notice and switches its buttons and fields off when `available` is false, and starts them off
+  until the status answers so nothing flashes.
+- **Rejected:** hiding `/recovery` and its nav link: on a bare-metal install it works, and the
+  frontend cannot tell the two apart without the new field. A browser-side reset for the owner
+  (an owner code printed at `./start.sh`) was offered and not chosen: it touches auth.
+- 380 frontend specs (new: login locked-out, recovery spec), 1334 backend tests, builds clean, E2E
+  passes. Not done: `/recovery`'s Reset and Enable still need no confirm (§827 minor).

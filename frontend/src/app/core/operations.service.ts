@@ -253,8 +253,8 @@ export class OperationsService {
     );
   }
 
-  getRecoveryStatus(): Observable<{ enabled: boolean }> {
-    return this.http.get<{ enabled: boolean }>(
+  getRecoveryStatus(): Observable<{ enabled: boolean; available: boolean }> {
+    return this.http.get<{ enabled: boolean; available: boolean }>(
       `${API_BASE_URL}/recovery/status`,
       { context: new HttpContext().set(SKIP_AUTH, true).set(SKIP_GLOBAL_ERROR_HANDLING, true) }
     );

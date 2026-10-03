@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.10] — 2026-10-03
+
+### Changed
+
+- Sign-in: a Locked out? line on the login page names the way back in, and /recovery says it only works on the box itself instead of answering 403
+
 ## [0.163.9] — 2026-10-03
 
 ### Changed

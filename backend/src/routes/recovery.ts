@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { query } from '../utils/database';
 import { hashPassword } from '../utils/password';
 import { writeAuditLog } from '../utils/audit';
-import { isRecoveryModeEnabled, isLocalRequest, setRecoveryMode } from '../utils/recovery';
+import { isRecoveryModeEnabled, isLocalRequest, recoveryStatusBody, setRecoveryMode } from '../utils/recovery';
 import { schemas, validateBody } from '../middleware/validation';
 
 const router = Router();
@@ -18,9 +18,9 @@ const recoveryLimiter = rateLimit({
 
 router.use(recoveryLimiter);
 
-router.get('/status', async (_req: Request, res: Response) => {
+router.get('/status', async (req: Request, res: Response) => {
   try {
-    return res.json({ enabled: await isRecoveryModeEnabled() });
+    return res.json(recoveryStatusBody(await isRecoveryModeEnabled(), req));
   } catch {
     return res.status(500).json({ error: 'Unable to read recovery status.' });
   }

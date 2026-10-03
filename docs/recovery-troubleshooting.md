@@ -31,7 +31,9 @@ to a one-off container). See plan.md §105/§126.
 gate on `req.ip` being loopback — which, with the backend in a container, only
 a request from *inside* that container satisfies. They are therefore usable
 only on a bare-metal (non-container) deployment. On the normal containerised
-install, use `./start.sh recover` above.
+install, use `./start.sh recover` above. The sign-in page's **Locked out?** line and the
+`/recovery` page say the same in the UI; on a containerised install `/recovery` shows the
+commands and switches its buttons off (`GET /api/recovery/status` returns `available: false`).
 
 ## Backup/restore
 

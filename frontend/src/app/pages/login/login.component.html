@@ -94,6 +94,20 @@
             </div>
           </form>
 
+          <!-- A locked-out person's only way back is a command on the box; say so here, where they are stuck (plan.md §829). -->
+          <details class="locked-out small mt-4">
+            <summary class="text-body-secondary">{{ (stage === 'mfa' ? 'login.locked.mfaSummary' : 'login.locked.summary') | t }}</summary>
+            <ng-container *ngIf="stage === 'credentials'">
+              <p class="mt-2 mb-2">{{ 'login.locked.password' | t }}</p>
+              <p class="mb-1">{{ 'login.locked.owner' | t }}</p>
+              <code class="user-select-all">./start.sh recover reset-password</code>
+            </ng-container>
+            <ng-container *ngIf="stage === 'mfa'">
+              <p class="mt-2 mb-1">{{ 'login.locked.mfa' | t }}</p>
+              <code class="user-select-all">./start.sh recover disable-2fa</code>
+            </ng-container>
+          </details>
+
           <p *ngIf="stage === 'credentials' && setupRequired" class="text-center text-body-secondary small mt-4 mb-0">
             {{ 'login.setup.prompt' | t }}
             <a routerLink="/setup">{{ 'login.setup.link' | t }}</a>.

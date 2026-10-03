@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.9** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.10** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -248,8 +248,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Sign-in flow: fix the critique's findings (plan.md §827)** — in order, test first, one
       commit and version bump each: (2) done (§828) — on `beta`, in pt-PT on a phone: a wrong password reads in Portuguese, is
       announced, and the cursor is back in the password with it selected; a wrong code on the 2FA step
-      does the same; (1) a "Locked out?" path on login in plain words, `/recovery`
-      hidden or explained where it cannot work, a lost-authenticator line on the MFA step; (3) set-password and setup failures inline with a full-width Back to
+      does the same; (1) done (§829) — on `beta`, the login page has a closed
+      "Locked out?" line naming the Users page and `./start.sh recover reset-password`, the code step has
+      "Lost your authenticator?" naming `disable-2fa`, and `/recovery` (signed in) shows the commands in
+      a blue notice with its buttons off; in pt-PT too; (3) set-password and setup failures inline with a full-width Back to
       sign in, setup's mismatch inline; (4) show-password, the 8-character rule up front, username
       autofocus, `/recovery` inputs 44px with `type`/`autocomplete`; (5) the card centred and one
       shared auth shell, `/recovery` inside it. On `beta`, after each: wrong password in pt-PT on a

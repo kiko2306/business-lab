@@ -21,6 +21,9 @@ export class RecoveryComponent implements OnInit {
   private readonly translate = inject(TranslateService);
 
   protected enabled = false;
+  // null until the status answers, so the controls start off and the notice
+  // does not flash. False on a containerised install (plan.md §829).
+  protected available: boolean | null = null;
   protected username = '';
   protected password = '';
 
@@ -30,7 +33,10 @@ export class RecoveryComponent implements OnInit {
 
   loadStatus(): void {
     this.operations.getRecoveryStatus().subscribe({
-      next: (response) => (this.enabled = response.enabled),
+      next: (response) => {
+        this.enabled = response.enabled;
+        this.available = response.available;
+      },
       error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('recovery.errors.loadStatus'))),
     });
   }
