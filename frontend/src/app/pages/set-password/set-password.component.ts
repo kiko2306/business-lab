@@ -41,6 +41,8 @@ export class SetPasswordComponent implements OnInit {
   protected submitting = false;
   /** Set when the link is bad/expired — the form is not shown. */
   protected linkError = '';
+  /** A refused password: said inside the card, the form kept (plan.md §827). */
+  protected submitError = '';
   protected invite: { username: string; email: string } | null = null;
 
   ngOnInit(): void {
@@ -76,6 +78,7 @@ export class SetPasswordComponent implements OnInit {
       this.form.markAllAsTouched();
       return;
     }
+    this.submitError = '';
     this.submitting = true;
     this.auth
       .acceptInvitation(this.token, this.form.controls.password.value)
@@ -85,7 +88,21 @@ export class SetPasswordComponent implements OnInit {
           this.toast.success(this.translate.t('setPassword.toast.success'));
           void this.router.navigateByUrl('/home');
         },
-        error: (error) => this.toast.error(this.translate.t(authErrorKey(error, 'invitation'))),
+        error: (error) => {
+          const key = authErrorKey(error, 'invitation');
+          if (key === 'setPassword.errors.invalidLink') {
+            // The link died between opening the page and pressing the button:
+            // nothing on this form can work now, so show the way out instead.
+            this.linkError = this.translate.t(key);
+            return;
+          }
+          this.submitError = this.translate.t(key);
+          setTimeout(() => {
+            const field = document.getElementById('spPassword') as HTMLInputElement | null;
+            field?.focus();
+            field?.select();
+          });
+        },
       });
   }
 }

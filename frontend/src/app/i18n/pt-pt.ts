@@ -814,7 +814,7 @@ export const ptPT: Record<string, string> = {
   'setPassword.confirmPasswordLabel': 'Confirmar palavra-passe',
   'setPassword.passwordMismatch': 'As palavras-passe não coincidem.',
   'setPassword.submitButton': 'Definir palavra-passe e iniciar sessão',
-  'setPassword.signInLink': 'Iniciar sessão',
+  'setPassword.backToSignIn': 'Voltar ao início de sessão',
   'setPassword.errors.missingToken': 'Esta ligação não tem token. Peça a quem o convidou para a reenviar.',
   'setPassword.errors.invalidLink': 'Esta ligação de convite expirou ou já foi usada. Peça a quem o convidou que envie uma nova.',
   'setPassword.errors.setFailed': 'Não foi possível definir a palavra-passe. A ligação pode ter acabado de expirar.',

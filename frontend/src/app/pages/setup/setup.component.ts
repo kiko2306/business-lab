@@ -47,18 +47,18 @@ export class SetupComponent {
     this.form.controls[controlName].markAsDirty();
   }
 
+  protected get mismatch(): boolean {
+    const { password, confirmPassword } = this.form.getRawValue();
+    return Boolean(confirmPassword) && password !== confirmPassword;
+  }
+
   submit(): void {
-    if (this.form.invalid) {
+    if (this.form.invalid || this.mismatch) {
       this.form.markAllAsTouched();
       return;
     }
 
-    const { username, email, password, confirmPassword } = this.form.getRawValue();
-    if (password !== confirmPassword) {
-      this.errorMessage = this.translate.t('setup.errors.passwordMismatch');
-      return;
-    }
-
+    const { username, email, password } = this.form.getRawValue();
     this.errorMessage = '';
     this.submitting = true;
 

@@ -77,9 +77,13 @@
                 <span *ngIf="form.controls.confirmPassword.hasError('required')">{{ 'setup.confirmPasswordRequired' | t }}</span>
                 <span *ngIf="form.controls.confirmPassword.hasError('maxlength')">{{ 'setup.confirmPasswordTooLong' | t }}</span>
               </div>
+              <!-- Said here, as set-password does, not as a bar after the submit (plan.md §827). -->
+              <div *ngIf="form.controls.confirmPassword.touched && mismatch" class="text-danger small mt-1" appFieldError="confirmPassword">
+                {{ 'setup.errors.passwordMismatch' | t }}
+              </div>
             </div>
 
-            <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting || form.invalid">
+            <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting || form.invalid || mismatch">
               <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
               {{ 'setup.submitButton' | t }}
             </button>
@@ -87,7 +91,7 @@
 
           <p class="text-center text-body-secondary small mt-4 mb-0">
             {{ 'setup.alreadyDone' | t }}
-            <a routerLink="/login">{{ 'setup.signInLink' | t }}</a>.
+            <a routerLink="/login" class="d-inline-block py-3">{{ 'setup.signInLink' | t }}</a>.
           </p>
         </div>
       </section>

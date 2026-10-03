@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.11] — 2026-10-03
+
+### Changed
+
+- Sign-in: a failed set-password or setup is said inside the card, a dead invitation link has a full-width Back to sign in, and setup flags a password mismatch under the field
+
 ## [0.163.10] — 2026-10-03
 
 ### Changed

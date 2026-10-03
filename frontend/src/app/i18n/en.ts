@@ -814,7 +814,7 @@ export const en: Record<string, string> = {
   'setPassword.confirmPasswordLabel': 'Confirm password',
   'setPassword.passwordMismatch': 'The passwords don’t match.',
   'setPassword.submitButton': 'Set password & sign in',
-  'setPassword.signInLink': 'Go to sign in',
+  'setPassword.backToSignIn': 'Back to sign in',
   'setPassword.errors.missingToken': 'This link is missing its token. Ask whoever invited you to resend it.',
   'setPassword.errors.invalidLink': 'This invitation link has expired or was already used. Ask whoever invited you to send a new one.',
   'setPassword.errors.setFailed': 'Could not set the password. The link may have just expired.',

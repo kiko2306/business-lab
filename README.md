@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.10** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.11** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -251,8 +251,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       does the same; (1) done (§829) — on `beta`, the login page has a closed
       "Locked out?" line naming the Users page and `./start.sh recover reset-password`, the code step has
       "Lost your authenticator?" naming `disable-2fa`, and `/recovery` (signed in) shows the commands in
-      a blue notice with its buttons off; in pt-PT too; (3) set-password and setup failures inline with a full-width Back to
-      sign in, setup's mismatch inline; (4) show-password, the 8-character rule up front, username
+      a blue notice with its buttons off; in pt-PT too; (3) done (§830) — on `beta`, open a used invite link: the alert says
+      to ask whoever invited you and a full-width Back to sign in sits under it; on a good link a refused
+      password shows inside the card; on `/setup` a mismatch shows under the confirm field with Create held; (4) show-password, the 8-character rule up front, username
       autofocus, `/recovery` inputs 44px with `type`/`autocomplete`; (5) the card centred and one
       shared auth shell, `/recovery` inside it. On `beta`, after each: wrong password in pt-PT on a
       phone, then follow the Locked out? line.

@@ -54,11 +54,30 @@ describe('SetupComponent failures', () => {
     expect(alert().textContent).toContain('already taken');
   });
 
-  it('announces a password mismatch too', () => {
-    component['form'].patchValue({ confirmPassword: 'different123' });
-    component.submit();
-    fixture.detectChanges();
+  // plan.md §827 fix 3: set-password flagged a mismatch under the field, setup
+  // only as a bar at the top, off-screen on a phone, after the submit.
+  describe('a password mismatch', () => {
+    beforeEach(() => {
+      component['form'].patchValue({ confirmPassword: 'different123' });
+      component['form'].controls.confirmPassword.markAsTouched();
+      fixture.detectChanges();
+    });
 
-    expect(alert().getAttribute('role')).toBe('alert');
+    it('is said under the confirm field, announced, before any submit', () => {
+      const message = (fixture.nativeElement as HTMLElement).querySelector('#confirmPassword-error') as HTMLElement;
+      expect(message.getAttribute('role')).toBe('alert');
+      expect(message.textContent).toContain('do not match');
+      expect((fixture.nativeElement as HTMLElement).querySelector('.alert-danger')).toBeNull();
+    });
+
+    it('holds the submit button, as set-password does', () => {
+      const submit = (fixture.nativeElement as HTMLElement).querySelector('button[type="submit"]') as HTMLButtonElement;
+      expect(submit.disabled).toBeTrue();
+    });
+  });
+
+  it('gives the way back to sign in a 44px target, not a 17px inline link', () => {
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a[href="/login"]') as HTMLElement;
+    expect(link.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
   });
 });

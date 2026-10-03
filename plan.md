@@ -37252,3 +37252,22 @@ reader. The test stack was removed by name afterwards.
   (an owner code printed at `./start.sh`) was offered and not chosen: it touches auth.
 - 380 frontend specs (new: login locked-out, recovery spec), 1334 backend tests, builds clean, E2E
   passes. Not done: `/recovery`'s Reset and Enable still need no confirm (§827 minor).
+
+## 830. Sign-in: set-password and setup no longer dead-end (§827 fix 3, P2)
+
+[x] done.
+
+- **A dead link has a way out.** The 17px "Go to sign in" text link is a full-width
+  "Back to sign in" button under the alert (`setPassword.backToSignIn`; the unused
+  `setPassword.signInLink` key is deleted).
+- **A failed submit stays in the card.** A refused password (400) is an announced alert above the
+  button, the form kept and the cursor back in the password with its text selected; a toast over the
+  header is gone. If the link died between opening the page and pressing the button (410, 422), the form
+  is replaced by the dead-link page and its way out, since nothing on it can work.
+- **Setup's mismatch is inline.** Under the confirm field, announced, before any submit, with the
+  button held: the same as set-password. The top bar after submit and its code are gone.
+- **Setup's footer link** is `py-3`: 53px, not 17px. An inline link in a sentence is exempt in WCAG
+  2.5.8; it was changed anyway because this is the one way off a page a phone user may be stuck on.
+- 386 frontend specs, build clean, E2E passes. Not done: the spent link still does not name the
+  inviter (the backend does not return it; §827 fix 3 asked "name the inviter or say whoever invited
+  you" and the latter is what the copy now says).
