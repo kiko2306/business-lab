@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.13] — 2026-10-03
+
+### Changed
+
+- Sign-in: one shared card for login, setup, set-password and recovery, centred on every width (it sat 12px left), recovery no longer a separate design
+
 ## [0.163.12] — 2026-10-03
 
 ### Changed

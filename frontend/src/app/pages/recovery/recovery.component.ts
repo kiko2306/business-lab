@@ -7,11 +7,12 @@ import { OperationsService } from '../../core/operations.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
+import { AuthShellComponent } from '../../components/auth-shell/auth-shell.component';
 
 @Component({
   selector: 'app-recovery',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TranslatePipe],
+  imports: [CommonModule, FormsModule, RouterLink, TranslatePipe, AuthShellComponent],
   templateUrl: './recovery.component.html',
   styleUrl: './recovery.component.css'
 })

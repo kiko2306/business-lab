@@ -1,122 +1,104 @@
-<main class="auth-page container py-5">
-  <div class="row justify-content-center">
-    <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-5 col-xxl-4">
-      <section class="card border-0 shadow auth-card">
-        <div class="card-body p-4 p-lg-5">
-          <div class="text-center mb-4">
-            <img src="favicon.svg" alt="" width="48" height="48" class="mb-2" />
-            <span class="auth-kicker d-block">Business Lab</span>
-            <h1 class="h3 mt-2 mb-2">{{ (stage === 'mfa' ? 'login.title.mfa' : 'login.title.signIn') | t }}</h1>
-            <p class="text-body-secondary mb-0">
-              <ng-container *ngIf="stage === 'credentials'">
-                {{ 'login.subtitle.credentials' | t }}
-              </ng-container>
-              <ng-container *ngIf="stage === 'mfa'">
-                {{ (useRecoveryCode ? 'login.subtitle.mfaRecovery' : 'login.subtitle.mfaCode') | t }}
-              </ng-container>
-            </p>
-          </div>
+<app-auth-shell kicker="Business Lab" [title]="(stage === 'mfa' ? 'login.title.mfa' : 'login.title.signIn') | t">
+  <span auth-subtitle>
+    <ng-container *ngIf="stage === 'credentials'">{{ 'login.subtitle.credentials' | t }}</ng-container>
+    <ng-container *ngIf="stage === 'mfa'">{{ (useRecoveryCode ? 'login.subtitle.mfaRecovery' : 'login.subtitle.mfaCode') | t }}</ng-container>
+  </span>
+  <div *ngIf="errorMessage" class="alert alert-danger" role="alert">{{ errorMessage }}</div>
 
-          <div *ngIf="errorMessage" class="alert alert-danger" role="alert">{{ errorMessage }}</div>
-
-          <form *ngIf="stage === 'credentials'" [formGroup]="form" (ngSubmit)="submit()" novalidate>
-            <div class="mb-3">
-              <label class="form-label fw-semibold" for="username">{{ 'login.username.label' | t }}</label>
-              <input
-                id="username"
-                type="text"
-                class="form-control form-control-lg"
-                formControlName="username"
-                autocomplete="username"
-                maxlength="64"
-                (paste)="sanitizePaste($event, 'username', 64)"
-              />
-              <div *ngIf="form.controls.username.touched && form.controls.username.invalid" class="text-danger small mt-1" appFieldError="username">
-                {{ 'login.username.error' | t }}
-              </div>
-            </div>
-
-            <div class="mb-4">
-              <label class="form-label fw-semibold" for="password">{{ 'login.password.label' | t }}</label>
-              <div class="input-group">
-                <input
-                  id="password"
-                  type="password"
-                  class="form-control form-control-lg"
-                  formControlName="password"
-                  autocomplete="current-password"
-                  maxlength="128"
-                  (paste)="sanitizePaste($event, 'password', 128)"
-                />
-                <button type="button" class="btn btn-outline-secondary" appPasswordToggle="password" #pwToggle="appPasswordToggle" [attr.aria-label]="'auth.password.toggleLabel' | t">{{ (pwToggle.shown ? 'auth.password.hide' : 'auth.password.show') | t }}</button>
-              </div>
-              <div *ngIf="form.controls.password.touched && form.controls.password.invalid" class="text-danger small mt-1" appFieldError="password">
-                {{ 'login.password.error' | t }}
-              </div>
-            </div>
-
-            <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting || form.invalid">
-              <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-              {{ 'login.submit' | t }}
-            </button>
-          </form>
-
-          <form *ngIf="stage === 'mfa'" [formGroup]="mfaForm" (ngSubmit)="submitMfa()" novalidate>
-            <div class="mb-3">
-              <label class="form-label fw-semibold" for="code">
-                {{ (useRecoveryCode ? 'login.mfa.recoveryLabel' : 'login.mfa.codeLabel') | t }}
-              </label>
-              <input
-                id="code"
-                type="text"
-                class="form-control form-control-lg"
-                formControlName="code"
-                [attr.inputmode]="useRecoveryCode ? 'text' : 'numeric'"
-                [attr.autocomplete]="useRecoveryCode ? 'off' : 'one-time-code'"
-                [placeholder]="useRecoveryCode ? 'xxxxx-xxxxx' : '123456'"
-                maxlength="32"
-                autofocus
-              />
-              <div *ngIf="mfaForm.controls.code.touched && mfaForm.controls.code.invalid" class="text-danger small mt-1" appFieldError="code">
-                {{ 'login.mfa.error' | t }}
-              </div>
-            </div>
-
-            <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting || mfaForm.invalid">
-              <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-              {{ 'login.mfa.verify' | t }}
-            </button>
-
-            <div class="d-flex justify-content-between mt-3 small">
-              <button type="button" class="btn btn-link p-0" (click)="toggleRecoveryCode()">
-                {{ (useRecoveryCode ? 'login.mfa.useAuthenticator' : 'login.mfa.useRecoveryCode') | t }}
-              </button>
-              <button type="button" class="btn btn-link p-0 text-body-secondary" (click)="backToCredentials()">
-                {{ 'login.mfa.startOver' | t }}
-              </button>
-            </div>
-          </form>
-
-          <!-- A locked-out person's only way back is a command on the box; say so here, where they are stuck (plan.md §829). -->
-          <details class="locked-out small mt-4">
-            <summary class="text-body-secondary">{{ (stage === 'mfa' ? 'login.locked.mfaSummary' : 'login.locked.summary') | t }}</summary>
-            <ng-container *ngIf="stage === 'credentials'">
-              <p class="mt-2 mb-2">{{ 'login.locked.password' | t }}</p>
-              <p class="mb-1">{{ 'login.locked.owner' | t }}</p>
-              <code class="user-select-all">./start.sh recover reset-password</code>
-            </ng-container>
-            <ng-container *ngIf="stage === 'mfa'">
-              <p class="mt-2 mb-1">{{ 'login.locked.mfa' | t }}</p>
-              <code class="user-select-all">./start.sh recover disable-2fa</code>
-            </ng-container>
-          </details>
-
-          <p *ngIf="stage === 'credentials' && setupRequired" class="text-center text-body-secondary small mt-4 mb-0">
-            {{ 'login.setup.prompt' | t }}
-            <a routerLink="/setup">{{ 'login.setup.link' | t }}</a>.
-          </p>
-        </div>
-      </section>
+  <form *ngIf="stage === 'credentials'" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <div class="mb-3">
+      <label class="form-label fw-semibold" for="username">{{ 'login.username.label' | t }}</label>
+      <input
+        id="username"
+        type="text"
+        class="form-control form-control-lg"
+        formControlName="username"
+        autocomplete="username"
+        maxlength="64"
+        (paste)="sanitizePaste($event, 'username', 64)"
+      />
+      <div *ngIf="form.controls.username.touched && form.controls.username.invalid" class="text-danger small mt-1" appFieldError="username">
+        {{ 'login.username.error' | t }}
+      </div>
     </div>
-  </div>
-</main>
+
+    <div class="mb-4">
+      <label class="form-label fw-semibold" for="password">{{ 'login.password.label' | t }}</label>
+      <div class="input-group">
+        <input
+          id="password"
+          type="password"
+          class="form-control form-control-lg"
+          formControlName="password"
+          autocomplete="current-password"
+          maxlength="128"
+          (paste)="sanitizePaste($event, 'password', 128)"
+        />
+        <button type="button" class="btn btn-outline-secondary" appPasswordToggle="password" #pwToggle="appPasswordToggle" [attr.aria-label]="'auth.password.toggleLabel' | t">{{ (pwToggle.shown ? 'auth.password.hide' : 'auth.password.show') | t }}</button>
+      </div>
+      <div *ngIf="form.controls.password.touched && form.controls.password.invalid" class="text-danger small mt-1" appFieldError="password">
+        {{ 'login.password.error' | t }}
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting || form.invalid">
+      <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+      {{ 'login.submit' | t }}
+    </button>
+  </form>
+
+  <form *ngIf="stage === 'mfa'" [formGroup]="mfaForm" (ngSubmit)="submitMfa()" novalidate>
+    <div class="mb-3">
+      <label class="form-label fw-semibold" for="code">
+        {{ (useRecoveryCode ? 'login.mfa.recoveryLabel' : 'login.mfa.codeLabel') | t }}
+      </label>
+      <input
+        id="code"
+        type="text"
+        class="form-control form-control-lg"
+        formControlName="code"
+        [attr.inputmode]="useRecoveryCode ? 'text' : 'numeric'"
+        [attr.autocomplete]="useRecoveryCode ? 'off' : 'one-time-code'"
+        [placeholder]="useRecoveryCode ? 'xxxxx-xxxxx' : '123456'"
+        maxlength="32"
+        autofocus
+      />
+      <div *ngIf="mfaForm.controls.code.touched && mfaForm.controls.code.invalid" class="text-danger small mt-1" appFieldError="code">
+        {{ 'login.mfa.error' | t }}
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting || mfaForm.invalid">
+      <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+      {{ 'login.mfa.verify' | t }}
+    </button>
+
+    <div class="d-flex justify-content-between mt-3 small">
+      <button type="button" class="btn btn-link p-0" (click)="toggleRecoveryCode()">
+        {{ (useRecoveryCode ? 'login.mfa.useAuthenticator' : 'login.mfa.useRecoveryCode') | t }}
+      </button>
+      <button type="button" class="btn btn-link p-0 text-body-secondary" (click)="backToCredentials()">
+        {{ 'login.mfa.startOver' | t }}
+      </button>
+    </div>
+  </form>
+
+  <!-- A locked-out person's only way back is a command on the box; say so here, where they are stuck (plan.md §829). -->
+  <details class="locked-out small mt-4">
+    <summary class="text-body-secondary">{{ (stage === 'mfa' ? 'login.locked.mfaSummary' : 'login.locked.summary') | t }}</summary>
+    <ng-container *ngIf="stage === 'credentials'">
+      <p class="mt-2 mb-2">{{ 'login.locked.password' | t }}</p>
+      <p class="mb-1">{{ 'login.locked.owner' | t }}</p>
+      <code class="user-select-all">./start.sh recover reset-password</code>
+    </ng-container>
+    <ng-container *ngIf="stage === 'mfa'">
+      <p class="mt-2 mb-1">{{ 'login.locked.mfa' | t }}</p>
+      <code class="user-select-all">./start.sh recover disable-2fa</code>
+    </ng-container>
+  </details>
+
+  <p *ngIf="stage === 'credentials' && setupRequired" class="text-center text-body-secondary small mt-4 mb-0">
+    {{ 'login.setup.prompt' | t }}
+    <a routerLink="/setup">{{ 'login.setup.link' | t }}</a>.
+  </p>
+</app-auth-shell>

@@ -1,108 +1,93 @@
-<main class="auth-page container py-5">
-  <div class="row justify-content-center">
-    <div class="col-12 col-md-9 col-lg-8 col-xl-7">
-      <section class="card border-0 shadow auth-card">
-        <div class="card-body p-4 p-lg-5">
-          <div class="text-center mb-4">
-            <span class="auth-kicker">{{ 'setup.kicker' | t }}</span>
-            <h1 class="h3 mt-2 mb-2">{{ 'setup.title' | t }}</h1>
-            <p class="text-body-secondary mb-0">
-              {{ 'setup.subtitle' | t }}
-            </p>
-          </div>
+<app-auth-shell [kicker]="'setup.kicker' | t" [title]="'setup.title' | t" size="wide">
+  <span auth-subtitle>{{ 'setup.subtitle' | t }}</span>
+  <div *ngIf="errorMessage" class="alert alert-danger" role="alert">{{ errorMessage }}</div>
 
-          <div *ngIf="errorMessage" class="alert alert-danger" role="alert">{{ errorMessage }}</div>
-
-          <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
-            <div class="mb-3">
-              <label class="form-label fw-semibold" for="setupUsername">{{ 'setup.usernameLabel' | t }}</label>
-              <input
-                id="setupUsername"
-                type="text"
-                class="form-control form-control-lg"
-                formControlName="username"
-                autocomplete="username"
-                maxlength="64"
-                (paste)="sanitizePaste($event, 'username', 64)"
-              />
-              <div *ngIf="form.controls.username.touched && form.controls.username.invalid" class="text-danger small mt-1" appFieldError="setupUsername">
-                {{ 'setup.usernameError' | t }}
-              </div>
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label fw-semibold" for="setupEmail">{{ 'setup.emailLabel' | t }}</label>
-              <input
-                id="setupEmail"
-                type="email"
-                class="form-control form-control-lg"
-                formControlName="email"
-                autocomplete="email"
-                maxlength="255"
-                (paste)="sanitizePaste($event, 'email', 255)"
-              />
-              <div *ngIf="form.controls.email.touched && form.controls.email.invalid" class="text-danger small mt-1" appFieldError="setupEmail">
-                {{ 'setup.emailError' | t }}
-              </div>
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label fw-semibold" for="setupPassword">{{ 'setup.passwordLabel' | t }}</label>
-              <div class="input-group">
-                <input
-                  id="setupPassword"
-                  type="password"
-                  class="form-control form-control-lg"
-                  formControlName="password"
-                  autocomplete="new-password"
-                  maxlength="128"
-                  aria-describedby="setupPassword-hint"
-                  (paste)="sanitizePaste($event, 'password', 128)"
-                />
-                <button type="button" class="btn btn-outline-secondary" appPasswordToggle="setupPassword" #pwToggle="appPasswordToggle" [attr.aria-label]="'auth.password.toggleLabel' | t">{{ (pwToggle.shown ? 'auth.password.hide' : 'auth.password.show') | t }}</button>
-              </div>
-              <div class="form-text" id="setupPassword-hint">{{ 'auth.password.hint' | t }}</div>
-              <div *ngIf="form.controls.password.touched && form.controls.password.invalid" class="text-danger small mt-1" appFieldError="setupPassword">
-                {{ 'setup.passwordError' | t }}
-              </div>
-            </div>
-
-            <div class="mb-4">
-              <label class="form-label fw-semibold" for="confirmPassword">{{ 'setup.confirmPasswordLabel' | t }}</label>
-              <div class="input-group">
-                <input
-                  id="confirmPassword"
-                  type="password"
-                  class="form-control form-control-lg"
-                  formControlName="confirmPassword"
-                  autocomplete="new-password"
-                  maxlength="128"
-                  (paste)="sanitizePaste($event, 'confirmPassword', 128)"
-                />
-                <button type="button" class="btn btn-outline-secondary" appPasswordToggle="confirmPassword" #confirmToggle="appPasswordToggle" [attr.aria-label]="'auth.password.toggleLabel' | t">{{ (confirmToggle.shown ? 'auth.password.hide' : 'auth.password.show') | t }}</button>
-              </div>
-              <div *ngIf="form.controls.confirmPassword.touched && form.controls.confirmPassword.invalid" class="text-danger small mt-1" appFieldError="confirmPassword">
-                <span *ngIf="form.controls.confirmPassword.hasError('required')">{{ 'setup.confirmPasswordRequired' | t }}</span>
-                <span *ngIf="form.controls.confirmPassword.hasError('maxlength')">{{ 'setup.confirmPasswordTooLong' | t }}</span>
-              </div>
-              <!-- Said here, as set-password does, not as a bar after the submit (plan.md §827). -->
-              <div *ngIf="form.controls.confirmPassword.touched && mismatch" class="text-danger small mt-1" appFieldError="confirmPassword">
-                {{ 'setup.errors.passwordMismatch' | t }}
-              </div>
-            </div>
-
-            <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting || form.invalid || mismatch">
-              <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-              {{ 'setup.submitButton' | t }}
-            </button>
-          </form>
-
-          <p class="text-center text-body-secondary small mt-4 mb-0">
-            {{ 'setup.alreadyDone' | t }}
-            <a routerLink="/login" class="d-inline-block py-3">{{ 'setup.signInLink' | t }}</a>.
-          </p>
-        </div>
-      </section>
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <div class="mb-3">
+      <label class="form-label fw-semibold" for="setupUsername">{{ 'setup.usernameLabel' | t }}</label>
+      <input
+        id="setupUsername"
+        type="text"
+        class="form-control form-control-lg"
+        formControlName="username"
+        autocomplete="username"
+        maxlength="64"
+        (paste)="sanitizePaste($event, 'username', 64)"
+      />
+      <div *ngIf="form.controls.username.touched && form.controls.username.invalid" class="text-danger small mt-1" appFieldError="setupUsername">
+        {{ 'setup.usernameError' | t }}
+      </div>
     </div>
-  </div>
-</main>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" for="setupEmail">{{ 'setup.emailLabel' | t }}</label>
+      <input
+        id="setupEmail"
+        type="email"
+        class="form-control form-control-lg"
+        formControlName="email"
+        autocomplete="email"
+        maxlength="255"
+        (paste)="sanitizePaste($event, 'email', 255)"
+      />
+      <div *ngIf="form.controls.email.touched && form.controls.email.invalid" class="text-danger small mt-1" appFieldError="setupEmail">
+        {{ 'setup.emailError' | t }}
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" for="setupPassword">{{ 'setup.passwordLabel' | t }}</label>
+      <div class="input-group">
+        <input
+          id="setupPassword"
+          type="password"
+          class="form-control form-control-lg"
+          formControlName="password"
+          autocomplete="new-password"
+          maxlength="128"
+          aria-describedby="setupPassword-hint"
+          (paste)="sanitizePaste($event, 'password', 128)"
+        />
+        <button type="button" class="btn btn-outline-secondary" appPasswordToggle="setupPassword" #pwToggle="appPasswordToggle" [attr.aria-label]="'auth.password.toggleLabel' | t">{{ (pwToggle.shown ? 'auth.password.hide' : 'auth.password.show') | t }}</button>
+      </div>
+      <div class="form-text" id="setupPassword-hint">{{ 'auth.password.hint' | t }}</div>
+      <div *ngIf="form.controls.password.touched && form.controls.password.invalid" class="text-danger small mt-1" appFieldError="setupPassword">
+        {{ 'setup.passwordError' | t }}
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label class="form-label fw-semibold" for="confirmPassword">{{ 'setup.confirmPasswordLabel' | t }}</label>
+      <div class="input-group">
+        <input
+          id="confirmPassword"
+          type="password"
+          class="form-control form-control-lg"
+          formControlName="confirmPassword"
+          autocomplete="new-password"
+          maxlength="128"
+          (paste)="sanitizePaste($event, 'confirmPassword', 128)"
+        />
+        <button type="button" class="btn btn-outline-secondary" appPasswordToggle="confirmPassword" #confirmToggle="appPasswordToggle" [attr.aria-label]="'auth.password.toggleLabel' | t">{{ (confirmToggle.shown ? 'auth.password.hide' : 'auth.password.show') | t }}</button>
+      </div>
+      <div *ngIf="form.controls.confirmPassword.touched && form.controls.confirmPassword.invalid" class="text-danger small mt-1" appFieldError="confirmPassword">
+        <span *ngIf="form.controls.confirmPassword.hasError('required')">{{ 'setup.confirmPasswordRequired' | t }}</span>
+        <span *ngIf="form.controls.confirmPassword.hasError('maxlength')">{{ 'setup.confirmPasswordTooLong' | t }}</span>
+      </div>
+      <!-- Said here, as set-password does, not as a bar after the submit (plan.md §827). -->
+      <div *ngIf="form.controls.confirmPassword.touched && mismatch" class="text-danger small mt-1" appFieldError="confirmPassword">
+        {{ 'setup.errors.passwordMismatch' | t }}
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting || form.invalid || mismatch">
+      <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+      {{ 'setup.submitButton' | t }}
+    </button>
+  </form>
+
+  <p class="text-center text-body-secondary small mt-4 mb-0">
+    {{ 'setup.alreadyDone' | t }}
+    <a routerLink="/login" class="d-inline-block py-3">{{ 'setup.signInLink' | t }}</a>.
+  </p>
+</app-auth-shell>

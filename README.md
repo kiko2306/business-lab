@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.12** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.13** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -245,19 +245,18 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       your authenticator app" link and a Copy key button, focus lands on the step's heading, then on
       the status line after Cancel, Done and turning it off, and a line says leaving starts over.
       Run the full journey (set up, wrong code, activate, recovery codes, disable) on a phone.
-- [ ] **Sign-in flow: fix the critique's findings (plan.md §827)** — in order, test first, one
-      commit and version bump each: (2) done (§828) — on `beta`, in pt-PT on a phone: a wrong password reads in Portuguese, is
-      announced, and the cursor is back in the password with it selected; a wrong code on the 2FA step
-      does the same; (1) done (§829) — on `beta`, the login page has a closed
-      "Locked out?" line naming the Users page and `./start.sh recover reset-password`, the code step has
-      "Lost your authenticator?" naming `disable-2fa`, and `/recovery` (signed in) shows the commands in
-      a blue notice with its buttons off; in pt-PT too; (3) done (§830) — on `beta`, open a used invite link: the alert says
-      to ask whoever invited you and a full-width Back to sign in sits under it; on a good link a refused
-      password shows inside the card; on `/setup` a mismatch shows under the confirm field with Create held; (4) done (§831) — on `beta`, on a phone: login, setup and set-password each
-      have a Show button that reveals the password and keeps what was typed, "At least 8 characters." is
-      under the new-password field, the cursor starts in the first field, and `/recovery` inputs are 44px; (5) the card centred and one
-      shared auth shell, `/recovery` inside it. On `beta`, after each: wrong password in pt-PT on a
-      phone, then follow the Locked out? line.
+- [ ] **Sign-in flow: fix the critique's findings (plan.md §827)** — all five done; this item is now
+      only the `beta` look. On a phone, in EN and pt-PT, on login, setup, a used invite link and
+      `/recovery`: (1) §829 — login has a closed "Locked out?" line naming the Users page and
+      `./start.sh recover reset-password`, the code step has "Lost your authenticator?" naming
+      `disable-2fa`, `/recovery` shows the commands in a blue notice with its buttons off; (2) §828 —
+      a wrong password and a wrong code read in your language, are announced, and the cursor returns
+      to the field with its text selected; (3) §830 — a used link says to ask whoever invited you and
+      has a full-width Back to sign in, a refused password shows inside the card, setup's mismatch is
+      under the confirm field; (4) §831 — each password field has a Show button, "At least 8
+      characters." is under new passwords, the cursor starts in the first field, `/recovery` inputs
+      are 44px; (5) §832 — the card is centred (equal space either side at every width) and all four
+      pages look like the same card, `/recovery` included.
 - [ ] **Critique: Updates (plan.md §812)** — `pages/self-update`; the operator must trust it not to break the box: progress, failure and rollback wording.
 - [ ] **Critique: Utils (plan.md §812)** — `pages/utils`.
 - [ ] **Critique: Content (social) (plan.md §812)** — `pages/social`; route `/content`.

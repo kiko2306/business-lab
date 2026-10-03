@@ -12,11 +12,12 @@ import { TranslateService } from '../../i18n/translate.service';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { FieldErrorDirective } from '../../components/field-error.directive';
 import { PasswordToggleDirective } from '../../components/password-toggle.directive';
+import { AuthShellComponent } from '../../components/auth-shell/auth-shell.component';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective, PasswordToggleDirective],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective, PasswordToggleDirective, AuthShellComponent],
   templateUrl: './login.component.html',
   styleUrl: './login.component.css'
 })

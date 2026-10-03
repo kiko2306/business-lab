@@ -75,4 +75,18 @@ describe('RecoveryComponent', () => {
     expect(field.type).toBe('text');
     expect(field.getAttribute('autocomplete')).toBe('username');
   });
+
+  it('sits in the shared auth shell, alone: one card, one h1', () => {
+    mount({ enabled: false, available: true });
+
+    expect(host().querySelector('app-auth-shell')).not.toBeNull();
+    expect(host().querySelectorAll('h1').length).toBe(1);
+    expect(host().querySelectorAll('.card .card').length).toBe(0);
+  });
+
+  it('keeps the way back to the menu', () => {
+    mount({ enabled: false, available: true });
+
+    expect(host().querySelector('a[href="/home"]')?.textContent).toContain('Back to menu');
+  });
 });

@@ -37299,3 +37299,28 @@ reader. The test stack was removed by name afterwards.
   touched). Tally: two specs, "compares a running day only as far as the hour it has reached" and
   "says how the day compares, in words", fail on a clean tree at this time of day and are
   unrelated; recorded as a README item.
+
+## 832. Sign-in: one shared card, centred (§827 fix 5, P2/P3)
+
+[x] done. §827's five fixes are all in; what is left of the README item is the `beta` look.
+
+- **Centred.** `.auth-page > .row { width: 100% }` cancelled the row's negative gutters (a flex item
+  sizes to its content, so it had to be told to fill): the card sat 12px left of centre and, at 390,
+  the inputs were 36px from the left edge and 60px from the right. The row is now
+  `calc(100% + var(--bs-gutter-x))`. `auth-layout.spec.ts` renders the card at 390, 768, 1280 and
+  1920 in iframes and measures equal space either side; all five cases failed first. The shared
+  theme is synced to Tally and the hotel apps. The iframe helper moved to `testing/page-frame.ts`,
+  shared with the touch-target spec.
+- **One shell.** `<app-auth-shell>` owns the `<main>`, the card, the product mark, the kicker, the
+  one `<h1>` and two slots (`auth-subtitle`, `auth-footer`), narrow or wide. Login, setup and
+  set-password drop their private copies; `/recovery` moves inside it: the two cards inside a card
+  became a status row and a reset form divided by a rule, with its Back to menu as the full-width
+  footer button, and a "Recovery" kicker (EN/pt-PT).
+- **Kept:** the kickers. The detector's `kicker-above-heading` stays flagged on login, setup and
+  set-password; they carry real context ("Initial setup", "Welcome") and removing them is a copy
+  decision, not a layout fix. `access-denied` and `unsubscribe` still carry their own copy of the
+  card markup (they get the centring fix through the shared CSS); they belong to the
+  "Small pages" critique.
+- 416 frontend specs, build clean, E2E passes (one run of three failed `auth.setup.ts` at its 30s
+  timeout and passed on the two reruns; cause not found). Tally still has the two time-of-day specs
+  from the README item. **Not done:** a product-voice line on the card ("this is X's box").

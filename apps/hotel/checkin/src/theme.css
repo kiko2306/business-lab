@@ -191,8 +191,11 @@ a {
   align-items: center;
 }
 
+/* A flex item sizes to its content, so the row has to be told to fill the
+   page; plain `width: 100%` cancelled Bootstrap's negative gutters and put the
+   card 12px left of centre (plan.md §827). Add the gutters back. */
 .auth-page > .row {
-  width: 100%;
+  width: calc(100% + var(--bs-gutter-x, 1.5rem));
 }
 
 .auth-card {

@@ -1,0 +1,20 @@
+<main class="auth-page container py-5">
+  <div class="row justify-content-center">
+    <div [ngClass]="size === 'wide' ? 'col-12 col-md-9 col-lg-8 col-xl-7' : 'col-12 col-sm-10 col-md-8 col-lg-6 col-xl-5 col-xxl-4'">
+      <section class="card border-0 shadow auth-card">
+        <div class="card-body p-4 p-lg-5">
+          <div class="text-center mb-4">
+            <img src="favicon.svg" alt="" width="48" height="48" class="mb-2" />
+            <span class="auth-kicker d-block">{{ kicker }}</span>
+            <h1 class="h3 mt-2 mb-2">{{ title }}</h1>
+            <div class="text-body-secondary"><ng-content select="[auth-subtitle]"></ng-content></div>
+          </div>
+
+          <ng-content></ng-content>
+
+          <ng-content select="[auth-footer]"></ng-content>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>

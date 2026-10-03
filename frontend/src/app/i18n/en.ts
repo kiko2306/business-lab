@@ -49,6 +49,7 @@ export const en: Record<string, string> = {
   'login.locked.owner': 'Run the box and can’t sign in at all? On the box itself, run:',
   'login.locked.mfaSummary': 'Lost your authenticator?',
   'login.locked.mfa': 'Use one of your recovery codes instead. With none left, whoever runs this box can turn two-factor off for you. On the box itself they run:',
+  'recovery.kicker': 'Recovery',
   'recovery.unavailable.title': 'Recovery from the browser is off here',
   'recovery.unavailable.text': 'This page works only when the dashboard runs directly on the box. Here, run one of these on the box itself:',
   'recovery.unavailable.resetPassword': 'Set a new password for a user',

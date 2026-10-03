@@ -49,6 +49,7 @@ export const ptPT: Record<string, string> = {
   'login.locked.owner': 'Gere a caixa e não consegue entrar de todo? Na própria caixa, execute:',
   'login.locked.mfaSummary': 'Perdeu a aplicação de autenticação?',
   'login.locked.mfa': 'Use antes um dos códigos de recuperação. Se já não tiver nenhum, quem gere esta caixa pode desativar a autenticação de dois fatores por si. Na própria caixa, executa:',
+  'recovery.kicker': 'Recuperação',
   'recovery.unavailable.title': 'A recuperação pelo navegador está desligada aqui',
   'recovery.unavailable.text': 'Esta página só funciona quando o painel corre diretamente na caixa. Aqui, execute um destes comandos na própria caixa:',
   'recovery.unavailable.resetPassword': 'Definir uma nova palavra-passe para um utilizador',

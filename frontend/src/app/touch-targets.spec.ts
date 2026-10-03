@@ -7,11 +7,7 @@
  * stylesheets are copied into a 390px and a 1280px iframe, where the query
  * evaluates for real.
  */
-function rulesOf(sheet: CSSStyleSheet): string {
-  return Array.from(sheet.cssRules)
-    .map((rule) => (rule instanceof CSSImportRule && rule.styleSheet ? rulesOf(rule.styleSheet) : rule.cssText))
-    .join('\n');
-}
+import { renderInFrame } from './testing/page-frame';
 
 const MARKUP = `
   <button class="btn btn-primary" id="btn">Save</button>
@@ -25,17 +21,7 @@ const MARKUP = `
   </div>
   <div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="sw" /><label class="form-check-label" for="sw">On</label></div>`;
 
-async function render(width: number): Promise<{ frame: HTMLIFrameElement; doc: Document }> {
-  const css = Array.from(document.styleSheets).map(rulesOf).join('\n');
-  const frame = document.createElement('iframe');
-  frame.style.cssText = `width:${width}px;height:600px;border:0;position:fixed;top:0;left:0`;
-  frame.srcdoc = `<!doctype html><html data-bs-theme="light"><head><style>${css}</style></head><body>${MARKUP}</body></html>`;
-  await new Promise<void>((done) => {
-    frame.onload = () => done();
-    document.body.appendChild(frame);
-  });
-  return { frame, doc: frame.contentDocument! };
-}
+const render = (width: number) => renderInFrame(width, MARKUP);
 
 const box = (doc: Document, id: string) => doc.getElementById(id)!.getBoundingClientRect();
 

@@ -11,6 +11,7 @@ import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
 import { FieldErrorDirective } from '../../components/field-error.directive';
 import { PasswordToggleDirective } from '../../components/password-toggle.directive';
+import { AuthShellComponent } from '../../components/auth-shell/auth-shell.component';
 
 /**
  * Public landing for a `/set-password?token=…` invite link (plan.md §158).
@@ -20,7 +21,7 @@ import { PasswordToggleDirective } from '../../components/password-toggle.direct
 @Component({
   selector: 'app-set-password',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective, PasswordToggleDirective],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective, PasswordToggleDirective, AuthShellComponent],
   templateUrl: './set-password.component.html',
   styleUrl: './set-password.component.css',
 })

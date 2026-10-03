@@ -107,4 +107,12 @@ describe('SetupComponent failures', () => {
       expect(document.activeElement?.id).toBe('setupUsername');
     });
   });
+
+  it('sits in the shared auth shell, alone: one card, one h1', () => {
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('app-auth-shell')).not.toBeNull();
+    expect(root.querySelectorAll('h1').length).toBe(1);
+    expect(root.querySelectorAll('.card .card').length).toBe(0);
+  });
 });
