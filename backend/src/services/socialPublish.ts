@@ -5,7 +5,7 @@
  * open.
  */
 
-import { getDraftById } from './socialDrafts';
+import { getDraftById, recordSend } from './socialDrafts';
 import { listActiveSubscribers } from './advertSubscribers';
 import { sendMail, mailIsConfigured } from '../utils/mailSend';
 import { getDashboardBaseUrl } from '../utils/generalSettings';
@@ -84,5 +84,18 @@ export async function publishDraft(draftId: number): Promise<PublishResult> {
       console.error('Social draft publish send failed:', (error as Error).message);
     }
   }
+  if (sent > 0) {
+    await recordSend(draftId, sent);
+  }
   return { total: subscribers.length, sent, failed };
+}
+
+/**
+ * What a send of this text would do, before it does it: the subject line the
+ * recipients would see (secretly the first line, so the owner is told) and how
+ * many people would get it. Takes the text, not an id, because the owner
+ * confirms the text on screen, which may not be saved yet.
+ */
+export async function previewPublish(content: string): Promise<{ subject: string; recipients: number }> {
+  return { subject: subjectFor(content), recipients: (await listActiveSubscribers()).length };
 }

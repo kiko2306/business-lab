@@ -124,6 +124,9 @@ export const schemas = {
   socialDraftUpdate: Joi.object({
     content: Joi.string().trim().min(1).max(10000).required(),
   }),
+  socialPublishPreview: Joi.object({
+    content: Joi.string().trim().min(1).max(10000).required(),
+  }),
   socialDraftIdParam: Joi.object({
     id: Joi.number().integer().positive().required(),
   }),

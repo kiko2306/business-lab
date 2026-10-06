@@ -37764,3 +37764,21 @@ for the sender, and nothing for the owner.
   soft-removing (an owner who removes an address means it, and a kept row would still block the person
   from being re-added by hand); a bulk import (no one asked; add when a real list needs moving).
 - 1361 backend tests (13 new, red first), 519 frontend tests (11 new), typecheck and build clean.
+
+## 849. A draft remembers its send, and a send can be previewed (§845 fix 3, backend half)
+
+[x] done, backend only: nothing on screen uses it yet (§850 does), so it stays on `dev`.
+
+- `social_drafts` gains `last_sent_at` and `last_sent_count`, added with `ALTER TABLE … ADD COLUMN IF
+  NOT EXISTS` in `ensureSocialDraftsTable` because the table exists on every running box. Drafts come
+  back with `lastSentAt`/`lastSentCount` (null until the first send). `publishDraft` stamps them via
+  `recordSend` when at least one message left; a run where every message bounced records nothing, so a
+  draft that never went out never claims it did.
+- `POST /social/publish-preview {content}` → `{ subject, recipients }`, from the same `subjectFor`
+  the send uses, so the dialog and the email cannot disagree about the subject. It takes the text, not
+  a draft id: the owner confirms what is on screen, which may be unsaved (§846).
+- Rejected: computing the subject on the frontend (two copies of "first non-blank line, 200 chars,
+  else Update"); a `status` column (`last_sent_at IS NOT NULL` already says it, and §611 slice 2 will
+  want per-platform status, not this); recording the partial-failure list (§845 fix 4).
+- 1369 backend tests (8 new, red first), typecheck clean. The route has no test of its own (thin; the
+  service is covered); §850's README item carries the proof on `beta`.

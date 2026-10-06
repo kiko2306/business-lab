@@ -1,16 +1,17 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { getDraftById } from './socialDrafts';
+import { getDraftById, recordSend } from './socialDrafts';
 import { listActiveSubscribers } from './advertSubscribers';
 import { sendMail, mailIsConfigured } from '../utils/mailSend';
 import { getDashboardBaseUrl } from '../utils/generalSettings';
-import { publishDraft, DraftNotFoundError, MailNotConfiguredError, DashboardUrlMissingError } from './socialPublish';
+import { publishDraft, previewPublish, DraftNotFoundError, MailNotConfiguredError, DashboardUrlMissingError } from './socialPublish';
 
-vi.mock('./socialDrafts', () => ({ getDraftById: vi.fn() }));
+vi.mock('./socialDrafts', () => ({ getDraftById: vi.fn(), recordSend: vi.fn() }));
 vi.mock('./advertSubscribers', () => ({ listActiveSubscribers: vi.fn() }));
 vi.mock('../utils/mailSend', () => ({ sendMail: vi.fn(), mailIsConfigured: vi.fn() }));
 vi.mock('../utils/generalSettings', () => ({ getDashboardBaseUrl: vi.fn() }));
 
 const mockedGetDraftById = vi.mocked(getDraftById);
+const mockedRecordSend = vi.mocked(recordSend);
 const mockedListActiveSubscribers = vi.mocked(listActiveSubscribers);
 const mockedSendMail = vi.mocked(sendMail);
 const mockedMailIsConfigured = vi.mocked(mailIsConfigured);
@@ -22,10 +23,13 @@ const draft = {
   content: 'We just shipped group reservations!\nTry it today.',
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
+  lastSentAt: null,
+  lastSentCount: null,
 };
 
 beforeEach(() => {
   mockedGetDraftById.mockReset();
+  mockedRecordSend.mockReset();
   mockedListActiveSubscribers.mockReset();
   mockedSendMail.mockReset();
   mockedMailIsConfigured.mockReset();
@@ -106,5 +110,58 @@ describe('publishDraft', () => {
     await publishDraft(1);
 
     expect(mockedSendMail).toHaveBeenCalledWith(expect.objectContaining({ subject: 'Update' }));
+  });
+});
+
+// plan.md §845 fix 3: a draft remembers that it went out, and the confirm can say
+// to how many and under what subject before anything is sent.
+describe('publishDraft records the send', () => {
+  it('stores how many were sent, so the draft can say "Sent <date> to N"', async () => {
+    mockedListActiveSubscribers.mockResolvedValue([
+      { email: 'a@example.com', unsubscribeToken: 'token-a' },
+      { email: 'b@example.com', unsubscribeToken: 'token-b' },
+    ]);
+    mockedSendMail.mockResolvedValue(undefined);
+
+    await publishDraft(1);
+
+    expect(mockedRecordSend).toHaveBeenCalledWith(1, 2);
+  });
+
+  it('counts only the messages that left, not the ones that bounced', async () => {
+    mockedListActiveSubscribers.mockResolvedValue([
+      { email: 'a@example.com', unsubscribeToken: 'token-a' },
+      { email: 'b@example.com', unsubscribeToken: 'token-b' },
+    ]);
+    mockedSendMail.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('SMTP rejected'));
+
+    await publishDraft(1);
+
+    expect(mockedRecordSend).toHaveBeenCalledWith(1, 1);
+  });
+
+  it('records nothing when nothing was sent', async () => {
+    mockedListActiveSubscribers.mockResolvedValue([]);
+    await publishDraft(1);
+    expect(mockedRecordSend).not.toHaveBeenCalled();
+  });
+});
+
+describe('previewPublish', () => {
+  it('gives the subject the send would use and the number of active recipients, for any text', async () => {
+    mockedListActiveSubscribers.mockResolvedValue([
+      { email: 'a@example.com', unsubscribeToken: 'token-a' },
+      { email: 'b@example.com', unsubscribeToken: 'token-b' },
+    ]);
+
+    await expect(previewPublish('\n  Big sale this week\nEverything must go')).resolves.toEqual({
+      subject: 'Big sale this week',
+      recipients: 2,
+    });
+  });
+
+  it('uses the same fallback subject as the send', async () => {
+    mockedListActiveSubscribers.mockResolvedValue([]);
+    await expect(previewPublish('   ')).resolves.toEqual({ subject: 'Update', recipients: 0 });
   });
 });

@@ -11,6 +11,7 @@ import { generateSocialPost, AiKeyMissingError } from '../services/claudeGenerat
 import { listDrafts, createDraft, updateDraftContent, deleteDraft } from '../services/socialDrafts';
 import {
   publishDraft,
+  previewPublish,
   DraftNotFoundError,
   MailNotConfiguredError,
   DashboardUrlMissingError,
@@ -85,6 +86,16 @@ router.post('/drafts/:id/publish', validateParams(schemas.socialDraftIdParam), a
     }
     logger.error('Publishing a social draft failed', { error: error instanceof Error ? error.message : error });
     return res.status(500).json({ error: 'Unable to publish the draft.' });
+  }
+});
+
+// What a send of this text would do, for the confirm dialog: subject and recipient count.
+router.post('/publish-preview', validateBody(schemas.socialPublishPreview), async (req: Request, res: Response) => {
+  try {
+    return res.json(await previewPublish(req.body.content));
+  } catch (error) {
+    logger.error('Previewing a social publish failed', { error: error instanceof Error ? error.message : error });
+    return res.status(500).json({ error: 'Unable to prepare the send.' });
   }
 });
 

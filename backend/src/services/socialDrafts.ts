@@ -14,6 +14,9 @@ export interface SocialDraft {
   content: string;
   createdAt: string;
   updatedAt: string;
+  /** When the draft last went out by email, and to how many; null until the first send (plan.md §845). */
+  lastSentAt: string | null;
+  lastSentCount: number | null;
 }
 
 interface Row {
@@ -22,6 +25,8 @@ interface Row {
   content: string;
   created_at: string;
   updated_at: string;
+  last_sent_at: string | null;
+  last_sent_count: number | null;
 }
 
 const toDraft = (r: Row): SocialDraft => ({
@@ -30,6 +35,8 @@ const toDraft = (r: Row): SocialDraft => ({
   content: r.content,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
+  lastSentAt: r.last_sent_at,
+  lastSentCount: r.last_sent_count,
 });
 
 export async function ensureSocialDraftsTable(): Promise<void> {
@@ -42,6 +49,14 @@ export async function ensureSocialDraftsTable(): Promise<void> {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  // Added later (plan.md §845): the table already exists on every running box.
+  await query('ALTER TABLE social_drafts ADD COLUMN IF NOT EXISTS last_sent_at TIMESTAMPTZ');
+  await query('ALTER TABLE social_drafts ADD COLUMN IF NOT EXISTS last_sent_count INTEGER');
+}
+
+/** Remembers that the draft went out, so the page can say so and ask before sending it twice. */
+export async function recordSend(id: number, sent: number): Promise<void> {
+  await query('UPDATE social_drafts SET last_sent_at = NOW(), last_sent_count = $2 WHERE id = $1', [id, sent]);
 }
 
 export async function listDrafts(): Promise<SocialDraft[]> {

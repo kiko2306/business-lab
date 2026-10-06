@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.164.1] — 2026-10-06
+
+### Changed
+
+- A content draft now remembers when it was emailed and to how many people, and the API can say what a send would do (subject and recipient count) before it happens
+
 ## [0.164.0] — 2026-10-06
 
 ### Added
