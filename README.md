@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.22** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.23** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -253,8 +253,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       (4) still open — the device list (shape it first: "this server", known and unknown devices).
       On `beta`, open Home and Settings on a phone and a laptop, EN and pt-PT.
 - [ ] **Content: fix the critique's findings (plan.md §845)** — 16/40. In order, test first, one
-      commit and version bump each: (1) **P0** Publish must send what the owner sees — block it (or
-      save first) while the draft has unsaved edits, and say which text goes in the dialog; (2) the
+      commit and version bump each: (1) done (§846) — on `beta`, edit a draft and press Publish without Save: the dialog says
+      your changes are saved first, and the email that arrives has the edited text; clear the box and
+      Publish: refused with a message, nothing sent; (2) the
       confirm names the recipient count and the subject and previews the text, and the draft keeps a
       "Sent <date> to N" line (needs `published_at` and a count on the draft); (3) a partial send is a
       warning with the failed count, and a draft that already went out asks before it goes again;

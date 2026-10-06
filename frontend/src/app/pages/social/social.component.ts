@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
 import { PanelComponent } from '../../components/panel/panel.component';
 import { SocialService } from '../../core/social.service';
 import { SocialDraft } from '../../core/models';
@@ -81,19 +82,26 @@ export class SocialComponent implements OnInit {
     if (!this.isDirty(draft)) {
       return;
     }
+    void this.persist(draft, true);
+  }
+
+  /** Stores the textarea's text; resolves false (after a toast) when the server refused it. */
+  private async persist(draft: SocialDraft, announce: boolean): Promise<boolean> {
     this.savingId = draft.id;
-    this.social.updateContent(draft.id, this.edits[draft.id]).subscribe({
-      next: ({ draft: updated }) => {
-        this.drafts = (this.drafts ?? []).map((d) => (d.id === updated.id ? updated : d));
-        this.edits[updated.id] = updated.content;
-        this.savingId = null;
+    try {
+      const { draft: updated } = await firstValueFrom(this.social.updateContent(draft.id, this.edits[draft.id]));
+      this.drafts = (this.drafts ?? []).map((d) => (d.id === updated.id ? updated : d));
+      this.edits[updated.id] = updated.content;
+      if (announce) {
         this.toast.success(this.translate.t('social.toast.saved'));
-      },
-      error: (error) => {
-        this.toast.error(extractErrorMessage(error, this.translate.t('social.errors.save')));
-        this.savingId = null;
-      },
-    });
+      }
+      return true;
+    } catch (error) {
+      this.toast.error(extractErrorMessage(error, this.translate.t('social.errors.save')));
+      return false;
+    } finally {
+      this.savingId = null;
+    }
   }
 
   async remove(draft: SocialDraft): Promise<void> {
@@ -121,16 +129,31 @@ export class SocialComponent implements OnInit {
   }
 
   async publish(draft: SocialDraft): Promise<void> {
+    // The server emails the *saved* copy. Whatever the textarea shows must be
+    // saved first, or the owner mails every subscriber text they are not
+    // looking at (plan.md §845, the P0). A cleared box differs from the saved
+    // copy too, but cannot be saved, so it stops here instead.
+    const edit = (this.edits[draft.id] ?? '').trim();
+    const unsaved = edit !== draft.content;
+    if (unsaved && !edit) {
+      this.toast.error(this.translate.t('social.errors.publishEmpty'));
+      return;
+    }
     const ok = await this.confirm.ask({
       title: this.translate.t('social.confirmPublish.title'),
-      message: this.translate.t('social.confirmPublish.message'),
+      message: this.translate.t(unsaved ? 'social.confirmPublish.messageUnsaved' : 'social.confirmPublish.message'),
       confirmText: this.translate.t('social.confirmPublish.confirmText'),
       danger: true,
     });
     if (!ok) {
       return;
     }
+    // Lock the button across the save too, so a second click cannot start a second send.
     this.publishingId = draft.id;
+    if (unsaved && !(await this.persist(draft, false))) {
+      this.publishingId = null;
+      return;
+    }
     this.social.publish(draft.id).subscribe({
       next: ({ sent, failed, total }) => {
         this.publishingId = null;

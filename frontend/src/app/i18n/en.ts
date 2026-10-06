@@ -802,6 +802,8 @@ export const en: Record<string, string> = {
   'social.confirmPublish.title': 'Publish draft',
   'social.confirmPublish.message': 'This emails the draft to every active subscriber right now. This cannot be undone.',
   'social.confirmPublish.confirmText': 'Publish',
+  'social.confirmPublish.messageUnsaved': 'Your changes are not saved yet. This saves them, then emails the text shown here to every active subscriber right now. This cannot be undone.',
+  'social.errors.publishEmpty': 'This draft is empty. Write something before you publish it.',
 
 
   'accessDenied.kicker': 'Access denied',

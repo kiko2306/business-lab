@@ -37686,3 +37686,28 @@ recipients, subject, sent history). And where do subscribers live: they have no 
 needs sticky activation); route-leave loss is solid. The in-flight Delete state was not separately
 caught. Not verified: a real Claude call, a real mail send, screen-reader output. The test stack was
 removed by name afterwards.
+
+## 846. Publish sends what the owner sees (§845 fix 1, P0)
+
+[x] done. `publish()` compared nothing: the server emails `draft.content` from the database, so an
+edit left unsaved went out as the old text to every subscriber. Now, before the confirm:
+
+- text in the box differs from the saved copy and is not empty → the confirm says so ("Your changes
+  are not saved yet. This saves them, then emails the text shown here…"), and on Confirm the draft
+  is saved first, then published; a failed save stops there (toast, nothing sent);
+- text cleared → no confirm, an error ("This draft is empty…") — a blank box also differs from the
+  saved copy but cannot be saved, and `isDirty` (which needs non-empty text) would have called it
+  clean and sent the old copy;
+- the Publish button locks from the click through the save and the send, so a second click cannot
+  start a second send.
+
+`save()` and the new `persist()` share one code path (`firstValueFrom`, one error toast), so the Save
+button and the pre-publish save cannot drift apart.
+
+- Rejected: blocking Publish with "Save first" (forces a detour the owner cannot misjudge anyway: the
+  dialog now names what will happen); saving silently on Publish with the old dialog text (the owner
+  would not know a save happened); a server-side `content` parameter on the publish route (a wider
+  change for the same outcome, and leaves two sources of truth).
+- Not done here: the dialog still shows no recipient count, subject or preview (§845 fix 2).
+- 508 frontend tests (6 new, red first: four failed, the clean-draft and cancel cases pinned existing
+  behaviour), build clean.

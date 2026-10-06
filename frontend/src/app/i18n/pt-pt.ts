@@ -802,6 +802,8 @@ export const ptPT: Record<string, string> = {
   'social.confirmPublish.title': 'Publicar rascunho',
   'social.confirmPublish.message': 'Isto envia agora o rascunho por email a todos os subscritores ativos. Não pode ser desfeito.',
   'social.confirmPublish.confirmText': 'Publicar',
+  'social.confirmPublish.messageUnsaved': 'As suas alterações ainda não estão guardadas. Isto guarda-as e envia agora por email o texto aqui mostrado a todos os subscritores ativos. Não pode ser desfeito.',
+  'social.errors.publishEmpty': 'Este rascunho está vazio. Escreva algo antes de o publicar.',
 
 
   'accessDenied.kicker': 'Acesso negado',
