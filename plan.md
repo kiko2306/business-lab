@@ -37558,3 +37558,28 @@ the scan into Settings? Decide before finding 1, since it changes what gets buil
 (`--network host` refused `localhost:8400`) and the app CSP blocks the injected script, so `detect.js`
 was inlined with `bypassCSP`. Not verified: screen-reader output, a real 10s LAN sweep (mocked).
 The test stack was removed by name afterwards.
+
+## 842. Home shows server health in plain sentences (§841 fix 1, P1)
+
+[x] done. §841 decided to fold `/utils` away; this is its first step: health moves onto Home
+(`app-health-summary`, shown to `apps:control`, same gate as Utils). `/utils` still has its own
+health panel until the route goes (fix 3), so nothing is lost meanwhile.
+
+- `core/health-summary.ts` (pure, test first): API payload → verdict sentence + rows (database,
+  each disk, memory, load). One whole translated sentence per alert metric (`disk`, `disk:docker`,
+  `memory`, `load`, unknown → "Something needs attention."), so pt-PT is no longer a lowercased
+  concatenation. The API words `ok`/`degraded` never reach the screen. Database `error` is not an
+  alert in the API, so the summary adds its own sentence. Load shows Light / Moderate / Heavy
+  against the alert threshold (half and full), not "per CPU".
+- Units: `core/format-bytes.ts` now holds the strip's `formatGB` (disk) and `formatGiB` (memory);
+  the strip and the summary import it, so one disk no longer reads as two numbers.
+- Every row carries a state word ("Fine" / "Needs attention") beside the bar, so colour is not the
+  only signal; bars are `role=progressbar` with the row label. The block is a `role=status` region,
+  has "Checked HH:MM" from `timestamp`, polls every 30 s, keeps the last good read if a later poll
+  fails, and shows Try again if the first read fails (the old panel hung on "Loading…").
+- Rendered once against the test stack (health mocked): 1280 and 390, dark/EN and light/pt-PT, ok,
+  degraded and failed reads — no overflow, smallest text 14px. The test stack was removed by name.
+- Rejected: building the rows from the header strip's meter model (it shows free space only, has no
+  alert text, and polls every 5 s); a second `OnPush` poll shared with the strip (more plumbing than
+  two cheap reads; revisit if the poll count matters).
+- 491 frontend tests (18 new, red first), build clean.

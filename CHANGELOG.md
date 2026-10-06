@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.20] — 2026-10-06
+
+### Changed
+
+- Home shows server health as plain sentences and bars, with a state word per row, a checked-at time and Try again (replaces the Utils page's health text)
+
 ## [0.163.19] — 2026-10-06
 
 ### Added

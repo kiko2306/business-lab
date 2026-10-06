@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.19** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.20** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -238,9 +238,12 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Utils: fix the critique's findings (plan.md §841)** — 20/40. In order, test first, one
       commit and version bump each. Decided 2026-10-06: **fold** `/utils` away — health moves onto
       Home, the scan into a Settings panel, then the route, nav item and tile go and `/utils`
-      redirects to `/home`. Order: (1) health on Home as scannable status rows with a plain-language
-      verdict and "checked at", translated status words, whole-sentence alerts per metric, one unit
-      system with the header strip, a Retry on fetch failure; (2) the scan as a Settings panel — keeps
+      redirects to `/home`. Order: (1) done (§842) — on `beta`, Home shows "Server health": a sentence
+      ("Everything is running normally." or one per problem), a row each for business data, disk,
+      memory and server load with Fine / Needs attention beside each bar, and "Checked HH:MM"; the
+      disk and memory figures match the header strip's units; in pt-PT no English; on a phone the rows
+      stack with no sideways scroll; block the API (stop the backend) before first load and Try
+      again appears; (2) the scan as a Settings panel — keeps
       focus, announces start and result, inline error with Retry, a useful empty state (note: Utils
       needs `apps:control`, Settings `settings:manage`; decide who may scan); (3) drop `/utils`, nav,
       Home tile, the strip's pointer comment, redirect; (4) device list (shape first). On `beta`, open

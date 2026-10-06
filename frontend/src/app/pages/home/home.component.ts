@@ -1,6 +1,7 @@
 import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { HealthSummaryComponent } from '../../components/health-summary/health-summary.component';
 import { AuthService } from '../../core/auth.service';
 import { Capability } from '../../core/capabilities';
 import { OperationsService } from '../../core/operations.service';
@@ -40,7 +41,7 @@ interface MenuTile {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [AsyncPipe, NgFor, NgIf, RouterLink, TranslatePipe],
+  imports: [AsyncPipe, HealthSummaryComponent, NgFor, NgIf, RouterLink, TranslatePipe],
   templateUrl: './home.component.html',
   styleUrl: './home.component.css',
 })

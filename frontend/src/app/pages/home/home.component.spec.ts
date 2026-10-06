@@ -4,7 +4,7 @@ import { BehaviorSubject, of } from 'rxjs';
 import { HomeComponent } from './home.component';
 import { AuthService } from '../../core/auth.service';
 import { Capability } from '../../core/capabilities';
-import { BackupLastAppDataDump, SelfUpdateStatus, ServiceSummary } from '../../core/models';
+import { BackupLastAppDataDump, HealthStatus, SelfUpdateStatus, ServiceSummary } from '../../core/models';
 import { OperationsService } from '../../core/operations.service';
 import { ServiceStateService } from '../../core/service-state.service';
 import { en } from '../../i18n/en';
@@ -19,6 +19,17 @@ describe('HomeComponent', () => {
   let state: jasmine.SpyObj<ServiceStateService>;
   let operations: jasmine.SpyObj<OperationsService>;
 
+  const okHealth: HealthStatus = {
+    status: 'ok',
+    database: 'ok',
+    disks: [{ name: 'docker', path: '/', percentUsed: 20, totalBytes: 500e9, usedBytes: 100e9, availableBytes: 400e9 }],
+    cpu: { percentUsed: 13 },
+    memory: { percentUsed: 42, totalBytes: 16 * 1024 ** 3, usedBytes: 6.72 * 1024 ** 3 },
+    load: { oneMinute: 0.5, loadPerCpu: 0.25 },
+    thresholds: { diskPercent: 85, memoryPercent: 90, loadPerCpu: 1.5 },
+    alerts: [],
+    timestamp: '2026-10-06T10:00:00Z',
+  };
   const neutralSelfUpdate: SelfUpdateStatus = { appVersion: '1.0.0', check: null, lastCheckError: null, latestRun: null };
 
   const setUp = (
@@ -27,7 +38,8 @@ describe('HomeComponent', () => {
   ) => {
     summary$ = new BehaviorSubject<ServiceSummary>({ total: 0, running: 0, stopped: 0, error: 0, starting: 0 });
     state = jasmine.createSpyObj('ServiceStateService', ['startPolling', 'stopPolling'], { summary$ });
-    operations = jasmine.createSpyObj('OperationsService', ['getSelfUpdateStatus', 'getLastSuccessfulBackup']);
+    operations = jasmine.createSpyObj('OperationsService', ['getSelfUpdateStatus', 'getLastSuccessfulBackup', 'getHealth']);
+    operations.getHealth.and.returnValue(of(okHealth));
     operations.getSelfUpdateStatus.and.returnValue(
       of(
         opts?.commitsBehind !== undefined
@@ -97,6 +109,19 @@ describe('HomeComponent', () => {
     setUp(['account' as Capability]);
     expect(el.querySelector('.home-status')).toBeNull();
     expect(state.startPolling).not.toHaveBeenCalled();
+  });
+
+  // plan.md §841: server health moved here from the Utils page.
+  it('shows the server-health read-out to a role that can control apps', () => {
+    setUp('all');
+    expect(el.querySelector('app-health-summary')).not.toBeNull();
+    expect(el.textContent).toContain('Everything is running normally.');
+  });
+
+  it('shows no health, and does not read it, for a role that cannot control apps', () => {
+    setUp(['account' as Capability]);
+    expect(el.querySelector('app-health-summary')).toBeNull();
+    expect(operations.getHealth).not.toHaveBeenCalled();
   });
 
   it('polls while it is on screen and stops when it leaves', () => {

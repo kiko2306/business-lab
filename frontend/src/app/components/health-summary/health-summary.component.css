@@ -1,0 +1,40 @@
+.health-summary__headline {
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.health-summary__headline--issue {
+  color: var(--bs-danger-text-emphasis, #b02a37);
+}
+
+/* label, state word, bar, detail — one line each on a laptop, stacked on a phone. */
+.health-row {
+  display: grid;
+  grid-template-columns: 11rem 9rem minmax(6rem, 1fr) minmax(10rem, 14rem);
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  padding: 0.35rem 0;
+}
+
+.health-row__state {
+  font-weight: 500;
+}
+
+.health-row--issue .health-row__state {
+  color: var(--bs-danger-text-emphasis, #b02a37);
+}
+
+.health-row__bar {
+  height: 0.5rem;
+}
+
+@media (max-width: 767.98px) {
+  .health-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .health-row__bar,
+  .health-row__detail {
+    grid-column: 1 / -1;
+  }
+}

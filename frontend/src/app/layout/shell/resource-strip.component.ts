@@ -2,6 +2,7 @@ import { NgFor, NgIf, NgSwitch, NgSwitchCase } from '@angular/common';
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { switchMap, timer } from 'rxjs';
+import { formatGB, formatGiB } from '../../core/format-bytes';
 import { DiskUsage, HealthStatus } from '../../core/models';
 import { OperationsService } from '../../core/operations.service';
 import { TranslateService } from '../../i18n/translate.service';
@@ -20,16 +21,6 @@ interface Meter {
   warn: number;
   /** red at/above this. */
   crit: number;
-}
-
-/** Binary GiB, one decimal — matches gethomepage's own memory widget. */
-function formatGiB(bytes: number): string {
-  return `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
-}
-
-/** Decimal GB, whole number — matches gethomepage's own disk widget. */
-function formatGB(bytes: number): string {
-  return `${Math.round(bytes / 1000 ** 3)} GB`;
 }
 
 /** The fullest filesystem — the one worth surfacing if only one can be shown. */

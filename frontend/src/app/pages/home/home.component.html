@@ -9,6 +9,8 @@
     <ng-template #subtitle><p class="text-body-secondary mb-0">{{ 'home.subtitle' | t }}</p></ng-template>
   </section>
 
+  <app-health-summary class="d-block mb-4" *ngIf="showStatus"></app-health-summary>
+
   <div class="menu-grid">
     <a
       *ngFor="let tile of visibleTiles"
