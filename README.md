@@ -279,6 +279,21 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       should the post say?", with Drafts open too once there are drafts, and no "Brief" or "Claude"
       anywhere, in pt-PT too. All six are done; this item is now only the `beta` looks. On `beta`, after each: open Content on a phone and
       a laptop, EN and pt-PT.
+- [ ] **Small pages: fix the critique's findings (plan.md §854)** — 17/40, three pages. In order,
+      test first, one commit and version bump each: (1) Unsubscribe stops mutating on a GET — the
+      page loads, names the sender, one button, a new POST route does it (keep or retire the old GET
+      route, decide in the commit); (2) Unsubscribe is owned and has an exit — sender name, "Changed
+      your mind? Subscribe again", no sign-in link, `<app-auth-shell>`, a `List-Unsubscribe` +
+      `List-Unsubscribe-Post` header on every advert, the sender name in the email footer; (3) Audit
+      logs: Result first (or a leading marker), action codes as plain sentences with the code kept
+      for the CSV, translated badge, wrapped resource; (4) Audit logs: loading, error with Retry and
+      "no entries match" with Clear filters as three distinct states, announced; (5) Unsubscribe
+      failures: translated, Retry, a timeout, a 429 that says so, the result announced; (6) Access
+      denied: "signed in as X", sign in with another account, a real 44px target, the reason Request
+      access is disabled, focus after submit, `<app-auth-shell>`; (7) Audit filters as a `<form>`,
+      "21-40 of 200", retention stated, timezone, open by default. Decide first: is there a business
+      name to show, and is the audit log for the owner or the reseller. On `beta`, after each: open
+      the page on a phone and a laptop, EN and pt-PT.
 - [ ] **Account: fix the critique's findings (plan.md §819)** — all five done; this item is now
       only the `beta` look. (1) §820 — on `beta`, Turn it off asks for a code or recovery code (no
       password field), then a confirm; a wrong code is refused and 2FA stays on; (2) §821 — a wrong

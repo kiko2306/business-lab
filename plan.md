@@ -37893,3 +37893,75 @@ available and re-sends to *everyone* (the server keeps the count that left, not 
   `defaultOpen` flag and string changes; the README `beta` item covers how it reads.
 
 **This finishes §845's six fixes.** The README item stays only for its `beta` looks.
+
+## 854. Critique round 2, the small pages: 17/40, and Unsubscribe is a GET that unsubscribes on load (§812)
+
+[x] done (critique only). Seventh and last surface of §812: `pages/audit-logs`, `pages/access-denied`,
+`pages/unsubscribe`, dual-agent (A design review, B detector and measured render), test stack with the
+APIs mocked, 96 + 234 screenshots at 1280/390, dark/light, EN/pt-PT. **17/40** for the three
+together. Detector CLI 0 on every template; in-page overlay: `body-text-viewport-edge`,
+`gpt-thin-border-wide-shadow` x2 (audit panels), `overused-font`, `layout-transition` (shell),
+`kicker-above-heading` (access denied). Snapshot in `.impeccable/critique/` (not committed). Nothing
+fixed yet.
+
+**Held up under measurement:** no overflow in any state, every enabled text >= 4.5:1, focus ring 2px
+>= 6.06:1, per-route titles and `<html lang>` in both locales, stacked audit table keeps its table
+semantics, the access-denied form is well built (labels, per-field errors tied by `aria-describedby`,
+48px fields), the unsubscribe and access-denied copy is short and does not blame, the §790 raw-Joi
+leak fix holds.
+
+**Findings, in fix order.**
+1. **P1 — Unsubscribe unsubscribes on a GET at page load** (`unsubscribe.component.ts:38-44` calls
+   `GET /subscribers/unsubscribe/:token`, which is the mutation, `routes/subscribers.ts:46-53`).
+   Mail gateways that detonate links in a JS-running browser (Safe Links, Proofpoint, Mimecast) would
+   silently remove a corporate customer before they read the mail; a reload repeats it. The harm is a
+   lost customer, not exposed data, and there is no way back. The page should load, name the sender,
+   ask once ("Unsubscribe"), and POST on the tap.
+2. **P1 — Unsubscribe is not owned and has no exit.** No sender or business name, no "Changed your
+   mind? Subscribe again", ends on "Go to sign in" (an admin door for a customer), and it carries its
+   own copy of the card markup instead of `<app-auth-shell>` (§832 left the small pages for this).
+   The email footer is a bare `Unsubscribe: <url>` after `---` (`socialPublish.ts:49-50`) with no
+   sender name, and no `List-Unsubscribe` / `List-Unsubscribe-Post` header (RFC 8058) is sent, so
+   mail clients cannot offer their own one-click unsubscribe.
+3. **P1 — Audit logs: the Result column is off-screen.** `white-space: nowrap` on cells plus a long
+   resource (§840's probe rows put a paragraph in one cell) scrolls the table sideways at 1280, and
+   the success/failure badge is the last column; a failed login looks like a good one. Actions are raw
+   codes (`SERVICE_START`, `critical-service.probe-failed`), the badge says "success"/"failure" in
+   pt-PT, dates are fixed `dd/MM/yyyy`, no timezone.
+4. **P1 — Audit logs: loading is silent and a failed load reads as an empty log.** `loading` is never
+   rendered; on error the table says "No audit logs found." under a 5-second toast, and the toast
+   shows server English in pt-PT ("Database connection refused (ECONNREFUSED …)"). A filter with no
+   match shows the same text with no Clear filters; no live region anywhere.
+5. **P2 — Unsubscribe failures.** Server English in pt-PT (500, 429, 502 even renders the literal
+   `<html>Bad Gateway</html>`), no Retry, no client timeout (a request that never answers spins for
+   ever), an unknown-but-well-formed token shows the green "unsubscribed" (defensible against probing,
+   but a mistyped link earns a false confirmation), and the 20-per-15-min limiter is one bucket per IP
+   (a carrier NAT can 429 a real customer). The spinner and result have no `role=status`.
+6. **P2 — Access denied: the next step is wrong for the person.** They are signed in and were
+   refused, but the only exit is "Go to sign in" (a 17px link), with no "signed in as X", the submit
+   button is disabled with no reason, no host in the URL drops the app name, "an administrator will
+   be emailed" names no one and no wait; focus falls to `<body>` after submit; pt-PT shows server
+   English on failure. No product mark.
+7. **P3 — Audit filters and paging.** Not a `<form>` (Enter does nothing), "Showing 20 of 200" is not
+   a range, fixed page size 20 though the API allows 100, 20 rows is 7,340px tall at 390, the
+   `datetime-local` filter is sent as a bare timestamp so it filters in server time while the table
+   shows browser time, retention (30 days, `audit.ts:3`) and the CSV's silent 100,000-row cap are
+   shown nowhere, both panels start collapsed.
+
+Minor: 17px sign-in links on both public pages (under 24px even by WCAG 2.2 AA's floor); the
+`auth-kicker` repeats the heading; the audit table at 1280 has 38px inputs and 31px buttons (§824 is
+phone only); CSV downloads with a fixed name and no confirmation.
+
+**Severity call.** No P0. Finding 1 is the closest: it can end a relationship without the person
+knowing, and a mail scanner is a realistic trigger the moment the first advert goes to a company
+address. It is the one to do first, and it needs a backend change (a POST route) as well as the page.
+
+**Open questions for the fix run.** Does the dashboard know a business name to say "[name] will not
+email you again"? (If not, the Dashboard URL host is the fallback.) Is the audit log a record for a
+reseller or a story for the owner? PRODUCT.md says the owner; today it is the first.
+
+**Harness notes.** The unsubscribe checks that hit the real backend ran into its own 20-per-15-min
+limit (429) after the first twenty; the 422/500/502 states were mocked with the real bodies. The audit
+"200 rows in one response" state is not what the API returns (pageSize 20); the page just has no cap.
+Not verified: screen-reader output, a real mail-gateway scan, a real List-Unsubscribe in an inbox. The
+test stack was removed by name afterwards.
