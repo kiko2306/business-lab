@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, throwError, Observable } from 'rxjs';
 import { SocialComponent } from './social.component';
 import { ConfirmService } from '../../core/confirm.service';
@@ -13,17 +13,21 @@ import { TranslateService } from '../../i18n/translate.service';
 // must never fire while the textarea shows something else.
 describe('SocialComponent publish', () => {
   const draft = (over: Partial<SocialDraft> = {}): SocialDraft =>
-    ({ id: 7, prompt: 'A sale', content: 'Saved copy', createdAt: '', updatedAt: '', ...over }) as SocialDraft;
+    ({ id: 7, prompt: 'A sale', content: 'Saved copy', createdAt: '', updatedAt: '', lastSentAt: null, lastSentCount: null, ...over }) as SocialDraft;
 
   let social: jasmine.SpyObj<SocialService>;
   let confirm: jasmine.SpyObj<ConfirmService>;
   let toast: jasmine.SpyObj<ToastService>;
   let component: SocialComponent;
   let calls: string[];
+  let recipients = 3;
+  let fixture: ComponentFixture<SocialComponent>;
 
   const setUp = (d: SocialDraft, edit: string) => {
     calls = [];
-    social = jasmine.createSpyObj('SocialService', ['listDrafts', 'updateContent', 'publish', 'generate', 'deleteDraft', 'listSubscribers']);
+    recipients = 3;
+    social = jasmine.createSpyObj('SocialService', ['listDrafts', 'updateContent', 'publish', 'generate', 'deleteDraft', 'listSubscribers', 'previewPublish']);
+    social.previewPublish.and.callFake((content: string) => of({ subject: content.split('\n')[0].slice(0, 200), recipients }));
     social.listSubscribers.and.returnValue(of({ subscribers: [] }));
     social.listDrafts.and.returnValue(of({ drafts: [d] }));
     social.updateContent.and.callFake((id: number, content: string) => {
@@ -46,7 +50,7 @@ describe('SocialComponent publish', () => {
       ],
     });
     TestBed.inject(TranslateService).setLocale('en');
-    const fixture = TestBed.createComponent(SocialComponent);
+    fixture = TestBed.createComponent(SocialComponent);
     fixture.detectChanges();
     component = fixture.componentInstance;
     component['edits'][d.id] = edit;
@@ -55,14 +59,20 @@ describe('SocialComponent publish', () => {
   it('publishes a clean draft after the plain confirm', async () => {
     setUp(draft(), 'Saved copy');
     await component.publish(draft());
-    expect(confirm.ask.calls.mostRecent().args[0].message).toBe(en['social.confirmPublish.message']);
+    const message = confirm.ask.calls.mostRecent().args[0].message;
+    expect(message).toContain('3 subscribers');
+    expect(message).toContain('Subject: Saved copy');
+    expect(message).not.toContain('not saved yet');
     expect(calls).toEqual(['publish']);
   });
 
   it('saves unsaved edits first, then publishes, and the dialog says so', async () => {
     setUp(draft(), 'Edited copy');
     await component.publish(draft());
-    expect(confirm.ask.calls.mostRecent().args[0].message).toBe(en['social.confirmPublish.messageUnsaved']);
+    const message = confirm.ask.calls.mostRecent().args[0].message;
+    expect(message).toContain('not saved yet');
+    expect(message).toContain('Subject: Edited copy');
+    expect(social.previewPublish).toHaveBeenCalledWith('Edited copy'); // the text on screen, not the saved one
     expect(social.updateContent).toHaveBeenCalledWith(7, 'Edited copy');
     expect(calls).toEqual(['save', 'publish']);
   });
@@ -90,8 +100,133 @@ describe('SocialComponent publish', () => {
     expect(toast.error).toHaveBeenCalledWith(en['social.errors.publishEmpty']);
   });
 
+  // plan.md §845 fix 3: the confirm says who, what subject and what text — and when it already went.
+  it('names the number of subscribers, the subject and a preview of the text', async () => {
+    setUp(draft({ content: 'Big sale this week\nEverything must go, ten percent off' }), 'Big sale this week\nEverything must go, ten percent off');
+    await component.publish(draft({ content: 'Big sale this week\nEverything must go, ten percent off' }));
+    const message = confirm.ask.calls.mostRecent().args[0].message;
+    expect(message).toContain('3 subscribers');
+    expect(message).toContain('Subject: Big sale this week');
+    expect(message).toContain('Everything must go, ten percent off');
+    expect(message).toContain('cannot be undone');
+  });
+
+  it('says "1 subscriber" for one', async () => {
+    setUp(draft(), 'Saved copy');
+    recipients = 1;
+    await component.publish(draft());
+    expect(confirm.ask.calls.mostRecent().args[0].message).toContain('1 subscriber ');
+  });
+
+  it('cuts a long text to a preview instead of filling the dialog', async () => {
+    const long = 'x'.repeat(2000);
+    setUp(draft({ content: long }), long);
+    await component.publish(draft({ content: long }));
+    expect(confirm.ask.calls.mostRecent().args[0].message.length).toBeLessThan(700);
+  });
+
+  it('warns when the draft already went out, with the date and the count', async () => {
+    const sent = draft({ lastSentAt: '2026-10-01T10:00:00Z', lastSentCount: 12 });
+    setUp(sent, 'Saved copy');
+    await component.publish(sent);
+    const message = confirm.ask.calls.mostRecent().args[0].message;
+    expect(message).toContain('already sent this post');
+    expect(message).toContain('12');
+  });
+
+  it('does not ask, and says why, when there is nobody to send to', async () => {
+    setUp(draft(), 'Saved copy');
+    recipients = 0;
+    await component.publish(draft());
+    expect(confirm.ask).not.toHaveBeenCalled();
+    expect(social.publish).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(en['social.errors.noSubscribers']);
+  });
+
+  it('sends nothing when the preview cannot be fetched', async () => {
+    setUp(draft(), 'Saved copy');
+    social.previewPublish.and.returnValue(throwError(() => new Error('500')) as Observable<never>);
+    await component.publish(draft());
+    expect(confirm.ask).not.toHaveBeenCalled();
+    expect(social.publish).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(en['social.errors.prepareSend']);
+  });
+
+  describe('Copy', () => {
+    it('copies the text on screen, not the saved copy, and announces it', async () => {
+      setUp(draft(), 'Edited on screen');
+      const writeText = jasmine.createSpy('writeText').and.resolveTo();
+      spyOnProperty(navigator, 'clipboard', 'get').and.returnValue({ writeText } as unknown as Clipboard);
+      await component.copy(draft());
+      expect(writeText).toHaveBeenCalledWith('Edited on screen');
+      expect(component['announcement']).toBe(en['social.toast.copied']);
+    });
+
+    it('falls back to selecting and copying when the clipboard API is not available (plain-http LAN)', async () => {
+      setUp(draft(), 'Edited on screen');
+      spyOnProperty(navigator, 'clipboard', 'get').and.returnValue(undefined as unknown as Clipboard);
+      const exec = spyOn(document, 'execCommand').and.returnValue(true);
+      await component.copy(draft());
+      expect(exec).toHaveBeenCalledWith('copy');
+      expect(component['announcement']).toBe(en['social.toast.copied']);
+    });
+
+    it('says so, and does not claim success, when copying fails', async () => {
+      setUp(draft(), 'Edited on screen');
+      spyOnProperty(navigator, 'clipboard', 'get').and.returnValue(undefined as unknown as Clipboard);
+      spyOn(document, 'execCommand').and.returnValue(false);
+      await component.copy(draft());
+      expect(toast.error).toHaveBeenCalledWith(en['social.errors.copy']);
+      expect(component['announcement']).toBe('');
+    });
+  });
+
+  describe('on the page', () => {
+    const open = (...labels: string[]) => {
+      const el: HTMLElement = fixture.nativeElement;
+      el.querySelectorAll<HTMLButtonElement>('.panel__toggle').forEach((b) => {
+        if (labels.some((l) => b.textContent?.includes(l))) b.click();
+      });
+      fixture.detectChanges();
+      return el;
+    };
+
+    it('leads each draft with Copy and names the send for what it is', () => {
+      localStorage.clear();
+      setUp(draft(), 'Saved copy');
+      const el = open('Drafts');
+      const buttons = Array.from(el.querySelectorAll('app-social .border.rounded button, .border.rounded button')).map((b) => b.textContent?.trim());
+      expect(buttons).toEqual(['Copy', 'Save', 'Email to subscribers', 'Delete']);
+    });
+
+    it('shows "Sent <date> to N" on a draft that went out, and nothing on one that did not', () => {
+      localStorage.clear();
+      setUp(draft({ lastSentAt: '2026-10-01T10:00:00Z', lastSentCount: 12 }), 'Saved copy');
+      social.listDrafts.and.returnValue(of({ drafts: [draft({ lastSentAt: '2026-10-01T10:00:00Z', lastSentCount: 12 }), draft({ id: 8 })] }));
+      fixture.componentInstance.ngOnInit();
+      const el = open('Drafts');
+      const lines = Array.from(el.querySelectorAll('.border.rounded')).map((c) => c.querySelector('.social-sent')?.textContent?.trim() ?? null);
+      expect(lines[0]).toContain('Sent');
+      expect(lines[0]).toContain('12 subscribers');
+      expect(lines[1]).toBeNull();
+    });
+  });
+
   it('has the new strings in both languages', () => {
-    for (const key of ['social.confirmPublish.messageUnsaved', 'social.errors.publishEmpty']) {
+    for (const key of [
+      'social.confirmPublish.unsavedNote',
+      'social.confirmPublish.cannotUndo',
+      'social.confirmPublish.alreadySent',
+      'social.confirmPublish.messageOne',
+      'social.confirmPublish.subject',
+      'social.errors.publishEmpty',
+      'social.errors.prepareSend',
+      'social.sentLine',
+      'social.sentLineOne',
+      'social.copyButton',
+      'social.toast.copied',
+      'social.errors.copy',
+    ]) {
       expect(en[key]).withContext(key).toBeTruthy();
       expect(ptPT[key]).withContext(key).toBeTruthy();
     }

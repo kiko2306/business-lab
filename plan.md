@@ -37782,3 +37782,33 @@ for the sender, and nothing for the owner.
   want per-platform status, not this); recording the partial-failure list (§845 fix 4).
 - 1369 backend tests (8 new, red first), typecheck clean. The route has no test of its own (thin; the
   service is covered); §850's README item carries the proof on `beta`.
+
+## 850. Copy first, and a send that says what it will do (§845 fix 3, frontend half)
+
+[x] done. On the Content page each draft now reads like a post generator's (§847): **Copy** is the
+filled button, then Save, **Email to subscribers** (was "Publish", which did not say to whom or how),
+Delete. The page subtitle and strings say "email" where the send is an email.
+
+- **Copy** takes what is in the box (the text the owner sees, saved or not), announces "Copied to the
+  clipboard." in a page-level `role=status` line, and on failure says so in a toast instead of
+  claiming success. `navigator.clipboard` exists only on https and localhost and this box is often
+  opened over plain http on the LAN, so it falls back to select-and-`execCommand('copy')`.
+  Rendered against the real stack: the real clipboard held the draft's text.
+- **The confirm** (`publish()`): first `POST /social/publish-preview` with the on-screen text (§849),
+  so the dialog can say, in order: "You already sent this post on <date> to N people." (only if it
+  did), "Your changes are not saved yet. They are saved first…" (only if so), "This emails N
+  subscribers right now, each with their own unsubscribe link.", "Subject: …" and an excerpt (280
+  characters, then "…"), "This cannot be undone." Zero recipients never opens a dialog: a toast points
+  at the Subscribers panel. A failed preview sends nothing.
+- **"Sent <date> to N subscribers."** under each draft that went out; after a send it is set on that
+  draft alone, in memory, rather than re-reading the list, which would reset edits in other drafts.
+- Real-stack checks: the `ALTER TABLE … ADD COLUMN IF NOT EXISTS` migration ran against a running
+  Postgres with an existing `social_drafts` table; the dialog rendered with the real preview endpoint
+  and two real subscribers at 1280 and 390, dark/EN and light/pt-PT. Not exercised: a real send (no
+  mailbox on the test stack), so the "Sent …" line after a send is covered by the README `beta` item.
+- This also delivers the "ask before it goes again" half of §845 fix 4; what is left of fix 4 is the
+  partial-send warning with the failed count.
+- Rejected: a separate "preview" step or modal (the confirm is the preview); disabling "Email to
+  subscribers" when the list is empty (a disabled button with no reason is the thing §845 complained
+  about; the toast says why); re-reading the draft list after a send.
+- 530 frontend tests (13 new), build clean.

@@ -241,6 +241,9 @@ export interface SocialDraft {
   content: string;
   createdAt: string;
   updatedAt: string;
+  /** When the draft last went out by email and to how many; null until the first send (plan.md §845). */
+  lastSentAt: string | null;
+  lastSentCount: number | null;
 }
 
 export interface ExposureSettings {

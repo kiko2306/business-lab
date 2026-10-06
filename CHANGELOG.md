@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.165.0] — 2026-10-06
+
+### Added
+
+- Content drafts lead with Copy, and the email send is now called Email to subscribers: its confirm names how many people get it, the subject and a preview of the text, warns if the draft already went out, and each sent draft shows Sent date to N
+
 ## [0.164.1] — 2026-10-06
 
 ### Changed

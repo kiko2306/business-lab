@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.164.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.165.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -255,18 +255,19 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Content: fix the critique's findings (plan.md §845, §847)** — 16/40. Decided 2026-10-06:
       Content is a **post generator**, and **subscribers are managed on the same page**. In order,
       test first, one commit and version bump each: (1) done (§846) — on `beta`, edit a draft and
-      press Publish without Save: the dialog says your changes are saved first, and the email that
-      arrives has the edited text; clear the box and Publish: refused, nothing sent; (2) done (§848) — on `beta`, Content has a Subscribers panel: add an address with the keyboard
+      press Email to subscribers without Save: the dialog says your changes are saved first, and the email that
+      arrives has the edited text; clear the box and press it: refused, nothing sent; (2) done (§848) — on `beta`, Content has a Subscribers panel: add an address with the keyboard
       ("Added …" is read out, the box keeps focus), it appears in the list; subscribe through the
       public form, then use the unsubscribe link in a sent email, and the row reads Unsubscribed with
       a date; typing that address in the box again is refused ("Only they can sign up again"); Remove
       asks first and names the address; on a phone the rows stack with no sideways scroll; an
       account without `settings:manage` cannot reach it (403);
-      (3) each draft leads with **Copy** (the post generator's main act) and the email send becomes
-      a clearly named second action, "Email to subscribers", whose confirm names the recipient
-      count, the subject (the first line) and previews the text, and the draft keeps a "Sent <date>
-      to N" line (`published_at` and a count on the draft); (4) a partial send is a warning with the
-      failed count, and a draft that already went out asks before it goes again; (5) Generate
+      (3) done (§849, §850) — on `beta`, a draft shows Copy, Save, Email to subscribers, Delete;
+      Copy puts the text on the clipboard (try it over plain http on the LAN too) and says so;
+      Email to subscribers opens a dialog naming how many people, the subject and the text, and with
+      no subscribers it refuses with a pointer to the Subscribers panel; after a real send (needs the
+      shared mailbox set) the draft reads "Sent <date> to N subscribers", and sending it again warns
+      "You already sent this post"; (4) a partial send is a warning with the failed count; (5) Generate
       announces its wait (`role=status`), errors sit inline with a link to Settings, focus lands
       somewhere sensible after each action, the new draft scrolls into view, a failed list load shows
       Try again, backend English no longer reaches pt-PT; (6) the generate panel opens by default,

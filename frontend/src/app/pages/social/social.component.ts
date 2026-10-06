@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { CommonModule, formatDate } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
@@ -39,6 +39,8 @@ export class SocialComponent implements OnInit {
   protected savingId: number | null = null;
   protected deletingId: number | null = null;
   protected publishingId: number | null = null;
+  /** One polite line for what the last copy did; read out, not shown. */
+  protected announcement = '';
 
   ngOnInit(): void {
     this.loadDrafts();
@@ -140,10 +142,42 @@ export class SocialComponent implements OnInit {
       this.toast.error(this.translate.t('social.errors.publishEmpty'));
       return;
     }
+
+    // Ask the server what this send would do, for the text on screen: the
+    // subject comes from the same code that builds the email.
+    let preview: { subject: string; recipients: number };
+    try {
+      preview = await firstValueFrom(this.social.previewPublish(edit));
+    } catch {
+      this.toast.error(this.translate.t('social.errors.prepareSend'));
+      return;
+    }
+    if (preview.recipients === 0) {
+      this.toast.error(this.translate.t('social.errors.noSubscribers'));
+      return;
+    }
+
+    const t = (key: string, params?: Record<string, string | number>) => this.translate.t(key, params);
+    const excerpt = edit.length > 280 ? `${edit.slice(0, 280)}…` : edit;
+    const message = [
+      draft.lastSentAt
+        ? t('social.confirmPublish.alreadySent', {
+            date: formatDate(draft.lastSentAt, 'mediumDate', this.translate.locale()),
+            count: draft.lastSentCount ?? 0,
+          })
+        : '',
+      unsaved ? t('social.confirmPublish.unsavedNote') : '',
+      t(preview.recipients === 1 ? 'social.confirmPublish.messageOne' : 'social.confirmPublish.message', { count: preview.recipients }),
+      `${t('social.confirmPublish.subject', { subject: preview.subject })}\n\n${excerpt}`,
+      t('social.confirmPublish.cannotUndo'),
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
     const ok = await this.confirm.ask({
-      title: this.translate.t('social.confirmPublish.title'),
-      message: this.translate.t(unsaved ? 'social.confirmPublish.messageUnsaved' : 'social.confirmPublish.message'),
-      confirmText: this.translate.t('social.confirmPublish.confirmText'),
+      title: t('social.confirmPublish.title'),
+      message,
+      confirmText: t('social.confirmPublish.confirmText'),
       danger: true,
     });
     if (!ok) {
@@ -162,6 +196,13 @@ export class SocialComponent implements OnInit {
           this.toast.error(this.translate.t('social.errors.noSubscribers'));
           return;
         }
+        if (sent > 0) {
+          // The server stamped it; mirror that here so the line appears without a reload,
+          // and without re-reading the list (which would drop edits in other drafts).
+          this.drafts = (this.drafts ?? []).map((d) =>
+            d.id === draft.id ? { ...d, lastSentAt: new Date().toISOString(), lastSentCount: sent } : d
+          );
+        }
         if (failed > 0) {
           this.toast.error(this.translate.t('social.toast.publishedPartial', { sent, total }));
           return;
@@ -173,5 +214,41 @@ export class SocialComponent implements OnInit {
         this.publishingId = null;
       },
     });
+  }
+
+  /** Copies what the owner is looking at — the post generator's main act. */
+  async copy(draft: SocialDraft): Promise<void> {
+    const text = (this.edits[draft.id] ?? '').trim();
+    if (!text) {
+      return;
+    }
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else if (!this.copyBySelection(text)) {
+        throw new Error('copy refused');
+      }
+      this.announcement = this.translate.t('social.toast.copied');
+    } catch {
+      this.announcement = '';
+      this.toast.error(this.translate.t('social.errors.copy'));
+    }
+  }
+
+  // `navigator.clipboard` exists only on https and localhost; the box is often
+  // opened over plain http on the LAN, where only select-and-copy works.
+  private copyBySelection(text: string): boolean {
+    const box = document.createElement('textarea');
+    box.value = text;
+    box.setAttribute('readonly', '');
+    box.style.position = 'fixed';
+    box.style.opacity = '0';
+    document.body.appendChild(box);
+    box.select();
+    try {
+      return document.execCommand('copy');
+    } finally {
+      box.remove();
+    }
   }
 }

@@ -1,4 +1,5 @@
 <main class="container-fluid py-4">
+  <p role="status" class="visually-hidden">{{ announcement }}</p>
   <div class="mb-4">
     <h1 class="h3 mb-1">{{ 'social.title' | t }}</h1>
     <p class="text-body-secondary mb-0">
@@ -44,10 +45,16 @@
         (ngModelChange)="edits[draft.id] = $event"
         [ngModelOptions]="{ standalone: true }"
       ></textarea>
+      <p class="small text-body-secondary mb-2 social-sent" *ngIf="draft.lastSentAt">
+        {{ (draft.lastSentCount === 1 ? 'social.sentLineOne' : 'social.sentLine') | t:{ date: (draft.lastSentAt | date: 'mediumDate':undefined:translate.locale()) ?? '', count: draft.lastSentCount ?? 0 } }}
+      </p>
       <div class="d-flex align-items-center gap-2 flex-wrap">
+        <button type="button" class="btn btn-sm btn-primary" (click)="copy(draft)">
+          {{ 'social.copyButton' | t }}
+        </button>
         <button
           type="button"
-          class="btn btn-sm btn-primary"
+          class="btn btn-sm btn-outline-primary"
           [disabled]="savingId === draft.id || !isDirty(draft)"
           (click)="save(draft)"
         >

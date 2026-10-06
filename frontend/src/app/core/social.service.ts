@@ -31,6 +31,15 @@ export class SocialService {
     return this.http.delete<void>(`${API_BASE_URL}/social/drafts/${id}`, this.opts);
   }
 
+  /** What a send of this text would do: the subject line and how many people would get it. */
+  previewPublish(content: string): Observable<{ subject: string; recipients: number }> {
+    return this.http.post<{ subject: string; recipients: number }>(
+      `${API_BASE_URL}/social/publish-preview`,
+      { content: content.trim() },
+      this.opts
+    );
+  }
+
   publish(id: number): Observable<{ total: number; sent: number; failed: number }> {
     return this.http.post<{ total: number; sent: number; failed: number }>(
       `${API_BASE_URL}/social/drafts/${id}/publish`,
