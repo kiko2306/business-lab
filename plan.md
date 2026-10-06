@@ -37995,3 +37995,30 @@ and a reload repeated it.
 - Still open here: the page still says nothing of whose emails these are, still ends on "Go to sign
   in", and failure text is still the server's (fixes 2 and 5).
 - 1372 backend tests (3 new, red first), 550 frontend tests (6 new), typecheck and build clean.
+
+## 856. The email says whose list it is, and the API can take an unsubscribe back (§854 fix 2, backend half)
+
+[x] done, backend only: the page that uses the two new routes is §857, so this stays on `dev`.
+
+- **Footer** of every advert: "You are receiving this because you subscribed to <host>." above the
+  unsubscribe link. The sender is `senderFromBaseUrl(getDashboardBaseUrl())`, the dashboard's own host
+  (user, 2026-10-06: there is no business name), and the line is left out if the URL cannot be built.
+- **`List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click`** (RFC 8058) on each
+  message, per recipient, pointing at the **API** POST (`{baseUrl}/api/subscribers/unsubscribe/<token>`),
+  not the page, because a mail client's own button POSTs there. `sendMail` takes an optional `headers`
+  object and passes it to nodemailer; a message without one (invites) is unchanged. A mail client
+  acting on that header is the person acting, so it is not the scanner problem §855 fixed; the route
+  already ignores the body, and the app already parses urlencoded bodies.
+- **`POST /subscribers/resubscribe/:token`** (`resubscribeByToken`): clears the opt-out on the row
+  behind the token, always 204 (unknown tokens must not be discoverable), same limiter and token
+  validation, a GET on it does nothing. It is the person speaking, so unlike the owner typing an
+  address in (§848) it may override an opt-out.
+- **`GET /subscribers/sender`** → `{ sender }`: whose emails these are, for the page to say. No token,
+  no subscriber data, no mutation; `null` when the dashboard URL is unknown.
+- Rejected: a `mailto:` form of List-Unsubscribe (needs an inbox we do not read); putting the sender
+  in the email subject (the subject is the draft's first line, §850); a sender name setting (a setting
+  nobody has asked for; revisit if a business name ever exists).
+- To check on `beta` with a real send: the header arrives and a mail app's unsubscribe button works
+  (that also proves `/api/subscribers/*` is reachable at the public dashboard URL, which this box
+  could not show).
+- 1385 backend tests (13 new, red first), typecheck clean.

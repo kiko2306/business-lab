@@ -7,6 +7,8 @@ import {
   listAllSubscribers,
   addSubscriber,
   removeSubscriber,
+  resubscribeByToken,
+  senderFromBaseUrl,
 } from './advertSubscribers';
 
 vi.mock('../utils/database', () => ({ query: vi.fn() }));
@@ -121,5 +123,37 @@ describe('removeSubscriber', () => {
     mockedQuery.mockResolvedValueOnce({ rows: [] } as never);
 
     await expect(removeSubscriber(99)).resolves.toBe(false);
+  });
+});
+
+// plan.md §854 fix 2: the person who tapped Unsubscribe by mistake can undo it.
+describe('resubscribeByToken', () => {
+  it('clears the opt-out on the row behind the token, nothing else', async () => {
+    mockedQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    await resubscribeByToken('tok123');
+
+    const [sql, params] = mockedQuery.mock.calls[0];
+    expect(sql).toContain('SET unsubscribed_at = NULL');
+    expect(sql).toContain('WHERE unsubscribe_token = $1');
+    expect(params).toEqual(['tok123']);
+  });
+
+  it('resolves for an unknown token — the page must not reveal which tokens exist', async () => {
+    mockedQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 } as never);
+    await expect(resubscribeByToken('unknown')).resolves.toBeUndefined();
+  });
+});
+
+// The dashboard has no business name, so the sender a customer sees is the dashboard's address.
+describe('senderFromBaseUrl', () => {
+  it('is the host of the dashboard URL, without scheme or path', () => {
+    expect(senderFromBaseUrl('https://dash.example.com')).toBe('dash.example.com');
+    expect(senderFromBaseUrl('https://dash.example.com:8443/app')).toBe('dash.example.com:8443');
+  });
+
+  it('is null when there is no usable URL', () => {
+    expect(senderFromBaseUrl(null)).toBeNull();
+    expect(senderFromBaseUrl('not a url')).toBeNull();
   });
 });

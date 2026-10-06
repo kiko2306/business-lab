@@ -15,6 +15,8 @@ export interface OutgoingMail {
   subject: string;
   text: string;
   replyTo?: string;
+  /** Extra message headers, e.g. List-Unsubscribe on bulk mail (plan.md §854). */
+  headers?: Record<string, string>;
 }
 
 function transportFor(config: MailConfig): nodemailer.Transporter {
@@ -50,6 +52,7 @@ export async function sendMail(mail: OutgoingMail): Promise<void> {
       replyTo: mail.replyTo,
       subject: mail.subject,
       text: mail.text,
+      ...(mail.headers ? { headers: mail.headers } : {}),
     });
   } finally {
     transport.close();

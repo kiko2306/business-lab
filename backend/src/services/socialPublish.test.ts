@@ -6,7 +6,10 @@ import { getDashboardBaseUrl } from '../utils/generalSettings';
 import { publishDraft, previewPublish, DraftNotFoundError, MailNotConfiguredError, DashboardUrlMissingError } from './socialPublish';
 
 vi.mock('./socialDrafts', () => ({ getDraftById: vi.fn(), recordSend: vi.fn() }));
-vi.mock('./advertSubscribers', () => ({ listActiveSubscribers: vi.fn() }));
+vi.mock('./advertSubscribers', () => ({
+  listActiveSubscribers: vi.fn(),
+  senderFromBaseUrl: (url: string | null) => (url ? new URL(url).host : null),
+}));
 vi.mock('../utils/mailSend', () => ({ sendMail: vi.fn(), mailIsConfigured: vi.fn() }));
 vi.mock('../utils/generalSettings', () => ({ getDashboardBaseUrl: vi.fn() }));
 
@@ -70,16 +73,16 @@ describe('publishDraft', () => {
 
     expect(result).toEqual({ total: 2, sent: 2, failed: 0 });
     expect(mockedSendMail).toHaveBeenCalledTimes(2);
-    expect(mockedSendMail).toHaveBeenNthCalledWith(1, {
+    expect(mockedSendMail).toHaveBeenNthCalledWith(1, expect.objectContaining({
       to: 'a@example.com',
       subject: 'We just shipped group reservations!',
       text: expect.stringContaining('https://dash.example.com/unsubscribe/token-a'),
-    });
-    expect(mockedSendMail).toHaveBeenNthCalledWith(2, {
+    }));
+    expect(mockedSendMail).toHaveBeenNthCalledWith(2, expect.objectContaining({
       to: 'b@example.com',
       subject: 'We just shipped group reservations!',
       text: expect.stringContaining('https://dash.example.com/unsubscribe/token-b'),
-    });
+    }));
   });
 
   it('keeps sending to the rest of the list when one recipient fails', async () => {
@@ -163,5 +166,30 @@ describe('previewPublish', () => {
   it('uses the same fallback subject as the send', async () => {
     mockedListActiveSubscribers.mockResolvedValue([]);
     await expect(previewPublish('   ')).resolves.toEqual({ subject: 'Update', recipients: 0 });
+  });
+});
+
+// plan.md §854 fix 2: say whose emails these are, and let the mail client offer its own
+// one-click unsubscribe (RFC 8058) — without it, big inboxes treat bulk mail as suspect.
+describe('publishDraft unsubscribe affordances', () => {
+  const send = async () => {
+    mockedListActiveSubscribers.mockResolvedValue([{ email: 'a@example.com', unsubscribeToken: 'token-a' }]);
+    mockedSendMail.mockResolvedValue(undefined);
+    await publishDraft(1);
+    return mockedSendMail.mock.calls[0][0];
+  };
+
+  it('names the sender in the footer, ahead of the unsubscribe link', async () => {
+    const mail = await send();
+    expect(mail.text).toContain('You are receiving this because you subscribed to dash.example.com.');
+    expect(mail.text.indexOf('dash.example.com.')).toBeLessThan(mail.text.indexOf('Unsubscribe: https://'));
+  });
+
+  it('adds List-Unsubscribe pointing at the POST route, and the one-click marker', async () => {
+    const mail = await send();
+    expect(mail.headers).toEqual({
+      'List-Unsubscribe': '<https://dash.example.com/api/subscribers/unsubscribe/token-a>',
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    });
   });
 });

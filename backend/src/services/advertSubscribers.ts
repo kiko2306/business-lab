@@ -47,6 +47,29 @@ export async function unsubscribeByToken(token: string): Promise<void> {
   );
 }
 
+/**
+ * Undoes an unsubscribe for the person who tapped it by mistake (plan.md §854).
+ * Keyed by their own token, so it is the person speaking — unlike an address the
+ * owner types in, which never overrides an opt-out. Always succeeds, like
+ * `unsubscribeByToken`: the page must not reveal which tokens exist.
+ */
+export async function resubscribeByToken(token: string): Promise<void> {
+  await query('UPDATE advert_subscribers SET unsubscribed_at = NULL WHERE unsubscribe_token = $1', [token]);
+}
+
+/**
+ * Whose emails these are, as a customer sees it. The dashboard has no business
+ * name (user, 2026-10-06), so it is the dashboard's own address.
+ */
+export function senderFromBaseUrl(baseUrl: string | null): string | null {
+  if (!baseUrl) return null;
+  try {
+    return new URL(baseUrl).host;
+  } catch {
+    return null;
+  }
+}
+
 export interface ActiveSubscriber {
   email: string;
   unsubscribeToken: string;

@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { schemas, validateBody, validateParams } from '../middleware/validation';
-import { subscribe, unsubscribeByToken } from '../services/advertSubscribers';
+import { subscribe, unsubscribeByToken, resubscribeByToken, senderFromBaseUrl } from '../services/advertSubscribers';
+import { getDashboardBaseUrl } from '../utils/generalSettings';
 
 const router = Router();
 
@@ -59,5 +60,34 @@ router.post(
     }
   }
 );
+
+// POST /api/subscribers/resubscribe/:token — "Changed your mind?" on the unsubscribe
+// page (plan.md §854). The person's own token, so it is the person speaking. A POST
+// for the same scanner reason as unsubscribe.
+router.post(
+  '/resubscribe/:token',
+  subscribersLimiter,
+  validateParams(schemas.subscriberToken),
+  async (req: Request, res: Response) => {
+    try {
+      await resubscribeByToken(req.params.token);
+      return res.status(204).send();
+    } catch (err) {
+      console.error('Resubscribe error:', (err as Error).message);
+      return res.status(500).json({ error: 'Could not subscribe again. Try again later.' });
+    }
+  }
+);
+
+// GET /api/subscribers/sender — whose emails these are, for the unsubscribe page to say.
+// Reads nothing about any subscriber and changes nothing, so a link scanner cannot hurt it.
+router.get('/sender', subscribersLimiter, async (_req: Request, res: Response) => {
+  try {
+    return res.json({ sender: senderFromBaseUrl(await getDashboardBaseUrl()) });
+  } catch (err) {
+    console.error('Sender lookup error:', (err as Error).message);
+    return res.json({ sender: null });
+  }
+});
 
 export default router;
