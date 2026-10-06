@@ -37633,3 +37633,56 @@ Health is on Home (§842), the scan is in Settings (§843).
   tells the truth); a 404 (breaks old bookmarks for no gain).
 - 502 frontend tests (3 new, red first), frontend build clean, `scripts/e2e-tests.sh` passes (12
   passed; the Utils nav case and the CSP page list lost `/utils`).
+
+## 845. Critique round 2, Content page: 16/40, and Publish can email text the owner is not looking at (§812)
+
+[x] done (critique only). Sixth run of §812: `pages/social` (route `/content`, §254), dual-agent (A
+design review, B detector and measured render) on the `docker-compose.test.yml` stack, `/api/social/*`
+mocked; 48 loads (6 states x 1280/390 x dark/light x EN/pt-PT) plus dynamic runs for focus and
+unsaved edits. **16/40**, the lowest of round 2. Detector CLI 0; in-page overlay: `nested-cards` (a
+bordered draft inside each panel), `gpt-thin-border-wide-shadow` (both panels),
+`body-text-viewport-edge`, `overused-font`, `layout-transition` (shell), `line-length` (test fixture
+only). Snapshot in `.impeccable/critique/` (not committed). Nothing fixed yet.
+
+**Held up under measurement:** no overflow in any state, enabled-text contrast >= 5.79, buttons 44px
+at 390, focus ring 2px solid >= 5.5:1, Publish and Delete both confirm in an `alertdialog` with focus
+moved in and returned on Cancel, draft editors named by their brief, a failed save keeps the edit.
+
+**Findings, in fix order.**
+1. **P0 — Publish sends the saved copy, not what is on screen.** `publish()`
+   (`social.component.ts:123`) never checks `isDirty`, and `publishDraft` reads `draft.content` from
+   the database (`socialPublish.ts:58-79`). Edit, press Publish without Save, confirm: every active
+   subscriber gets the old text, irreversibly. Confirmed against the code, not just the render. The
+   dialog does not say which text goes.
+2. **P1 — the publish confirm is blind and leaves no trace.** No recipient count, no subject (the
+   subject is secretly the first non-empty line, `subjectFor`), no preview; afterwards a 5-second
+   toast and a draft that looks unsent, so it can be sent again by habit. Needs a `published_at` (and
+   count) on the draft.
+3. **P1 — a partial send reads as a failure and a retry double-sends.** `publishedPartial` is a red
+   error toast with no list; Publish is still available and re-sends to everyone who already got it.
+4. **P2 — the wait and the failures are unaccompanied.** No live region on Generate, "Calling Claude…"
+   is vendor jargon, no-key and failure are 5-second toasts over the nav, with no link to Settings;
+   focus falls to `BODY` after Generate, Save, Publish and Delete (measured), and the new draft lands
+   below the fold at 390 with nothing scrolling to it. A failed list load leaves "Loading…" forever.
+5. **P2 — both panels open collapsed**, so the page's one task is behind a click.
+6. **P3 — words.** "Social-media post" while the button sends email; "Brief"; backend English leaks
+   into pt-PT toasts ("Anthropic API error 529…", "SMTP not configured"); no toast after Delete;
+   unsaved edits are lost on leaving the page; a 4-row textarea for up to 10,000 characters; no way
+   to see or add subscribers from the dashboard (only the public `POST /api/subscribers`).
+
+Minor: `isDirty` compares the trimmed edit with the raw content, so trailing whitespace shows Save as
+enabled on load; disabled Generate and Save give no reason; desktop buttons 31-38px (§824 is phone
+only); 4000-character brief limit with no counter.
+
+**Severity call.** A tagged the dirty-publish P0 and the rest P1-P3; B's measurements agree. This is
+the first P0 of round 2: the others were misleading or missing, this one sends the wrong thing to
+real customers. It is a data-integrity bug and should go first, ahead of any design work.
+
+**Open questions for the fix run.** Is this a "social post generator" or an "email campaign tool"?
+The page says one and does the other; the honest design for each differs (copy to clipboard vs
+recipients, subject, sent history). And where do subscribers live: they have no dashboard UI.
+
+**Harness notes.** B could not prove a `beforeunload` guard is absent for a hard reload (Playwright
+needs sticky activation); route-leave loss is solid. The in-flight Delete state was not separately
+caught. Not verified: a real Claude call, a real mail send, screen-reader output. The test stack was
+removed by name afterwards.

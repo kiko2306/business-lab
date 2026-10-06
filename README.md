@@ -252,6 +252,18 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       the Settings tile's text mentions finding devices, and opening `/utils` by hand lands on Home;
       (4) still open — the device list (shape it first: "this server", known and unknown devices).
       On `beta`, open Home and Settings on a phone and a laptop, EN and pt-PT.
+- [ ] **Content: fix the critique's findings (plan.md §845)** — 16/40. In order, test first, one
+      commit and version bump each: (1) **P0** Publish must send what the owner sees — block it (or
+      save first) while the draft has unsaved edits, and say which text goes in the dialog; (2) the
+      confirm names the recipient count and the subject and previews the text, and the draft keeps a
+      "Sent <date> to N" line (needs `published_at` and a count on the draft); (3) a partial send is a
+      warning with the failed count, and a draft that already went out asks before it goes again;
+      (4) Generate announces its wait (`role=status`), errors sit inline with a link to Settings,
+      focus lands somewhere sensible after each action, the new draft scrolls into view, a failed
+      list load shows Try again, backend English no longer reaches pt-PT; (5) the generate panel opens
+      by default, "Brief"/"Calling Claude" and the "social post" wording become plain words. Decide
+      first: post generator or email tool, and where subscribers are managed. On `beta`, after each:
+      open Content on a phone and a laptop, EN and pt-PT.
 - [ ] **Account: fix the critique's findings (plan.md §819)** — all five done; this item is now
       only the `beta` look. (1) §820 — on `beta`, Turn it off asks for a code or recovery code (no
       password field), then a confirm; a wrong code is refused and 2FA stays on; (2) §821 — a wrong
