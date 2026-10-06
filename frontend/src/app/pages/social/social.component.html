@@ -19,16 +19,25 @@
         [placeholder]="'social.briefPlaceholder' | t"
       ></textarea>
       <div class="mt-3">
-        <button type="submit" class="btn btn-primary" [disabled]="generating || !prompt.trim()">
+        <!-- aria-disabled, not disabled, while it runs: a disabled button drops keyboard focus to <body>. -->
+        <button type="submit" class="btn btn-primary" [disabled]="!generating && !prompt.trim()" [attr.aria-disabled]="generating ? 'true' : null">
           {{ (generating ? 'social.generating' : 'social.generateButton') | t }}
         </button>
-        <span *ngIf="generating" class="small text-body-secondary ms-2">{{ 'social.callingClaude' | t }}</span>
       </div>
+      <p role="status" class="small text-body-secondary mt-2 mb-0 social-generate-status">{{ generating ? ('social.generateWait' | t) : '' }}</p>
+      <p role="alert" class="text-danger small mt-2 mb-0 social-generate-error" *ngIf="generateError">
+        {{ (generateError === 'noKey' ? 'social.errors.noAiKey' : 'social.errors.generate') | t }}
+        <a *ngIf="generateError === 'noKey'" routerLink="/settings" class="link-danger">{{ 'social.errors.settingsLink' | t }}</a>
+      </p>
     </form>
   </app-panel>
 
   <app-panel key="social:drafts" [title]="'social.draftsPanel.title' | t" [subtitle]="'social.draftsPanel.subtitle' | t">
-    <div *ngIf="drafts === null" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
+    <div *ngIf="drafts === null && !loadFailed" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
+    <div *ngIf="loadFailed" role="alert" class="d-flex flex-wrap align-items-center gap-2 social-load-error">
+      <span class="text-danger">{{ 'social.errors.loadDrafts' | t }}</span>
+      <button type="button" class="btn btn-sm btn-outline-primary" (click)="loadDrafts()">{{ 'social.errors.retryLoad' | t }}</button>
+    </div>
     <div *ngIf="drafts && drafts.length === 0" class="text-body-secondary small">
       {{ 'social.noDraftsYet' | t }}
     </div>
@@ -39,6 +48,7 @@
       </p>
       <textarea
         class="form-control mb-2"
+        [id]="'draft-' + draft.id"
         [attr.aria-label]="'social.draftEditorLabel' | t:{ brief: draft.prompt }"
         rows="4"
         [ngModel]="edits[draft.id]"

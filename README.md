@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.165.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.165.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -270,10 +270,12 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       "You already sent this post"; (4) done (§851) — on `beta`, a send where some addresses bounce (e.g. add one at a dead domain
       next to a good one) is a yellow warning "Sent to 1 of 2 subscribers. 1 did not get it.", and the
       draft keeps the line "1 of 2 subscribers did not get it. Sending again emails everyone…" in
-      readable colour on both themes; (5) Generate
-      announces its wait (`role=status`), errors sit inline with a link to Settings, focus lands
-      somewhere sensible after each action, the new draft scrolls into view, a failed list load shows
-      Try again, backend English no longer reaches pt-PT; (6) the generate panel opens by default,
+      readable colour on both themes; (5) done (§852) — on `beta`, with no AI key set, Generate (Enter on the button) says "No AI key is set
+      up yet… Add one in Settings." beside the button with a working link, the brief is kept, no toast;
+      with a key, the wait line reads "Writing your draft…", the Drafts panel opens and the cursor is in
+      the new draft; Save leaves the cursor in that draft, Delete announces "Draft deleted." and
+      leaves it in the brief box; stop the backend and reload: the drafts area offers Try again; in
+      pt-PT no English error text appears anywhere on the page; (6) the generate panel opens by default,
       "Brief"/"Calling Claude" become plain words. On `beta`, after each: open Content on a phone and
       a laptop, EN and pt-PT.
 - [ ] **Account: fix the critique's findings (plan.md §819)** — all five done; this item is now

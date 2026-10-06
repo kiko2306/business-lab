@@ -1,6 +1,8 @@
 import { CommonModule, formatDate } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { PanelComponent } from '../../components/panel/panel.component';
 import { SubscribersComponent } from '../../components/subscribers/subscribers.component';
@@ -8,7 +10,7 @@ import { SocialService } from '../../core/social.service';
 import { SocialDraft } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { ConfirmService } from '../../core/confirm.service';
-import { extractErrorMessage } from '../../core/api';
+import { SectionCollapseService } from '../../core/section-collapse.service';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
 
@@ -21,7 +23,7 @@ import { TranslateService } from '../../i18n/translate.service';
 @Component({
   selector: 'app-social',
   standalone: true,
-  imports: [CommonModule, FormsModule, PanelComponent, SubscribersComponent, TranslatePipe],
+  imports: [CommonModule, FormsModule, RouterLink, PanelComponent, SubscribersComponent, TranslatePipe],
   templateUrl: './social.component.html',
   styleUrl: './social.component.css',
 })
@@ -29,11 +31,15 @@ export class SocialComponent implements OnInit {
   private readonly social = inject(SocialService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
+  private readonly collapse = inject(SectionCollapseService);
   protected readonly translate = inject(TranslateService);
 
   protected prompt = '';
   protected generating = false;
   protected drafts: SocialDraft[] | null = null;
+  protected loadFailed = false;
+  /** Why the last Generate failed, shown beside the button: a missing AI key has a way out, anything else a retry. */
+  protected generateError: 'noKey' | 'failed' | null = null;
   // Per-draft editable copy of the content, keyed by id; committed on Save.
   protected edits: Record<number, string> = {};
   protected savingId: number | null = null;
@@ -48,13 +54,24 @@ export class SocialComponent implements OnInit {
     this.loadDrafts();
   }
 
-  private loadDrafts(): void {
+  protected loadDrafts(): void {
+    this.loadFailed = false;
     this.social.listDrafts().subscribe({
       next: ({ drafts }) => {
         this.drafts = drafts;
         this.edits = Object.fromEntries(drafts.map((d) => [d.id, d.content]));
       },
-      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('social.errors.loadDrafts'))),
+      // Inline with a retry: a toast is gone in 5s and "Loading…" would never end.
+      error: () => (this.loadFailed = true),
+    });
+  }
+
+  /** After the next render: the card or box the owner should land in, since the control that held focus is gone or disabled. */
+  private focusSoon(id: string): void {
+    setTimeout(() => {
+      const target = document.getElementById(id);
+      target?.focus();
+      target?.scrollIntoView?.({ block: 'nearest' });
     });
   }
 
@@ -64,16 +81,22 @@ export class SocialComponent implements OnInit {
       return;
     }
     this.generating = true;
+    this.generateError = null;
     this.social.generate(prompt).subscribe({
       next: ({ draft }) => {
         this.drafts = [draft, ...(this.drafts ?? [])];
         this.edits[draft.id] = draft.content;
         this.prompt = '';
         this.generating = false;
-        this.toast.success(this.translate.t('social.toast.generated'));
+        // The new draft lives in the other panel, which may be closed; open it and
+        // land in the draft, or the owner is told "ready" and shown nothing.
+        this.collapse.open('social:drafts');
+        this.announcement = this.translate.t('social.toast.generated');
+        this.focusSoon(`draft-${draft.id}`);
       },
       error: (error) => {
-        this.toast.error(extractErrorMessage(error, this.translate.t('social.errors.generate')));
+        // 400 is the server saying no AI key is set up; the rest is a failed call.
+        this.generateError = error instanceof HttpErrorResponse && error.status === 400 ? 'noKey' : 'failed';
         this.generating = false;
       },
     });
@@ -99,10 +122,12 @@ export class SocialComponent implements OnInit {
       this.edits[updated.id] = updated.content;
       if (announce) {
         this.toast.success(this.translate.t('social.toast.saved'));
+        // Save disables itself once the draft is clean, which would drop focus to <body>.
+        this.focusSoon(`draft-${updated.id}`);
       }
       return true;
-    } catch (error) {
-      this.toast.error(extractErrorMessage(error, this.translate.t('social.errors.save')));
+    } catch {
+      this.toast.error(this.translate.t('social.errors.save'));
       return false;
     } finally {
       this.savingId = null;
@@ -125,9 +150,11 @@ export class SocialComponent implements OnInit {
         this.drafts = (this.drafts ?? []).filter((d) => d.id !== draft.id);
         delete this.edits[draft.id];
         this.deletingId = null;
+        this.announcement = this.translate.t('social.toast.deleted');
+        this.focusSoon('prompt'); // the card that held focus is gone
       },
-      error: (error) => {
-        this.toast.error(extractErrorMessage(error, this.translate.t('social.errors.delete')));
+      error: () => {
+        this.toast.error(this.translate.t('social.errors.delete'));
         this.deletingId = null;
       },
     });
@@ -216,7 +243,10 @@ export class SocialComponent implements OnInit {
         this.toast.success(this.translate.t('social.toast.published', { sent }));
       },
       error: (error) => {
-        this.toast.error(extractErrorMessage(error, this.translate.t('social.errors.publish')));
+        // 400 is "email is not set up" (mailbox or Dashboard URL); the server's own words are English.
+        this.toast.error(
+          this.translate.t(error instanceof HttpErrorResponse && error.status === 400 ? 'social.errors.publishNotReady' : 'social.errors.publish')
+        );
         this.publishingId = null;
       },
     });

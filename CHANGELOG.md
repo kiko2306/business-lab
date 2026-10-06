@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.165.2] — 2026-10-06
+
+### Changed
+
+- Content page: Generate announces its wait and keeps keyboard focus, a missing AI key is explained beside the button with a link to Settings, a new draft opens and takes the cursor, Save and Delete leave the cursor somewhere sensible, a failed draft list offers Try again, and errors are always in your language
+
 ## [0.165.1] — 2026-10-06
 
 ### Changed

@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of, throwError, Observable } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { provideRouter } from '@angular/router';
+import { of, throwError, Observable, Subject } from 'rxjs';
 import { SocialComponent } from './social.component';
 import { ConfirmService } from '../../core/confirm.service';
 import { SocialDraft } from '../../core/models';
@@ -44,6 +46,7 @@ describe('SocialComponent publish', () => {
     TestBed.configureTestingModule({
       imports: [SocialComponent],
       providers: [
+        provideRouter([]),
         { provide: SocialService, useValue: social },
         { provide: ConfirmService, useValue: confirm },
         { provide: ToastService, useValue: toast },
@@ -189,6 +192,140 @@ describe('SocialComponent publish', () => {
     });
   });
 
+  // plan.md §845 fix 5: the wait is announced, failures sit beside the button in the
+  // page's language, and focus never falls to <body>.
+  describe('Generate, failures and focus', () => {
+    const openAll = () => {
+      localStorage.clear();
+      const el: HTMLElement = fixture.nativeElement;
+      el.querySelectorAll<HTMLButtonElement>('.panel__toggle').forEach((b) => b.click());
+      fixture.detectChanges();
+      return el;
+    };
+    const type = async (el: HTMLElement, text: string) => {
+      await fixture.whenStable();
+      const box = el.querySelector<HTMLTextAreaElement>('#prompt')!;
+      box.value = text;
+      box.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      return box;
+    };
+
+    it('keeps focus on the button while generating and says what is happening', async () => {
+      localStorage.clear();
+      setUp(draft(), 'Saved copy');
+      const wait$ = new Subject<{ draft: SocialDraft }>();
+      social.generate.and.returnValue(wait$);
+      const el = openAll();
+      await type(el, 'A sale');
+      const button = el.querySelector<HTMLButtonElement>('form button[type="submit"]')!;
+      button.focus();
+      button.click();
+      fixture.detectChanges();
+      expect(button.disabled).toBeFalse();
+      expect(button.getAttribute('aria-disabled')).toBe('true');
+      expect(document.activeElement).toBe(button);
+      expect(el.querySelector('.social-generate-status')?.textContent?.trim()).toBe(en['social.generateWait']);
+    });
+
+    it('announces the new draft and puts the cursor in it', async () => {
+      localStorage.clear();
+      setUp(draft(), 'Saved copy');
+      social.generate.and.returnValue(of({ draft: draft({ id: 9, prompt: 'A sale', content: 'Fresh text' }) }));
+      const el = openAll();
+      await type(el, 'A sale');
+      fixture.autoDetectChanges(true); // as in the app: the card renders before focus moves to it
+      el.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
+      await fixture.whenStable();
+      await new Promise((r) => setTimeout(r));
+      expect(component['announcement']).toBe(en['social.toast.generated']);
+      const box = document.activeElement as HTMLTextAreaElement;
+      expect(box.tagName).toBe('TEXTAREA');
+      expect(box.value).toBe('Fresh text');
+    });
+
+    it('with no AI key, says so beside the button and links to Settings, not a vanishing toast', async () => {
+      localStorage.clear();
+      setUp(draft(), 'Saved copy');
+      social.generate.and.returnValue(throwError(() => new HttpErrorResponse({ status: 400, error: { error: 'No AI provider key configured for social-posts.' } })));
+      const el = openAll();
+      await type(el, 'A sale');
+      el.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const alert = el.querySelector('[role="alert"].social-generate-error');
+      expect(alert?.textContent).toContain(en['social.errors.noAiKey']);
+      expect(alert?.querySelector('a')?.getAttribute('href')).toBe('/settings');
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(component['prompt']).toBe('A sale'); // the brief survives
+    });
+
+    it('for any other failure, says it in the page language and keeps the brief', async () => {
+      localStorage.clear();
+      setUp(draft(), 'Saved copy');
+      TestBed.inject(TranslateService).setLocale('pt-PT');
+      social.generate.and.returnValue(throwError(() => new HttpErrorResponse({ status: 502, error: { error: 'Anthropic API error 529' } })));
+      const el = openAll();
+      await type(el, 'A sale');
+      el.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const text = el.querySelector('.social-generate-error')?.textContent ?? '';
+      expect(text).toContain(ptPT['social.errors.generate']);
+      expect(text).not.toContain('Anthropic');
+    });
+
+    it('shows Try again, not an endless "Loading…", when the drafts will not load', async () => {
+      localStorage.clear();
+      setUp(draft(), 'Saved copy');
+      social.listDrafts.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+      component.ngOnInit();
+      const el = openAll();
+      expect(el.querySelector('.social-load-error')?.textContent).toContain(en['social.errors.loadDrafts']);
+      expect(el.textContent).not.toContain('Loading…');
+      social.listDrafts.and.returnValue(of({ drafts: [draft()] }));
+      el.querySelector<HTMLButtonElement>('.social-load-error button')!.click();
+      fixture.detectChanges();
+      expect(el.querySelector('.social-load-error')).toBeNull();
+      expect(el.querySelectorAll('.border.rounded').length).toBe(1);
+    });
+
+    it('puts the cursor back in the draft after Save', async () => {
+      localStorage.clear();
+      setUp(draft(), 'Edited');
+      const el = openAll();
+      fixture.autoDetectChanges(true);
+      el.querySelector<HTMLButtonElement>('.border.rounded button.btn-outline-primary')!.click(); // Save
+      await fixture.whenStable();
+      await new Promise((r) => setTimeout(r));
+      expect((document.activeElement as HTMLElement).tagName).toBe('TEXTAREA');
+    });
+
+    it('puts the cursor in the brief box after a draft is deleted', async () => {
+      localStorage.clear();
+      setUp(draft(), 'Saved copy');
+      social.deleteDraft.and.returnValue(of(undefined));
+      const el = openAll();
+      el.querySelector<HTMLButtonElement>('.border.rounded button.btn-outline-danger')!.click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      await new Promise((r) => setTimeout(r));
+      expect(document.activeElement?.id).toBe('prompt');
+      expect(component['announcement']).toBe(en['social.toast.deleted']);
+    });
+
+    it('does not let backend English reach the page: errors are our own strings, by status', async () => {
+      setUp(draft(), 'Saved copy');
+      TestBed.inject(TranslateService).setLocale('pt-PT');
+      social.publish.and.returnValue(throwError(() => new HttpErrorResponse({ status: 400, error: { error: 'Configure the shared mailbox in Settings before publishing.' } })));
+      await component.publish(draft());
+      expect(toast.error).toHaveBeenCalledWith(ptPT['social.errors.publishNotReady']);
+      social.publish.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500, error: { error: 'Unable to publish the draft.' } })));
+      await component.publish(draft());
+      expect(toast.error).toHaveBeenCalledWith(ptPT['social.errors.publish']);
+    });
+  });
+
   describe('Copy', () => {
     it('copies the text on screen, not the saved copy, and announces it', async () => {
       setUp(draft(), 'Edited on screen');
@@ -259,6 +396,12 @@ describe('SocialComponent publish', () => {
       'social.errors.publishEmpty',
       'social.errors.prepareSend',
       'social.partialLine',
+      'social.generateWait',
+      'social.errors.noAiKey',
+      'social.errors.publishNotReady',
+      'social.errors.settingsLink',
+      'social.errors.retryLoad',
+      'social.toast.deleted',
       'social.sentLine',
       'social.sentLineOne',
       'social.copyButton',

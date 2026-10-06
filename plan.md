@@ -37833,3 +37833,39 @@ available and re-sends to *everyone* (the server keeps the count that left, not 
   The `beta` item covers it.
 - 533 frontend tests (3 new, red first; one spec needed `localStorage.clear()` because Karma runs in
   random order and an earlier spec leaves the Drafts panel open), build clean.
+
+## 852. Content: the wait, the failures and the focus (§845 fix 5, P2)
+
+[x] done. Everything in §845 finding 4 that was not the P0 or the send confirm:
+
+- **Generate** keeps keyboard focus (`aria-disabled` while it runs, not `disabled`, which dropped
+  focus to `<body>`; the empty-brief case stays `disabled`, it never held focus) and has an
+  always-present `role=status` line: "Writing your draft. This can take up to 30 seconds." in place
+  of "Calling Claude…".
+- **A new draft is shown, not just announced.** The Drafts panel starts collapsed, so "Draft
+  generated" used to point at something hidden. Success now opens it (`SectionCollapseService.open`),
+  announces "Draft ready. It is the first one in Drafts." and moves the cursor into the new draft,
+  scrolled into view (the card used to land below the fold at 390).
+- **Failures sit beside the button**, not in a 5-second toast over the nav: HTTP 400 (the server's "no
+  AI key", `AiKeyMissingError`) says "No AI key is set up yet… Add one in Settings." with a link to
+  `/settings`; anything else says the draft could not be written. The brief survives both.
+- **Backend English no longer reaches the page.** The component used `extractErrorMessage`, which
+  prefers the server's text ("Anthropic API error 529…", "SMTP not configured" showed in pt-PT). It is
+  gone from this component: messages are our own strings, chosen by status (publish 400 = "email is
+  not set up", with the Settings pointer; everything else its own sentence).
+- **A failed list load** shows "Could not load your drafts." with Try again instead of "Loading…"
+  forever.
+- **Focus after Save and Delete:** Save disables itself once the draft is clean, so focus now goes
+  back into that draft's text box; after Delete (the card is gone) it goes to the brief box, and
+  "Draft deleted." is announced (there was no feedback at all).
+- Rendered against the **real** backend, which has no AI key on the test stack: Enter on Generate
+  gives the inline message and the Settings link at 1280 and 390, dark/EN and light/pt-PT, focus still
+  on the button, brief kept, no toast, no overflow.
+- Rejected: moving focus to a results heading (the cursor in the new draft is where the next action
+  is); `aria-busy` on the panel (the status line already carries the wait); keeping server text as a
+  fallback when we have no string for it (that is how English reached pt-PT; add a string instead).
+- Left for fix 6: "Brief" wording and opening the Generate panel by default. Unsaved edits are still
+  lost on leaving the page (found in §845's measurements; not in the README item, add it if it bites).
+- 541 frontend tests (8 new, red first), build clean. Two focus specs run with
+  `fixture.autoDetectChanges(true)`: the app renders the card before the timeout that focuses it,
+  the bare fixture does not.
