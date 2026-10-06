@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.165.3] — 2026-10-06
+
+### Changed
+
+- Content opens on its task (the Generate box is open on arrival, and Drafts too when there are some) and asks What should the post say? instead of Brief
+
 ## [0.165.2] — 2026-10-06
 
 ### Changed

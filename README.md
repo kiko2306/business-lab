@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.165.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.165.3** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -252,7 +252,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       the Settings tile's text mentions finding devices, and opening `/utils` by hand lands on Home;
       (4) still open — the device list (shape it first: "this server", known and unknown devices).
       On `beta`, open Home and Settings on a phone and a laptop, EN and pt-PT.
-- [ ] **Content: fix the critique's findings (plan.md §845, §847)** — 16/40. Decided 2026-10-06:
+- [ ] **Content: fix the critique's findings (plan.md §845, §847)** — 16/40, all six done. Decided 2026-10-06:
       Content is a **post generator**, and **subscribers are managed on the same page**. In order,
       test first, one commit and version bump each: (1) done (§846) — on `beta`, edit a draft and
       press Email to subscribers without Save: the dialog says your changes are saved first, and the email that
@@ -275,8 +275,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       with a key, the wait line reads "Writing your draft…", the Drafts panel opens and the cursor is in
       the new draft; Save leaves the cursor in that draft, Delete announces "Draft deleted." and
       leaves it in the brief box; stop the backend and reload: the drafts area offers Try again; in
-      pt-PT no English error text appears anywhere on the page; (6) the generate panel opens by default,
-      "Brief"/"Calling Claude" become plain words. On `beta`, after each: open Content on a phone and
+      pt-PT no English error text appears anywhere on the page; (6) done (§853) — on `beta`, a first visit lands on the open "Generate a draft" box asking "What
+      should the post say?", with Drafts open too once there are drafts, and no "Brief" or "Claude"
+      anywhere, in pt-PT too. All six are done; this item is now only the `beta` looks. On `beta`, after each: open Content on a phone and
       a laptop, EN and pt-PT.
 - [ ] **Account: fix the critique's findings (plan.md §819)** — all five done; this item is now
       only the `beta` look. (1) §820 — on `beta`, Turn it off asks for a code or recovery code (no

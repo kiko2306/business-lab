@@ -174,7 +174,7 @@ describe('SocialComponent publish', () => {
       await component.publish(draft());
       fixture.detectChanges();
       const el: HTMLElement = fixture.nativeElement;
-      el.querySelectorAll<HTMLButtonElement>('.panel__toggle').forEach((b) => b.textContent?.includes('Drafts') && b.click());
+      el.querySelectorAll<HTMLButtonElement>('.panel__toggle[aria-expanded="false"]').forEach((b) => b.textContent?.includes('Drafts') && b.click());
       fixture.detectChanges();
       const line = el.querySelector('.social-partial')?.textContent?.replace(/\s+/g, ' ') ?? '';
       expect(line).toContain('2 of 5 subscribers did not get it');
@@ -198,7 +198,7 @@ describe('SocialComponent publish', () => {
     const openAll = () => {
       localStorage.clear();
       const el: HTMLElement = fixture.nativeElement;
-      el.querySelectorAll<HTMLButtonElement>('.panel__toggle').forEach((b) => b.click());
+      el.querySelectorAll<HTMLButtonElement>('.panel__toggle[aria-expanded="false"]').forEach((b) => b.click()); // some start open now (§845 fix 6)
       fixture.detectChanges();
       return el;
     };
@@ -326,6 +326,39 @@ describe('SocialComponent publish', () => {
     });
   });
 
+  // plan.md §845 fix 6: the page opens on its task, in plain words.
+  describe('first visit and wording', () => {
+    it('opens the Generate panel, and the Drafts panel when there are drafts, without a click', () => {
+      localStorage.clear();
+      setUp(draft(), 'Saved copy');
+      fixture.detectChanges();
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('#prompt')).not.toBeNull();
+      expect(el.querySelectorAll('.border.rounded').length).toBe(1);
+    });
+
+    it('leaves the Drafts panel closed when there are none yet', () => {
+      localStorage.clear();
+      setUp(draft(), 'Saved copy');
+      social.listDrafts.and.returnValue(of({ drafts: [] }));
+      component.ngOnInit();
+      fixture.detectChanges();
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('#prompt')).not.toBeNull();
+      expect(el.textContent).not.toContain(en['social.noDraftsYet']);
+    });
+
+    it('says "what should the post say", not "brief" or the AI vendor, in both languages', () => {
+      for (const dict of [en, ptPT]) {
+        for (const key of Object.keys(dict).filter((k) => k.startsWith('social.'))) {
+          expect(dict[key].replace(/{{[^}]*}}/g, '')).withContext(key).not.toMatch(/\bbrief(ing)?\b|\bclaude\b/i);
+        }
+      }
+      expect(en['social.callingClaude']).toBeUndefined();
+      expect(ptPT['social.callingClaude']).toBeUndefined();
+    });
+  });
+
   describe('Copy', () => {
     it('copies the text on screen, not the saved copy, and announces it', async () => {
       setUp(draft(), 'Edited on screen');
@@ -358,7 +391,7 @@ describe('SocialComponent publish', () => {
   describe('on the page', () => {
     const open = (...labels: string[]) => {
       const el: HTMLElement = fixture.nativeElement;
-      el.querySelectorAll<HTMLButtonElement>('.panel__toggle').forEach((b) => {
+      el.querySelectorAll<HTMLButtonElement>('.panel__toggle[aria-expanded="false"]').forEach((b) => {
         if (labels.some((l) => b.textContent?.includes(l))) b.click();
       });
       fixture.detectChanges();

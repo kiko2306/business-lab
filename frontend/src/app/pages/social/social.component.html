@@ -7,7 +7,7 @@
     </p>
   </div>
 
-  <app-panel key="social:generate" [title]="'social.generatePanel.title' | t" [subtitle]="'social.generatePanel.subtitle' | t">
+  <app-panel key="social:generate" [defaultOpen]="true" [title]="'social.generatePanel.title' | t" [subtitle]="'social.generatePanel.subtitle' | t">
     <form (ngSubmit)="generate()">
       <label class="form-label fw-semibold" for="prompt">{{ 'social.briefLabel' | t }}</label>
       <textarea
@@ -32,7 +32,7 @@
     </form>
   </app-panel>
 
-  <app-panel key="social:drafts" [title]="'social.draftsPanel.title' | t" [subtitle]="'social.draftsPanel.subtitle' | t">
+  <app-panel key="social:drafts" [defaultOpen]="!!drafts?.length" [title]="'social.draftsPanel.title' | t" [subtitle]="'social.draftsPanel.subtitle' | t">
     <div *ngIf="drafts === null && !loadFailed" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
     <div *ngIf="loadFailed" role="alert" class="d-flex flex-wrap align-items-center gap-2 social-load-error">
       <span class="text-danger">{{ 'social.errors.loadDrafts' | t }}</span>

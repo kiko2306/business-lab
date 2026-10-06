@@ -37869,3 +37869,27 @@ available and re-sends to *everyone* (the server keeps the count that left, not 
 - 541 frontend tests (8 new, red first), build clean. Two focus specs run with
   `fixture.autoDetectChanges(true)`: the app renders the card before the timeout that focuses it,
   the bare fixture does not.
+
+## 853. Content opens on its task, in plain words (§845 fix 6, P2/P3)
+
+[x] done. The last of §845's fixes.
+
+- **Open on arrival.** Both panels used to start collapsed, so the first visit was a title and two
+  closed bars. The Generate panel now has `defaultOpen`, and Drafts opens when there are drafts
+  (`[defaultOpen]="!!drafts?.length"`); with none, the empty Drafts panel stays closed rather than
+  opening onto "No drafts yet". An explicit open or close the owner makes still wins and is
+  remembered (`SectionCollapseService`).
+- **Words.** The box asks "What should the post say?" (was "Brief"), the line above each draft says
+  "You asked:" (was "Brief:"), the subtitle says "Write a social-media post with AI…" and the panel
+  subtitle "Say what the post should be about"; pt-PT follows. `social.callingClaude` is deleted
+  (§852 replaced it with the wait line). A spec fails if "brief"/"briefing"/"Claude" returns to any
+  `social.*` string in either language; the `{{brief}}` placeholder name in the draft editor's
+  accessible label is not shown, so the check ignores `{{…}}`.
+- Existing specs that clicked every panel toggle now click only the closed ones; they had been
+  *closing* panels that now start open.
+- Rejected: opening Drafts always (an empty list opening first is the page's worst view); renaming
+  the `brief` field/identifier in code (internal, and the backend's `prompt` is unchanged).
+- 544 frontend tests (3 new, red first), three clean runs in a row, build clean. Not rendered: a
+  `defaultOpen` flag and string changes; the README `beta` item covers how it reads.
+
+**This finishes §845's six fixes.** The README item stays only for its `beta` looks.
