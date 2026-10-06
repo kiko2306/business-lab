@@ -864,6 +864,8 @@ export const ptPT: Record<string, string> = {
   'unsubscribe.working': 'A cancelar a subscrição…',
   'unsubscribe.done': 'A sua subscrição foi cancelada. Não receberá mais emails.',
   'unsubscribe.signInLink': 'Iniciar sessão',
+  'unsubscribe.button': 'Cancelar a minha subscrição',
+  'unsubscribe.intro': 'Toque no botão para deixar de receber estes emails. Nada muda até o fazer.',
   'unsubscribe.errors.missingToken': 'Este link de cancelamento não tem token.',
   'unsubscribe.errors.failed': 'Não foi possível processar o pedido. Tente novamente mais tarde.',
 

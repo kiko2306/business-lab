@@ -5,20 +5,29 @@
         <div class="card-body p-4 p-lg-5 text-center">
           <h1 class="h3 mb-3">{{ 'unsubscribe.title' | t }}</h1>
 
-          <div *ngIf="loading" class="text-body-secondary py-4">
-            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-            {{ 'unsubscribe.working' | t }}
+          <p class="text-body-secondary" *ngIf="!done && token">{{ 'unsubscribe.intro' | t }}</p>
+
+          <!-- One live region for the wait and the result, present from the start so a change is announced. -->
+          <div role="status" class="mb-3">
+            <span *ngIf="working" class="text-body-secondary">
+              <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>{{ 'unsubscribe.working' | t }}
+            </span>
+            <div *ngIf="done" class="alert alert-success mb-0">{{ 'unsubscribe.done' | t }}</div>
           </div>
 
-          <div *ngIf="!loading && !error" class="alert alert-success mb-0">
-            {{ 'unsubscribe.done' | t }}
-          </div>
+          <div *ngIf="error" role="alert" class="alert alert-danger">{{ error }}</div>
 
-          <div *ngIf="!loading && error" class="alert alert-danger mb-0">
-            {{ error }}
-          </div>
+          <button
+            *ngIf="token && !done"
+            type="button"
+            class="btn btn-primary btn-lg unsubscribe__confirm"
+            [attr.aria-disabled]="working ? 'true' : null"
+            (click)="confirm()"
+          >
+            {{ 'unsubscribe.button' | t }}
+          </button>
 
-          <p class="text-center text-body-secondary small mt-4 mb-0" *ngIf="!loading">
+          <p class="text-center text-body-secondary small mt-4 mb-0" *ngIf="done || error">
             <a routerLink="/login">{{ 'unsubscribe.signInLink' | t }}</a>
           </p>
         </div>

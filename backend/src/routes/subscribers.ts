@@ -39,10 +39,13 @@ router.post('/', subscribersLimiter, validateBody(schemas.subscriberSubscribe), 
   }
 });
 
-// GET /api/subscribers/unsubscribe/:token — what the frontend's
-// /unsubscribe/:token page calls to both perform the unsubscribe and learn
-// the result to render (plan.md §612).
-router.get(
+// POST /api/subscribers/unsubscribe/:token — what the frontend's
+// /unsubscribe/:token page calls when the person taps its one button
+// (plan.md §612, §854). A POST, not the GET it started as: mail gateways
+// (Safe Links, Proofpoint, Mimecast) open every link in a browser that runs
+// scripts, and a GET that mutates would unsubscribe a customer who never
+// tapped anything. Idempotent: a second tap or an old link just succeeds.
+router.post(
   '/unsubscribe/:token',
   subscribersLimiter,
   validateParams(schemas.subscriberToken),

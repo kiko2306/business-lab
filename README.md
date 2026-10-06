@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.165.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.165.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -279,10 +279,13 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       should the post say?", with Drafts open too once there are drafts, and no "Brief" or "Claude"
       anywhere, in pt-PT too. All six are done; this item is now only the `beta` looks. On `beta`, after each: open Content on a phone and
       a laptop, EN and pt-PT.
-- [ ] **Small pages: fix the critique's findings (plan.md §854)** — 17/40, three pages. In order,
-      test first, one commit and version bump each: (1) Unsubscribe stops mutating on a GET — the
-      page loads, names the sender, one button, a new POST route does it (keep or retire the old GET
-      route, decide in the commit); (2) Unsubscribe is owned and has an exit — sender name, "Changed
+- [ ] **Small pages: fix the critique's findings (plan.md §854)** — 17/40, three pages. Decided
+      2026-10-06: no business name exists (show the Dashboard URL host as the sender) and the audit
+      log is for the **owner** (plain sentences, raw code kept for the CSV). In order, test first, one
+      commit and version bump each: (1) done (§855) — on `beta`, open an unsubscribe link from a real
+      advert email: the page shows one button and nothing happens until you tap it; reloading the
+      page does not unsubscribe either; tapping it ends the emails and a second tap is harmless;
+      (2) Unsubscribe is owned and has an exit — sender name, "Changed
       your mind? Subscribe again", no sign-in link, `<app-auth-shell>`, a `List-Unsubscribe` +
       `List-Unsubscribe-Post` header on every advert, the sender name in the email footer; (3) Audit
       logs: Result first (or a leading marker), action codes as plain sentences with the code kept

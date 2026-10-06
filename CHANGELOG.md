@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.165.4] — 2026-10-06
+
+### Fixed
+
+- Opening an unsubscribe link no longer unsubscribes anyone: the page now asks, and only a tap on its button ends the emails, so a mail scanner that opens the link cannot remove a customer
+
 ## [0.165.3] — 2026-10-06
 
 ### Changed

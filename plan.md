@@ -37965,3 +37965,33 @@ limit (429) after the first twenty; the 422/500/502 states were mocked with the 
 "200 rows in one response" state is not what the API returns (pageSize 20); the page just has no cap.
 Not verified: screen-reader output, a real mail-gateway scan, a real List-Unsubscribe in an inbox. The
 test stack was removed by name afterwards.
+
+## 855. Unsubscribe is a tap, not a page load (§854 fix 1, P1)
+
+[x] done. Opening `/unsubscribe/:token` used to fire `GET /api/subscribers/unsubscribe/:token` on
+load, and that GET *was* the unsubscribe. A mail gateway that opens links in a browser that runs
+scripts (Safe Links, Proofpoint, Mimecast) would have removed a customer who never tapped anything,
+and a reload repeated it.
+
+- **Backend:** the route is now `POST /subscribers/unsubscribe/:token` (same limiter, same
+  `subscriberToken` validation, still idempotent, 204). The GET is gone, not repurposed: the only
+  caller was the page, and the links in sent emails point at the *page* (`{baseUrl}/unsubscribe/…`),
+  not the API, so no already-sent email breaks. A test pins that a GET does nothing and reaches
+  `unsubscribeByToken` zero times.
+- **Page:** it loads with no request, says "Tap the button to stop getting these emails. Nothing
+  changes until you do." and shows one 48px button ("Unsubscribe me" / "Cancelar a minha
+  subscrição"). The tap POSTs; the wait and the result share one `role=status` region present from
+  the start; the button uses `aria-disabled` while running (a second tap does nothing and focus stays);
+  a failure shows the error and leaves the button, so retry is the same tap. With no token it explains
+  and offers no button. `OperationsService.confirmUnsubscribe` (GET) became `unsubscribe` (POST).
+- **Real stack, public (no session):** zero requests to `/api/subscribers` on load, one POST on Enter,
+  and a reload afterwards sends nothing — at 1280 and 390, dark/EN and light/pt-PT; no overflow.
+- Rejected: keeping the GET and adding a "confirm" step on top (it would still mutate when scanned);
+  a CSRF-style token in the POST (the unsubscribe token already is the capability, and the route is
+  public by design); a one-time token (the second tap must stay harmless).
+- Decisions recorded with this fix (user, 2026-10-06): the dashboard has **no business name**, so
+  fix 2 shows the Dashboard URL host as the sender; the audit log is **for the owner**, so fix 3
+  writes actions as plain sentences and keeps the raw code for the CSV.
+- Still open here: the page still says nothing of whose emails these are, still ends on "Go to sign
+  in", and failure text is still the server's (fixes 2 and 5).
+- 1372 backend tests (3 new, red first), 550 frontend tests (6 new), typecheck and build clean.

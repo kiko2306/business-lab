@@ -285,10 +285,15 @@ export class OperationsService {
     );
   }
 
-  /** What the public /unsubscribe/:token page calls (plan.md §612) — reachable signed out. */
-  confirmUnsubscribe(token: string): Observable<void> {
-    return this.http.get<void>(
+  /**
+   * What the public /unsubscribe/:token page calls when the person taps its
+   * button (plan.md §612, §854) — reachable signed out. A POST: opening the
+   * link must never unsubscribe anyone, or a mail gateway's link scanner would.
+   */
+  unsubscribe(token: string): Observable<void> {
+    return this.http.post<void>(
       `${API_BASE_URL}/subscribers/unsubscribe/${encodeURIComponent(token)}`,
+      {},
       { context: new HttpContext().set(SKIP_AUTH, true).set(SKIP_GLOBAL_ERROR_HANDLING, true) }
     );
   }

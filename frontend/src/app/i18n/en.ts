@@ -864,6 +864,8 @@ export const en: Record<string, string> = {
   'unsubscribe.working': 'Unsubscribing…',
   'unsubscribe.done': 'You’ve been unsubscribed. You won’t receive further emails.',
   'unsubscribe.signInLink': 'Go to sign in',
+  'unsubscribe.button': 'Unsubscribe me',
+  'unsubscribe.intro': 'Tap the button to stop getting these emails. Nothing changes until you do.',
   'unsubscribe.errors.missingToken': 'This unsubscribe link is missing its token.',
   'unsubscribe.errors.failed': 'Could not process this request. Try again later.',
 
