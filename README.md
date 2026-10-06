@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.18** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.19** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -257,6 +257,11 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       characters." is under new passwords, the cursor starts in the first field, `/recovery` inputs
       are 44px; (5) §832 — the card is centred (equal space either side at every width) and all four
       pages look like the same card, `/recovery` included.
+- [ ] **Beta-test the watchdog's audit rows (plan.md §840)** — on `beta`, Audit logs, filter
+      Action `critical-service.probe-failed`: nothing while Tailscale is healthy. To see a row,
+      `docker stop tailscale-tailscale-1` on the host for ~3 min (dev/test box only): rows appear
+      naming the probe, `ECONNRESET`/timeout, ms, "resolves to …" and an Uptime Kuma verdict; a
+      `critical-service.restarted` row follows, and `critical-service.recovered` once it answers.
 - [ ] **Updates page: fix the critique's findings (plan.md §834)** — all five done; this item is now
       only the `beta` look, on a phone and a laptop, EN and pt-PT. (5) §839 — the page opens with the
       panel open and leads with one badge: "Up to date" / "N updates available" / "Updating…" /

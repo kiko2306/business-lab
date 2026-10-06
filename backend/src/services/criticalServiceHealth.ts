@@ -33,10 +33,12 @@
 
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import dns from 'dns/promises';
 import fs from 'fs/promises';
 import logger from '../utils/logger';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { publishAlert } from '../utils/alertNotify';
+import { writeAuditLog } from '../utils/audit';
 import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import { getHostGatewayIp } from '../utils/network';
 import { managementJsonPath } from './netbirdAuthFlow';
@@ -76,6 +78,9 @@ interface ProjectState {
 }
 
 const failures = new Map<string, number>();
+// Failed passes since the probe last answered. Unlike `failures` a restart
+// does not zero it — it is what dates "recovered after N failed passes".
+const streaks = new Map<string, number>();
 const projects = new Map<string, ProjectState>();
 
 function projectState(name: string): ProjectState {
@@ -87,16 +92,61 @@ function projectState(name: string): ProjectState {
   return s;
 }
 
-/** null when reachable; otherwise why not — the part §444 had no record of. */
-async function probeError(url: string): Promise<string | null> {
+/**
+ * Where the name points from this container's resolver — the thing to compare
+ * with what Uptime Kuma's resolver reached when the two disagree (§444).
+ */
+async function resolvedAddresses(host: string): Promise<string> {
+  try {
+    const found = await Promise.race([
+      dns.lookup(host, { all: true }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timed out')), 3_000).unref()),
+    ]);
+    return found.map((a) => a.address).join(', ') || 'nothing';
+  } catch (error) {
+    const e = error as Error & { code?: string };
+    return `lookup failed (${e.code ?? e.message})`;
+  }
+}
+
+interface ProbeOutcome {
+  /** null when reachable; otherwise why not — the part §444 had no record of. */
+  error: string | null;
+  /** One line for the audit log: timing, failing syscall/address, resolution. Empty when reachable. */
+  detail: string;
+}
+
+async function runProbe(url: string): Promise<ProbeOutcome> {
+  const started = Date.now();
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
     await response.body?.cancel();
-    return null;
+    return { error: null, detail: '' };
   } catch (error) {
-    const e = error as Error & { cause?: { code?: string; message?: string } };
-    const cause = e.cause ? ` (${e.cause.code ?? e.cause.message})` : '';
-    return `${e.name}: ${e.message}${cause}`;
+    const e = error as Error & { cause?: { code?: string; message?: string; syscall?: string; address?: string; port?: number } };
+    const c = e.cause;
+    const cause = c ? ` (${c.code ?? c.message})` : '';
+    const where = c?.syscall ? `, ${c.syscall}${c.address ? ` ${c.address}${c.port ? `:${c.port}` : ''}` : ''}` : '';
+    const resolved = await resolvedAddresses(new URL(url).hostname);
+    return {
+      error: `${e.name}: ${e.message}${cause}`,
+      detail: `after ${Date.now() - started} ms${where}; resolves to ${resolved}`,
+    };
+  }
+}
+
+function kumaVerdict(status: number | null): string {
+  switch (status) {
+    case 1:
+      return 'Uptime Kuma sees it up';
+    case 0:
+      return 'Uptime Kuma sees it down';
+    case 2:
+      return 'Uptime Kuma: pending';
+    case 3:
+      return 'Uptime Kuma: maintenance';
+    default:
+      return 'Uptime Kuma: no answer';
   }
 }
 
@@ -204,6 +254,8 @@ interface ProbeResult {
   probe: Probe;
   url: string;
   error: string | null;
+  /** Uptime Kuma's verdict for the URL, looked up on every failed pass; null = no answer. */
+  kuma: number | null;
 }
 
 async function handleProject(project: string, results: ProbeResult[]): Promise<void> {
@@ -225,6 +277,11 @@ async function handleProject(project: string, results: ProbeResult[]): Promise<v
       s.gaveUpAlerted = true;
       const names = atThreshold.map((r) => r.probe.name).join(', ');
       logger.error(`Critical service auto-restart: restarting ${project} did not restore ${names} — not restarting again until it recovers`);
+      await writeAuditLog({
+        action: 'critical-service.gave-up',
+        resource: `${project}: restart did not restore ${names}; auto-restart paused until it recovers`,
+        result: 'failure',
+      });
       await publishAlert({
         category: 'critical-service',
         title: `${project}: auto-restart didn't help`,
@@ -238,7 +295,7 @@ async function handleProject(project: string, results: ProbeResult[]): Promise<v
 
   const confirmed: ProbeResult[] = [];
   for (const r of atThreshold) {
-    const kuma = await kumaMonitorStatus(r.url);
+    const kuma = r.kuma;
     if (kuma === null || kuma === KUMA_DOWN) {
       confirmed.push(r);
     } else {
@@ -259,6 +316,10 @@ async function handleProject(project: string, results: ProbeResult[]): Promise<v
     logger.warn(`Critical service auto-restart: restarted ${project} after repeated ${names} failures`, {
       errors: confirmed.map((r) => r.error),
     });
+    await writeAuditLog({
+      action: 'critical-service.restarted',
+      resource: `${project}: restarted after repeated ${names} failures (${confirmed.map((r) => `${r.error}; ${kumaVerdict(r.kuma)}`).join(' | ')})`,
+    });
     await publishAlert({
       category: 'critical-service',
       title: `${names}: auto-restarted ${project}`,
@@ -277,13 +338,30 @@ export async function checkCriticalServices(): Promise<void> {
   for (const probe of PROBES) {
     const url = await probe.url().catch(() => null);
     if (!url) continue; // config not ready yet — nothing to check
-    const error = await probeError(url);
+    const { error, detail } = await runProbe(url);
     const count = error === null ? 0 : (failures.get(probe.name) ?? 0) + 1;
     failures.set(probe.name, count);
+    const streak = error === null ? 0 : (streaks.get(probe.name) ?? 0) + 1;
+    const wasFailing = streaks.get(probe.name) ?? 0;
+    streaks.set(probe.name, streak);
+    let kuma: number | null = null;
     if (error !== null) {
+      kuma = await kumaMonitorStatus(url);
       logger.warn(`Critical service auto-restart: ${probe.name} unreachable`, { consecutiveFailures: count, url, error });
+      // Stops at the longest window before a restart is possible: after that
+      // the outage is already on record and a long one would flood the log.
+      if (streak <= RESTART_AFTER_DNS) {
+        await writeAuditLog({
+          action: 'critical-service.probe-failed',
+          resource: `${probe.name}: ${error} ${detail}; ${kumaVerdict(kuma)}`,
+          result: 'failure',
+          metadata: { url, consecutiveFailures: count, kumaStatus: kuma, error, detail },
+        });
+      }
+    } else if (wasFailing > 0) {
+      await writeAuditLog({ action: 'critical-service.recovered', resource: `${probe.name}: reachable again after ${wasFailing} failed passes` });
     }
-    byProject.set(probe.restartService, [...(byProject.get(probe.restartService) ?? []), { probe, url, error }]);
+    byProject.set(probe.restartService, [...(byProject.get(probe.restartService) ?? []), { probe, url, error, kuma }]);
   }
 
   for (const [project, results] of byProject) {

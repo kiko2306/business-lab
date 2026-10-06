@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.19] — 2026-10-06
+
+### Added
+
+- Tailscale/NetBird watchdog writes each failed probe, restart, give-up and recovery to the Audit log, with the error, timing, resolved address and Uptime Kuma's verdict
+
 ## [0.163.18] — 2026-10-03
 
 ### Changed

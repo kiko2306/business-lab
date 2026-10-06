@@ -5,6 +5,8 @@ vi.mock('../utils/alertNotify', () => ({ publishAlert: vi.fn() }));
 vi.mock('../config/services', () => ({ resolveComposeFile: vi.fn(), getPublishedUpstreamPort: vi.fn() }));
 vi.mock('../utils/network', () => ({ getHostGatewayIp: vi.fn(async () => '10.201.0.1') }));
 vi.mock('./netbirdAuthFlow', () => ({ managementJsonPath: vi.fn(() => '/fake/management.json') }));
+vi.mock('../utils/audit', () => ({ writeAuditLog: vi.fn() }));
+vi.mock('dns/promises', () => ({ default: { lookup: vi.fn(async () => [{ address: '100.64.0.9', family: 4 }]) } }));
 vi.mock('../utils/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 vi.mock('fs/promises', () => ({ default: { readFile: vi.fn() } }));
 
@@ -17,6 +19,7 @@ vi.mock('child_process', () => ({ execFile: (...args: unknown[]) => execFileMock
 import { getExposureConfig } from '../utils/exposureSettings';
 import { publishAlert } from '../utils/alertNotify';
 import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
+import { writeAuditLog } from '../utils/audit';
 import fs from 'fs/promises';
 import { isDnsFailure, parseKumaMonitorStatus } from './criticalServiceHealth';
 
@@ -25,6 +28,11 @@ const mockedPublishAlert = vi.mocked(publishAlert);
 const mockedResolveComposeFile = vi.mocked(resolveComposeFile);
 const mockedKumaPort = vi.mocked(getPublishedUpstreamPort);
 const mockedReadFile = vi.mocked(fs.readFile);
+const mockedAudit = vi.mocked(writeAuditLog);
+
+function auditRows(action: string) {
+  return mockedAudit.mock.calls.map(([row]) => row).filter((row) => row.action === action);
+}
 
 const FUNNEL_URL = 'https://businesslab-signal.tail122b53.ts.net/';
 const KUMA_METRICS = 'http://10.201.0.1:10370/metrics';
@@ -48,8 +56,8 @@ function stubFetch({ probesUp, kuma, dns = false }: { probesUp: boolean; kuma: n
         return { ok: true, status: 200, text: async () => text } as unknown as Response;
       }
       if (!probesUp) {
-        const error = new TypeError('fetch failed') as TypeError & { cause?: { code: string } };
-        if (dns) error.cause = { code: 'ENOTFOUND' };
+        const error = new TypeError('fetch failed') as TypeError & { cause?: { code: string; syscall?: string } };
+        error.cause = dns ? { code: 'ENOTFOUND' } : { code: 'ECONNRESET', syscall: 'read' };
         throw error;
       }
       return { ok: false, status: 405, body: null } as unknown as Response;
@@ -223,5 +231,70 @@ describe('checkCriticalServices', () => {
     await passes(checkCriticalServices, 6);
     expect(execFileMock).not.toHaveBeenCalled();
     expect(mockedPublishAlert).not.toHaveBeenCalled();
+  });
+});
+
+// The log that makes the next "fails from here, Uptime Kuma sees it up"
+// outage diagnosable: it lands in the audit log, which the dashboard shows.
+describe('audit trail', () => {
+  it('records a failed pass with the error, timing, resolved address and what Uptime Kuma says', async () => {
+    stubFetch({ probesUp: false, kuma: 1 });
+    const { checkCriticalServices } = await import('./criticalServiceHealth');
+    await checkCriticalServices();
+
+    const [row] = auditRows('critical-service.probe-failed').filter((r) => r.resource?.includes('Tailscale Funnel'));
+    expect(row.result).toBe('failure');
+    expect(row.resource).toContain('ECONNRESET');
+    expect(row.resource).toContain('read');
+    expect(row.resource).toContain('100.64.0.9');
+    expect(row.resource).toContain('Uptime Kuma sees it up');
+    expect(row.metadata).toMatchObject({ url: FUNNEL_URL, consecutiveFailures: 1, kumaStatus: 1 });
+  });
+
+  it('says so when Uptime Kuma gave no verdict', async () => {
+    stubFetch({ probesUp: false, kuma: null });
+    const { checkCriticalServices } = await import('./criticalServiceHealth');
+    await checkCriticalServices();
+    expect(auditRows('critical-service.probe-failed')[0].resource).toContain('Uptime Kuma: no answer');
+  });
+
+  it('stops writing failed passes once the restart decision window is over, so a long outage cannot flood the log', async () => {
+    stubFetch({ probesUp: false, kuma: 1 });
+    const { checkCriticalServices } = await import('./criticalServiceHealth');
+    await passes(checkCriticalServices, 40);
+    // 3 probes x at most RESTART_AFTER_DNS (8) passes.
+    expect(auditRows('critical-service.probe-failed').length).toBeLessThanOrEqual(24);
+  });
+
+  it('records the restart once per project', async () => {
+    stubFetch({ probesUp: false, kuma: 0 });
+    const { checkCriticalServices } = await import('./criticalServiceHealth');
+    await passes(checkCriticalServices, 3);
+    const rows = auditRows('critical-service.restarted');
+    expect(rows.map((r) => r.resource).sort()).toEqual([expect.stringContaining('netbird-vpn'), expect.stringContaining('tailscale')]);
+    expect(rows.every((r) => (r.result ?? 'success') === 'success')).toBe(true);
+  });
+
+  it('records giving up once per project', async () => {
+    stubFetch({ probesUp: false, kuma: null });
+    const { checkCriticalServices } = await import('./criticalServiceHealth');
+    await passes(checkCriticalServices, 30);
+    expect(auditRows('critical-service.gave-up')).toHaveLength(2);
+  });
+
+  it('records recovery after a failed streak, and nothing when it never failed', async () => {
+    stubFetch({ probesUp: true, kuma: 1 });
+    const { checkCriticalServices } = await import('./criticalServiceHealth');
+    await passes(checkCriticalServices, 3);
+    expect(mockedAudit).not.toHaveBeenCalled();
+
+    stubFetch({ probesUp: false, kuma: 1 });
+    await passes(checkCriticalServices, 2);
+    stubFetch({ probesUp: true, kuma: 1 });
+    await checkCriticalServices();
+    const rows = auditRows('critical-service.recovered');
+    expect(rows).toHaveLength(3);
+    expect(rows[0].result ?? 'success').toBe('success');
+    expect(rows[0].resource).toContain('2 failed passes');
   });
 });

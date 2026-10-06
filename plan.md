@@ -37489,3 +37489,24 @@ the server's prose reached the screen in only four places, and none of them need
   line is open if wanted.
 - 473 frontend specs (11 new, red first; the older specs' panel helper and two expectations updated),
   build clean, E2E passes.
+
+## 840. Watchdog probe failures land in the audit log (after the 2026-10-05 Funnel restart)
+
+[x] done. Why: 23:24 UTC the watchdog restarted tailscale after 4 failed Funnel probes (`ECONNRESET`
+from the backend) while tailscaled itself looked healthy (control stream dropped + redialed 23:15, no
+health warning). Kuma agreed "up" at 23:22 (restart skipped) but not at 23:24; only the container log
+held the story, so nothing in the dashboard said why.
+
+- `criticalServiceHealth.ts` writes `audit_logs` rows (shown on Audit logs, 30-day retention, no
+  frontend change): `critical-service.probe-failed` (error, ms, failing syscall/address, what this
+  container's resolver returns, Uptime Kuma's verdict), `.restarted`, `.gave-up`, `.recovered` (after N
+  failed passes).
+- Kuma is now asked on every failed pass (was: only at the restart threshold), and that verdict is
+  reused for the restart decision — one fetch, same answer on screen and in the decision.
+- Failed-pass rows stop after `RESTART_AFTER_DNS` (8) passes of a streak: later passes add nothing and
+  a long outage would write ~720 rows/day/probe. `streaks` counts since last healthy and survives a
+  restart (`failures` is zeroed there), so recovery after a restart still reports.
+- Rejected: own table + route + page (the audit log already is "system operations", exportable, with
+  retention); a ring buffer in memory (lost on every backend restart, which is when it matters).
+- Filter by action is exact-match: type `critical-service.probe-failed`.
+- 1349 backend tests (6 new, red first), typecheck clean.
