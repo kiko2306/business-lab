@@ -7,7 +7,6 @@ const PAGES: { link: string; url: string; heading: string }[] = [
   { link: 'Apps', url: '**/apps', heading: 'Apps' },
   { link: 'Backups', url: '**/backups', heading: 'Backups & restore' },
   { link: 'Settings', url: '**/settings', heading: 'Settings' },
-  { link: 'Utils', url: '**/utils', heading: 'Utils' },
   { link: 'Users & roles', url: '**/users', heading: 'Users & roles' },
   { link: 'Audit logs', url: '**/audit-logs', heading: 'Audit logs' },
   { link: 'Security', url: '**/account', heading: 'Account security' },

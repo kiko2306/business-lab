@@ -37610,3 +37610,26 @@ the Utils page keeps its own copy until the route goes (fix 3).
 - 499 frontend tests (8 new, red first), backend typecheck and frontend build clean. Rendered once
   (mocked scan): hosts, none, failed, in flight at 1280 and 390, dark/EN and light/pt-PT; no overflow.
   Stack removed by name.
+
+## 844. Utils is gone (§841 fix 3, P2)
+
+[x] done. `pages/utils`, its nav link, its Home tile and its `utils.*`, `shell.nav.utils` and
+`home.tiles.utils.*` strings are deleted; `/utils` is now `{ path: 'utils', redirectTo: 'home' }`,
+unguarded, so a bookmark lands on Home whatever the role (the old route needed `apps:control`).
+Health is on Home (§842), the scan is in Settings (§843).
+
+- **The bento grid had to change.** §141.2's grid was 4 doubles + 4 singles = 12 cells for eight
+  tiles; with seven, that left a ragged row. Now 2 doubles (Apps, Backups) + 5 singles = 9 cells =
+  three rows of three; Settings and Account lost `wide`. A spec fails if the cells stop dividing by
+  three. The 2-up and 1-up breakpoints are unchanged (doubles go full width).
+- **Discoverability:** the scan moved to a place nobody looks for it, so the Settings tile now says
+  "…email and finding devices on your network" (pt-PT too).
+- **Strings guard kept, not dropped:** `utils-strings.spec.ts` (no stack/Docker jargon, §790) became
+  `health-strings.spec.ts` over `home.health.*` and `settings.networkScan.*`, plus a check that no
+  `utils.*` key is left in either language.
+- `app.config.ts`, the header strip, the Home CSS and the panel spec carried comments naming Utils;
+  rewritten rather than left pointing at a page that no longer exists.
+- Rejected: keeping a hidden `/utils` that renders Home (a redirect is one line and the address bar
+  tells the truth); a 404 (breaks old bookmarks for no gain).
+- 502 frontend tests (3 new, red first), frontend build clean, `scripts/e2e-tests.sh` passes (12
+  passed; the Utils nav case and the CSP page list lost `/utils`).

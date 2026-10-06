@@ -90,12 +90,9 @@ export const routes: Routes = [
         title: 'shell.nav.content',
         canActivate: [requireCapability('settings:manage')],
       },
-      {
-        path: 'utils',
-        loadComponent: () => import('./pages/utils/utils.component').then((m) => m.UtilsComponent),
-        title: 'shell.nav.utils',
-        canActivate: [requireCapability('apps:control')],
-      },
+      // Utils was folded away (plan.md §841): health is on Home, the scan is in
+      // Settings. Keep old bookmarks landing somewhere useful.
+      { path: 'utils', redirectTo: 'home' },
       {
         path: 'audit-logs',
         loadComponent: () => import('./pages/audit-logs/audit-logs.component').then((m) => m.AuditLogsComponent),

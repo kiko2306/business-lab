@@ -75,10 +75,18 @@ describe('HomeComponent', () => {
     expect(el.querySelector('.menu-tile__badge')).toBeNull();
   });
 
+  // plan.md §841 fix 3: Utils is gone — health is on Home, the scan is in Settings.
+  it('has no Utils tile, and the bento grid still divides into even rows of three', () => {
+    setUp('all');
+    expect(links()).not.toContain('/utils');
+    const cells = el.querySelectorAll('a.menu-tile').length + el.querySelectorAll('a.menu-tile--wide').length;
+    expect(cells % 3).toBe(0);
+  });
+
   it('shows a short initials avatar per tile, not an emoji (plan.md §761/§789)', () => {
     setUp('all');
     const icons = Array.from(el.querySelectorAll('.menu-tile__icon')).map((i) => i.textContent?.trim());
-    expect(icons.length).toBe(8);
+    expect(icons.length).toBe(7);
     // Every icon is plain letters — no emoji, which renders as a missing-glyph
     // box on a system without a colour-emoji font (found live in §777's audit).
     for (const icon of icons) {
@@ -166,6 +174,8 @@ describe('HomeComponent', () => {
       expect(dict['home.tiles.networking.title']).toBeUndefined();
       expect(dict['home.pendingBadge']).toBeUndefined();
       expect(dict['home.tiles.settings.description']).toBeTruthy();
+      expect(dict['home.tiles.utils.title']).toBeUndefined();
+      expect(dict['shell.nav.utils']).toBeUndefined();
     }
     const jargon = /registry|tunnel|provisioning|ntfy|snapshot|stack|image updates/i;
     for (const key of Object.keys(en).filter((k) => k.startsWith('home.'))) {

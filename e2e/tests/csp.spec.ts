@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // plan.md §522). A violation rarely breaks a page outright — a style,
 // request or worker just silently doesn't load — so fail loudly on any
 // report the browser logs while every shell page renders.
-const PAGES = ['/home', '/apps', '/backups', '/settings', '/content', '/utils', '/audit-logs', '/users', '/updates', '/account'];
+const PAGES = ['/home', '/apps', '/backups', '/settings', '/content', '/audit-logs', '/users', '/updates', '/account'];
 
 test('the shell pages load with no Content-Security-Policy violations', async ({ page }) => {
   const violations: string[] = [];

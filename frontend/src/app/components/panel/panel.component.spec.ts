@@ -14,7 +14,7 @@ describe('PanelComponent', () => {
     fixture.detectChanges();
   });
 
-  // Panels are the structure of Settings, Backups, Utils and Audit logs. As
+  // Panels are the structure of Settings, Backups and Audit logs. As
   // plain spans they contributed nothing to the document outline, so heading
   // navigation — the way a screen-reader user moves through a long page —
   // found only the page's own h1, and the h3s inside the panels skipped a level.

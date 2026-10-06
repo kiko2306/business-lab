@@ -26,8 +26,8 @@ interface MenuTile {
   anyCapability?: Capability[];
   /**
    * Spans two columns in the bento grid (§141.2). Reserved for the tiles a
-   * user reaches most often, plus one on the closing row so the grid divides
-   * evenly (4 doubles + 4 singles = 12 = four clean rows of three).
+   * user reaches most often: 2 doubles + 5 singles = 9 cells = three clean
+   * rows of three (Utils' tile left, §841, so the old 4 + 4 no longer fits).
    */
   wide?: boolean;
   /** Which of the two cheap status reads (plan.md §781) badges this tile, if any. */
@@ -65,9 +65,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     { titleKey: 'home.tiles.backups.title', descriptionKey: 'home.tiles.backups.description', link: '/backups', initials: 'BK', capability: 'backups:manage', wide: true, badgeFor: 'backups' },
     { titleKey: 'home.tiles.users.title', descriptionKey: 'home.tiles.users.description', link: '/users', initials: 'US', capability: 'users:manage' },
     // Networking used to be its own tile onto the same /settings page; one tile now, gated like the route.
-    { titleKey: 'home.tiles.settings.title', descriptionKey: 'home.tiles.settings.description', link: '/settings', initials: 'SE', anyCapability: ['settings:manage', 'exposure:settings'], wide: true },
-    { titleKey: 'home.tiles.utils.title', descriptionKey: 'home.tiles.utils.description', link: '/utils', initials: 'UT', capability: 'apps:control' },
-    { titleKey: 'home.tiles.account.title', descriptionKey: 'home.tiles.account.description', link: '/account', initials: 'AC', wide: true },
+    { titleKey: 'home.tiles.settings.title', descriptionKey: 'home.tiles.settings.description', link: '/settings', initials: 'SE', anyCapability: ['settings:manage', 'exposure:settings'] },
+    { titleKey: 'home.tiles.account.title', descriptionKey: 'home.tiles.account.description', link: '/account', initials: 'AC' },
     { titleKey: 'home.tiles.auditLogs.title', descriptionKey: 'home.tiles.auditLogs.description', link: '/audit-logs', initials: 'AL', capability: 'audit:view' },
   ];
 

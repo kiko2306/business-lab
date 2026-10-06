@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.21** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.22** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -247,10 +247,11 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       press Find devices with the keyboard: focus stays on the button, "Scanning your network…" is read
       out, then "Found N devices." and the table with Name / Device maker / Address; an account with
       `apps:control` but not `settings:manage` no longer sees the panel and gets 403 from the API
-      (and from Utils' old scan until fix 3); unplug the box's network and scan: the failure shows
-      beside the button; (3) drop `/utils`, nav,
-      Home tile, the strip's pointer comment, redirect; (4) device list (shape first). On `beta`, open
-      Home and Settings on a phone and a laptop, EN and pt-PT.
+      unplug the box's network and scan: the failure shows beside the button; (3) done (§844) — on `beta`,
+      the nav and Home have no Utils, Home has seven tiles in even rows (two wide: Apps, Backups),
+      the Settings tile's text mentions finding devices, and opening `/utils` by hand lands on Home;
+      (4) still open — the device list (shape it first: "this server", known and unknown devices).
+      On `beta`, open Home and Settings on a phone and a laptop, EN and pt-PT.
 - [ ] **Account: fix the critique's findings (plan.md §819)** — all five done; this item is now
       only the `beta` look. (1) §820 — on `beta`, Turn it off asks for a code or recovery code (no
       password field), then a confirm; a wrong code is refused and 2FA stays on; (2) §821 — a wrong

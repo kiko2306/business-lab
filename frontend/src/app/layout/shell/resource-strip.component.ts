@@ -37,8 +37,8 @@ function worstDisk(disks: DiskUsage[]): DiskUsage | null {
  * Page (§147.2, §455, §456): a plain white line icon per metric (inline SVG,
  * `currentColor` — no icon font, no emoji), the headline number gethomepage
  * itself would show (percent for CPU, free space for memory/disk), and a
- * utilisation bar underneath. `/utils` keeps the detailed Health panel; this is the
- * always-visible summary. Best-effort: a failed poll just leaves the last
+ * utilisation bar underneath. Home's health card (§841) has the sentences and
+ * the alert text; this is the always-visible summary. Best-effort: a failed poll just leaves the last
  * numbers up, and nothing renders until the first success.
  */
 @Component({

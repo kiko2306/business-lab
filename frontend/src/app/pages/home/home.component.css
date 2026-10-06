@@ -1,7 +1,6 @@
 /* A bento grid (§141.2): three columns on desktop, with the high-traffic
-   tiles (Apps, Backups) and one closing tile spanning two columns. Eight
-   tiles = 4 doubles + 4 singles = 12 cells = four even rows, no ragged
-   straggler. Rows size to content (compact, icon-led tiles, plan.md §781)
+   tiles (Apps, Backups) spanning two columns. Seven tiles = 2 doubles +
+   5 singles = 9 cells = three even rows, no ragged straggler. Rows size to content (compact, icon-led tiles, plan.md §781)
    rather than a fixed height — nothing here runs long enough to need one.
    Steps down to 2-up (doubles go full width) then 1-up on a phone. */
 .menu-grid {

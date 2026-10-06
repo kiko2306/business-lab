@@ -10,8 +10,8 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(
       routes,
-      // Keep fragment links working (the panels still expose `#health`/`#utils`
-      // anchors) and restore scroll position on back/forward navigation.
+      // Keep fragment links working (panels expose anchors such as `#network-scan`)
+      // and restore scroll position on back/forward navigation.
       withInMemoryScrolling({ anchorScrolling: 'enabled', scrollPositionRestoration: 'enabled' }),
     ),
     provideHttpClient(withInterceptors([authInterceptor, apiErrorInterceptor])),

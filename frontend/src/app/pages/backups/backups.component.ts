@@ -372,7 +372,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
 
   /**
    * Sizes are reported in bytes; show them in the unit a person would use.
-   * Binary units (KiB steps), matching the utils page's formatter.
+   * Binary units (KiB steps).
    */
   protected formatBytes(bytes: number): string {
     if (!bytes || bytes < 0) {

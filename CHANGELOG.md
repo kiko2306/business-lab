@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.22] — 2026-10-06
+
+### Changed
+
+- Utils is gone from the menu and Home: server health is on Home, the network scan is in Settings, and an old /utils link lands on Home
+
 ## [0.163.21] — 2026-10-06
 
 ### Changed

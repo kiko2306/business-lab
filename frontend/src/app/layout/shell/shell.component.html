@@ -25,8 +25,6 @@
              *ngIf="caps.has('settings:manage') || caps.has('exposure:settings')">{{ 'shell.nav.settings' | t }}</a>
           <a class="app-nav__link" routerLink="/content" routerLinkActive="active"
              *ngIf="caps.has('settings:manage')">{{ 'shell.nav.content' | t }}</a>
-          <a class="app-nav__link" routerLink="/utils" routerLinkActive="active"
-             *ngIf="caps.has('apps:control')">{{ 'shell.nav.utils' | t }}</a>
           <a class="app-nav__link" routerLink="/users" routerLinkActive="active"
              *ngIf="caps.has('users:manage')">{{ 'shell.nav.users' | t }}</a>
           <a class="app-nav__link" routerLink="/audit-logs" routerLinkActive="active"
