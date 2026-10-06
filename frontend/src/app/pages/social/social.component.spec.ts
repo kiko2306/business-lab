@@ -40,7 +40,7 @@ describe('SocialComponent publish', () => {
     });
     confirm = jasmine.createSpyObj('ConfirmService', ['ask']);
     confirm.ask.and.resolveTo(true);
-    toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
+    toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'warning']);
     TestBed.configureTestingModule({
       imports: [SocialComponent],
       providers: [
@@ -152,6 +152,43 @@ describe('SocialComponent publish', () => {
     expect(toast.error).toHaveBeenCalledWith(en['social.errors.prepareSend']);
   });
 
+  // plan.md §845 fix 4: a send that mostly worked is a warning, not an error, and it leaves a trace.
+  describe('a partial send', () => {
+    const partial = () => social.publish.and.returnValue(of({ sent: 3, failed: 2, total: 5 }));
+
+    it('is a warning with the failed count, not a red error', async () => {
+      setUp(draft(), 'Saved copy');
+      partial();
+      await component.publish(draft());
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(toast.warning).toHaveBeenCalledWith('Sent to 3 of 5 subscribers. 2 did not get it.');
+    });
+
+    it('stays on the draft after the toast is gone, and says what sending again would do', async () => {
+      localStorage.clear(); // an earlier spec may have left the Drafts panel open
+      setUp(draft(), 'Saved copy');
+      partial();
+      await component.publish(draft());
+      fixture.detectChanges();
+      const el: HTMLElement = fixture.nativeElement;
+      el.querySelectorAll<HTMLButtonElement>('.panel__toggle').forEach((b) => b.textContent?.includes('Drafts') && b.click());
+      fixture.detectChanges();
+      const line = el.querySelector('.social-partial')?.textContent?.replace(/\s+/g, ' ') ?? '';
+      expect(line).toContain('2 of 5 subscribers did not get it');
+      expect(line).toContain('emails everyone on the list again');
+    });
+
+    it('is cleared by the next send that goes through to everyone', async () => {
+      setUp(draft(), 'Saved copy');
+      partial();
+      await component.publish(draft());
+      social.publish.and.returnValue(of({ sent: 5, failed: 0, total: 5 }));
+      await component.publish(draft());
+      expect(component['partial'][7]).toBeUndefined();
+      expect(toast.success).toHaveBeenCalled();
+    });
+  });
+
   describe('Copy', () => {
     it('copies the text on screen, not the saved copy, and announces it', async () => {
       setUp(draft(), 'Edited on screen');
@@ -221,6 +258,7 @@ describe('SocialComponent publish', () => {
       'social.confirmPublish.subject',
       'social.errors.publishEmpty',
       'social.errors.prepareSend',
+      'social.partialLine',
       'social.sentLine',
       'social.sentLineOne',
       'social.copyButton',

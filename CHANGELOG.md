@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.165.1] — 2026-10-06
+
+### Changed
+
+- A content email that reached most but not all subscribers is now a warning with the number who missed it, and the draft keeps a line saying so until the next send
+
 ## [0.165.0] — 2026-10-06
 
 ### Added

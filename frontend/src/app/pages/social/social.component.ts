@@ -41,6 +41,8 @@ export class SocialComponent implements OnInit {
   protected publishingId: number | null = null;
   /** One polite line for what the last copy did; read out, not shown. */
   protected announcement = '';
+  /** Drafts whose last send only partly went out, until the next send replaces it. In memory only: the server keeps the count that left, not who missed it. */
+  protected partial: Record<number, { failed: number; total: number }> = {};
 
   ngOnInit(): void {
     this.loadDrafts();
@@ -204,9 +206,13 @@ export class SocialComponent implements OnInit {
           );
         }
         if (failed > 0) {
-          this.toast.error(this.translate.t('social.toast.publishedPartial', { sent, total }));
+          // Mostly worked: a warning, and a line that outlives the toast so the owner
+          // can see why sending again would not be harmless.
+          this.partial[draft.id] = { failed, total };
+          this.toast.warning(this.translate.t('social.toast.publishedPartial', { sent, total, failed }));
           return;
         }
+        delete this.partial[draft.id];
         this.toast.success(this.translate.t('social.toast.published', { sent }));
       },
       error: (error) => {

@@ -37812,3 +37812,24 @@ Delete. The page subtitle and strings say "email" where the send is an email.
   subscribers" when the list is empty (a disabled button with no reason is the thing §845 complained
   about; the toast says why); re-reading the draft list after a send.
 - 530 frontend tests (13 new), build clean.
+
+## 851. A partial send is a warning that stays (§845 fix 4)
+
+[x] done. A send where some messages bounced was a red 5-second error toast ("Sent to 3 of 5 …
+some sends failed"), which read as total failure and then vanished, while Email to subscribers stayed
+available and re-sends to *everyone* (the server keeps the count that left, not who missed it).
+
+- `toast.warning` (it already existed) with the failed count: "Sent to 3 of 5 subscribers. 2 did not
+  get it."
+- A line on the draft, `.social-partial`: "2 of 5 subscribers did not get it. Sending again emails
+  everyone on the list again." It outlives the toast, is held in memory per draft, and is cleared by
+  the next send that reaches everyone. Together with §850's "You already sent this post…" in the
+  confirm, a second send is never a surprise.
+- Rejected: storing per-recipient results and resending to the failed only (a table and a route for a
+  failure that today means one bad mailbox in a short list; add when a list is large enough that
+  re-sending to all is a real cost); keeping the line across a reload (the draft still says "Sent
+  <date> to 3" from the server, which is the durable truth).
+- Not rendered: one text line using Bootstrap's `text-warning-emphasis`, which carries both themes.
+  The `beta` item covers it.
+- 533 frontend tests (3 new, red first; one spec needed `localStorage.clear()` because Karma runs in
+  random order and an earlier spec leaves the Drafts panel open), build clean.

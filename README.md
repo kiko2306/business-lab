@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.165.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.165.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -267,7 +267,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       Email to subscribers opens a dialog naming how many people, the subject and the text, and with
       no subscribers it refuses with a pointer to the Subscribers panel; after a real send (needs the
       shared mailbox set) the draft reads "Sent <date> to N subscribers", and sending it again warns
-      "You already sent this post"; (4) a partial send is a warning with the failed count; (5) Generate
+      "You already sent this post"; (4) done (§851) — on `beta`, a send where some addresses bounce (e.g. add one at a dead domain
+      next to a good one) is a yellow warning "Sent to 1 of 2 subscribers. 1 did not get it.", and the
+      draft keeps the line "1 of 2 subscribers did not get it. Sending again emails everyone…" in
+      readable colour on both themes; (5) Generate
       announces its wait (`role=status`), errors sit inline with a link to Settings, focus lands
       somewhere sensible after each action, the new draft scrolls into view, a failed list load shows
       Try again, backend English no longer reaches pt-PT; (6) the generate panel opens by default,
