@@ -37510,3 +37510,51 @@ held the story, so nothing in the dashboard said why.
   retention); a ring buffer in memory (lost on every backend restart, which is when it matters).
 - Filter by action is exact-match: type `critical-service.probe-failed`.
 - 1349 backend tests (6 new, red first), typecheck clean.
+
+## 841. Critique round 2, Utils page: 20/40, and health is a wall of text no one can scan (§812)
+
+[x] done (critique only). Fifth run of §812: `pages/utils` (route `/utils`), dual-agent (A design
+review, B detector and measured render) on the `docker-compose.test.yml` stack, health and scan
+APIs mocked with `page.route`; 80 loads (10 states x 1280/390 x dark/light x EN/pt-PT). **20/40**.
+Detector CLI 0 (static source is blind to what Angular renders); in-page overlay 4:
+`body-text-viewport-edge` (subtitle, 12px shell gutter), `gpt-thin-border-wide-shadow` (both
+panels), `overused-font` (global), `layout-transition` (shell strip, false positive). Snapshot in
+`.impeccable/critique/` (not committed). Nothing fixed yet.
+
+**Held up under measurement:** no overflow in any state, contrast >= 4.53 (lowest: white "ok" on
+the 12px success badge), buttons 44px at 390, focus ring 2px solid 6.06:1 (dark) / 6.44:1 (light),
+valid h1/h2/h3 outline, table-stack labels render at 390 and a 75-char hostname wraps.
+
+**Findings, in fix order.**
+1. **P1 — health is four `small` lines, state is font weight.** A degraded row differs from a
+   passing one only by `fw-semibold` (`utils.component.html:30,40,46`); the only status device is a
+   12px pill. The same numbers are drawn better by the header resource strip. `health.timestamp` is
+   in the payload and unused, so no "checked at"; the panel never polls, so it can disagree with the
+   strip.
+2. **P1 — jargon and untranslated or ungrammatical text.** Badge prints the raw API value `ok` /
+   `degraded` in pt-PT (`html:19-21`); "Database: ok", "Load per CPU", KiB/GiB (the strip says GB, so
+   one disk shows two numbers); host "Type" is a MAC vendor. `degradedReason` lowercases and joins
+   fragments: EN "load per cpu is 1.80…", pt-PT "armazenamento das aplicações utilização está
+   em 93%…". Number formats mix in one pt-PT panel ("0,30" next to "8.2 GiB").
+3. **P1 — the scan loses focus, says nothing, and dead-ends.** Focus drops to `BODY` the moment the
+   button disables and never returns; no live region anywhere, spinner `aria-hidden`; failure is a
+   top-right toast far from the button with no retry; "No devices responded." gives no next step; a
+   failed health fetch leaves "Loading health checks…" forever (`ts:44` only toasts).
+4. **P2 — both panels open collapsed**, so the first visit is a title and two closed bars; the page
+   title and the second panel title are both "Utils"/"Utilitários".
+5. **P3 — discovered devices are not actionable** (IPs, null hostnames, MAC vendors; no "this
+   server", no known/unknown). A product question, not a fix: shape it before building.
+
+Minor: desktop buttons 31px/38px (the shared 44px rule is phone-only, §824); unused `FormsModule`
+import; Refresh gives no feedback; page subtitle repeats the panel subtitles.
+
+**Severity call.** No P0: nothing blocks a task. Finding 3's failed-health loading state is the
+closest.
+
+**Open question for the fix run.** Does `/utils` earn a nav item, or does health fold into Home and
+the scan into Settings? Decide before finding 1, since it changes what gets built.
+
+**Harness notes.** `impeccable live-server` could not be reached from the Playwright container
+(`--network host` refused `localhost:8400`) and the app CSP blocks the injected script, so `detect.js`
+was inlined with `bypassCSP`. Not verified: screen-reader output, a real 10s LAN sweep (mocked).
+The test stack was removed by name afterwards.

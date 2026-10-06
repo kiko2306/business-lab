@@ -235,6 +235,14 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
       label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
       no row of buttons overflows. At 1280px nothing looks different from before.
+- [ ] **Utils: fix the critique's findings (plan.md §841)** — 20/40. In order, test first, one
+      commit and version bump each: first decide whether `/utils` keeps its nav item or health folds
+      into Home and the scan into Settings; then (1) health as scannable status rows with a
+      plain-language verdict and "checked at"; (2) translated status words, whole-sentence alerts per
+      metric, one unit system with the header strip; (3) scan keeps focus, announces start and result,
+      inline error with Retry, health fetch failure with Retry; (4) health panel open by default, panel
+      title no longer "Utils"; (5) device list (shape first). On `beta`, open Utils on a phone and a
+      laptop, EN and pt-PT.
 - [ ] **Account: fix the critique's findings (plan.md §819)** — all five done; this item is now
       only the `beta` look. (1) §820 — on `beta`, Turn it off asks for a code or recovery code (no
       password field), then a confirm; a wrong code is refused and 2FA stays on; (2) §821 — a wrong
