@@ -252,19 +252,23 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       the Settings tile's text mentions finding devices, and opening `/utils` by hand lands on Home;
       (4) still open — the device list (shape it first: "this server", known and unknown devices).
       On `beta`, open Home and Settings on a phone and a laptop, EN and pt-PT.
-- [ ] **Content: fix the critique's findings (plan.md §845)** — 16/40. In order, test first, one
-      commit and version bump each: (1) done (§846) — on `beta`, edit a draft and press Publish without Save: the dialog says
-      your changes are saved first, and the email that arrives has the edited text; clear the box and
-      Publish: refused with a message, nothing sent; (2) the
-      confirm names the recipient count and the subject and previews the text, and the draft keeps a
-      "Sent <date> to N" line (needs `published_at` and a count on the draft); (3) a partial send is a
-      warning with the failed count, and a draft that already went out asks before it goes again;
-      (4) Generate announces its wait (`role=status`), errors sit inline with a link to Settings,
-      focus lands somewhere sensible after each action, the new draft scrolls into view, a failed
-      list load shows Try again, backend English no longer reaches pt-PT; (5) the generate panel opens
-      by default, "Brief"/"Calling Claude" and the "social post" wording become plain words. Decide
-      first: post generator or email tool, and where subscribers are managed. On `beta`, after each:
-      open Content on a phone and a laptop, EN and pt-PT.
+- [ ] **Content: fix the critique's findings (plan.md §845, §847)** — 16/40. Decided 2026-10-06:
+      Content is a **post generator**, and **subscribers are managed on the same page**. In order,
+      test first, one commit and version bump each: (1) done (§846) — on `beta`, edit a draft and
+      press Publish without Save: the dialog says your changes are saved first, and the email that
+      arrives has the edited text; clear the box and Publish: refused, nothing sent; (2) a
+      Subscribers panel on Content — everyone on the list with active/unsubscribed, add one, remove
+      one (new admin routes behind `settings:manage`; the public form and unsubscribe link stay);
+      (3) each draft leads with **Copy** (the post generator's main act) and the email send becomes
+      a clearly named second action, "Email to subscribers", whose confirm names the recipient
+      count, the subject (the first line) and previews the text, and the draft keeps a "Sent <date>
+      to N" line (`published_at` and a count on the draft); (4) a partial send is a warning with the
+      failed count, and a draft that already went out asks before it goes again; (5) Generate
+      announces its wait (`role=status`), errors sit inline with a link to Settings, focus lands
+      somewhere sensible after each action, the new draft scrolls into view, a failed list load shows
+      Try again, backend English no longer reaches pt-PT; (6) the generate panel opens by default,
+      "Brief"/"Calling Claude" become plain words. On `beta`, after each: open Content on a phone and
+      a laptop, EN and pt-PT.
 - [ ] **Account: fix the critique's findings (plan.md §819)** — all five done; this item is now
       only the `beta` look. (1) §820 — on `beta`, Turn it off asks for a code or recovery code (no
       password field), then a confirm; a wrong code is refused and 2FA stays on; (2) §821 — a wrong

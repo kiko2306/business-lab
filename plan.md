@@ -37711,3 +37711,24 @@ button and the pre-publish save cannot drift apart.
 - Not done here: the dialog still shows no recipient count, subject or preview (§845 fix 2).
 - 508 frontend tests (6 new, red first: four failed, the clean-draft and cancel cases pinned existing
   behaviour), build clean.
+
+## 847. Content: a post generator with its subscribers beside it (decision on §845)
+
+[x] decided 2026-10-06, nothing built. §845 asked whether Content is a "post generator" or an "email
+tool" and where subscribers live. Answer from the user: **a post generator, and subscribers are
+managed in the same place the content is created.**
+
+What follows from it, and why the README item was re-cut:
+
+- The draft's main act is **Copy** (take the text to wherever the post goes). The email send stays
+  — §611/§612 slice 1 is live and has real subscribers — but it is the second action and says what
+  it is ("Email to subscribers"), so the page no longer claims "social post" while the button mails
+  customers.
+- Subscribers get a panel on Content, not a Settings page: `advert_subscribers` exists with public
+  subscribe/unsubscribe routes (§612) and `listActiveSubscribers()`, but no admin read or write. The
+  new routes sit behind `settings:manage`, like the send itself. This also supplies the recipient
+  count the publish confirm needs (§845 finding 2), so the panel comes before the confirm rework.
+- Slice 2 of §611 (posting straight to a platform) stays parked: still no named platform and no
+  token the dashboard can derive.
+- Rejected: splitting Content into two pages (one task, one place was the instruction); a standalone
+  Subscribers page in the nav (a nav entry for a list this size).
