@@ -38022,3 +38022,29 @@ and a reload repeated it.
   (that also proves `/api/subscribers/*` is reachable at the public dashboard URL, which this box
   could not show).
 - 1385 backend tests (13 new, red first), typecheck clean.
+
+## 857. The unsubscribe page is owned, and has a way back (§854 fix 2, page half)
+
+[x] done. Uses §856's routes. The page now sits in `<app-auth-shell>` (the shared card of §832; it
+carried its own copy before) and reads, for a customer who tapped the link in an advert:
+
+- **Whose list.** The kicker above the heading is the sender (the dashboard's host, e.g.
+  `dash.example.com`), the intro says "Tap the button to stop getting emails from dash.example.com",
+  and the result says "You've been unsubscribed. dash.example.com won't email you again." If the
+  server cannot say (`sender: null`; the test stack, which has no dashboard URL, is this case) the page
+  falls back to "Email preferences" and the earlier generic sentences. The sender is fetched
+  best-effort after load by `GET /subscribers/sender`; the page works without it.
+- **A way back.** After unsubscribing: "Tapped by mistake? Subscribe again" (a link-style button,
+  44px at 390) POSTs `resubscribe` with the same token, and the result region says "You're subscribed
+  again. Thank you."
+- **No admin door.** "Go to sign in" is gone from the page and its strings (a customer has no account
+  here, and a 17px target was below the floor). A spec asserts no link to `/login`.
+- Real stack, public, mocked sender for the named case: GET `/sender` on load, POST unsubscribe on
+  Enter, POST resubscribe on the undo, no sign-in link, no overflow, at 1280 and 390, dark/EN and
+  light/pt-PT. One of eight runs read the status before the resubscribe answered (a 500 ms
+  wait in my script, not the page); the request had been sent.
+- Rejected: one combined "subscribed / unsubscribed" toggle (the page's one job is to end the emails; the
+  way back is secondary and must not compete with the button); asking for the email to confirm (the
+  token is the capability, and a customer on a phone will not retype an address).
+- Still open from §854: the failure text (fix 5) and everything on Audit logs and Access denied.
+- 555 frontend tests (5 new, red first), build clean.

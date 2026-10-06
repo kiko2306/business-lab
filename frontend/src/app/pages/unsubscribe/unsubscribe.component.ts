@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
+import { AuthShellComponent } from '../../components/auth-shell/auth-shell.component';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { OperationsService } from '../../core/operations.service';
@@ -17,7 +18,7 @@ import { TranslateService } from '../../i18n/translate.service';
 @Component({
   selector: 'app-unsubscribe',
   standalone: true,
-  imports: [CommonModule, RouterLink, TranslatePipe],
+  imports: [CommonModule, AuthShellComponent, TranslatePipe],
   templateUrl: './unsubscribe.component.html',
   styleUrl: './unsubscribe.component.css',
 })
@@ -27,6 +28,9 @@ export class UnsubscribeComponent implements OnInit {
   private readonly translate = inject(TranslateService);
 
   protected token = '';
+  /** Whose emails these are; null until known, or when the server cannot say. */
+  protected sender: string | null = null;
+  protected resubscribed = false;
   protected working = false;
   protected done = false;
   protected error = '';
@@ -35,7 +39,36 @@ export class UnsubscribeComponent implements OnInit {
     this.token = (this.route.snapshot.paramMap.get('token') ?? '').trim();
     if (!this.token) {
       this.error = this.translate.t('unsubscribe.errors.missingToken');
+      return;
     }
+    // Best effort: the page works without it, just less specifically.
+    this.operations.getUnsubscribeSender().subscribe({
+      next: ({ sender }) => (this.sender = sender),
+      error: () => (this.sender = null),
+    });
+  }
+
+  protected get kicker(): string {
+    return this.sender ?? this.translate.t('unsubscribe.kickerFallback');
+  }
+
+  /** The person changed their mind — their own token, so it may override their own opt-out. */
+  protected undo(): void {
+    if (this.working) {
+      return;
+    }
+    this.working = true;
+    this.error = '';
+    this.operations
+      .resubscribe(this.token)
+      .pipe(finalize(() => (this.working = false)))
+      .subscribe({
+        next: () => {
+          this.done = false;
+          this.resubscribed = true;
+        },
+        error: (err) => (this.error = extractErrorMessage(err, this.translate.t('unsubscribe.errors.failed'))),
+      });
   }
 
   protected confirm(): void {

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.165.6] — 2026-10-06
+
+### Changed
+
+- The unsubscribe page now says whose emails they are, offers Subscribe again if you tapped by mistake, sits in the shared card and no longer points a customer at the admin sign-in
+
 ## [0.165.5] — 2026-10-06
 
 ### Changed

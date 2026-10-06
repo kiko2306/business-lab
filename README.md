@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.165.5** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.165.6** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -285,9 +285,13 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       commit and version bump each: (1) done (§855) — on `beta`, open an unsubscribe link from a real
       advert email: the page shows one button and nothing happens until you tap it; reloading the
       page does not unsubscribe either; tapping it ends the emails and a second tap is harmless;
-      (2) Unsubscribe is owned and has an exit — sender name, "Changed
-      your mind? Subscribe again", no sign-in link, `<app-auth-shell>`, a `List-Unsubscribe` +
-      `List-Unsubscribe-Post` header on every advert, the sender name in the email footer; (3) Audit
+      (2) done (§856, §857) — on `beta`, a real advert email ends with "You are receiving this because
+      you subscribed to <dashboard host>." above the link; its headers include `List-Unsubscribe` and
+      `List-Unsubscribe-Post` (view the raw message), and the unsubscribe button your mail app shows
+      (Gmail, Apple Mail) works in one tap and the address stops getting emails — that also proves
+      `/api/subscribers/*` is reachable at the public dashboard URL; the page shows the host above
+      the heading, after the tap says it won't email you again, "Subscribe again" brings you back,
+      and no "Go to sign in" appears; (3) Audit
       logs: Result first (or a leading marker), action codes as plain sentences with the code kept
       for the CSV, translated badge, wrapped resource; (4) Audit logs: loading, error with Retry and
       "no entries match" with Clear filters as three distinct states, announced; (5) Unsubscribe

@@ -298,6 +298,23 @@ export class OperationsService {
     );
   }
 
+  /** "Changed your mind?" on the unsubscribe page (plan.md §854) — the person's own token, signed out. */
+  resubscribe(token: string): Observable<void> {
+    return this.http.post<void>(
+      `${API_BASE_URL}/subscribers/resubscribe/${encodeURIComponent(token)}`,
+      {},
+      { context: new HttpContext().set(SKIP_AUTH, true).set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
+  }
+
+  /** Whose emails these are, for the unsubscribe page to say; null when the server cannot tell. Signed out. */
+  getUnsubscribeSender(): Observable<{ sender: string | null }> {
+    return this.http.get<{ sender: string | null }>(
+      `${API_BASE_URL}/subscribers/sender`,
+      { context: new HttpContext().set(SKIP_AUTH, true).set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
+  }
+
   listUsers(): Observable<AdminUserListResponse> {
     return this.http.get<AdminUserListResponse>(`${API_BASE_URL}/users`, {
       context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
