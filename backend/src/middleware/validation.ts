@@ -276,6 +276,10 @@ export const schemas = {
     email: emailSchema.required(),
     redirect: Joi.string().trim().uri({ scheme: ['http', 'https'] }).max(2000).optional(),
   }),
+  // An address added by hand from the dashboard (plan.md §847); no redirect, unlike the public form.
+  subscriberAdd: Joi.object({
+    email: emailSchema.required(),
+  }),
   // The unsubscribe-link token (plan.md §612) — same shape as invitationToken,
   // and the same raw-Joi-message leak on a malformed one (plan.md §790).
   subscriberToken: Joi.object({

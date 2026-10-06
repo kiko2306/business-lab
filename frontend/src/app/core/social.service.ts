@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from './api';
 import { SKIP_GLOBAL_ERROR_HANDLING } from './http-context';
-import { SocialDraft } from './models';
+import { SocialDraft, Subscriber } from './models';
 
 /** Content generation — plan.md §254 P2. Publishing is a later phase. */
 @Injectable({ providedIn: 'root' })
@@ -37,5 +37,18 @@ export class SocialService {
       {},
       this.opts
     );
+  }
+
+  // The advert mailing list (plan.md §847), behind the same `settings:manage` gate as the drafts.
+  listSubscribers(): Observable<{ subscribers: Subscriber[] }> {
+    return this.http.get<{ subscribers: Subscriber[] }>(`${API_BASE_URL}/social/subscribers`, this.opts);
+  }
+
+  addSubscriber(email: string): Observable<{ result: 'added' | 'exists' }> {
+    return this.http.post<{ result: 'added' | 'exists' }>(`${API_BASE_URL}/social/subscribers`, { email: email.trim() }, this.opts);
+  }
+
+  removeSubscriber(id: number): Observable<void> {
+    return this.http.delete<void>(`${API_BASE_URL}/social/subscribers/${id}`, this.opts);
   }
 }

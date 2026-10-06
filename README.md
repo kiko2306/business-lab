@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.23** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.164.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -256,9 +256,12 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       Content is a **post generator**, and **subscribers are managed on the same page**. In order,
       test first, one commit and version bump each: (1) done (§846) — on `beta`, edit a draft and
       press Publish without Save: the dialog says your changes are saved first, and the email that
-      arrives has the edited text; clear the box and Publish: refused, nothing sent; (2) a
-      Subscribers panel on Content — everyone on the list with active/unsubscribed, add one, remove
-      one (new admin routes behind `settings:manage`; the public form and unsubscribe link stay);
+      arrives has the edited text; clear the box and Publish: refused, nothing sent; (2) done (§848) — on `beta`, Content has a Subscribers panel: add an address with the keyboard
+      ("Added …" is read out, the box keeps focus), it appears in the list; subscribe through the
+      public form, then use the unsubscribe link in a sent email, and the row reads Unsubscribed with
+      a date; typing that address in the box again is refused ("Only they can sign up again"); Remove
+      asks first and names the address; on a phone the rows stack with no sideways scroll; an
+      account without `settings:manage` cannot reach it (403);
       (3) each draft leads with **Copy** (the post generator's main act) and the email send becomes
       a clearly named second action, "Email to subscribers", whose confirm names the recipient
       count, the subject (the first line) and previews the text, and the draft keeps a "Sent <date>

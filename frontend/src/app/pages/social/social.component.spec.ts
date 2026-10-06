@@ -23,7 +23,8 @@ describe('SocialComponent publish', () => {
 
   const setUp = (d: SocialDraft, edit: string) => {
     calls = [];
-    social = jasmine.createSpyObj('SocialService', ['listDrafts', 'updateContent', 'publish', 'generate', 'deleteDraft']);
+    social = jasmine.createSpyObj('SocialService', ['listDrafts', 'updateContent', 'publish', 'generate', 'deleteDraft', 'listSubscribers']);
+    social.listSubscribers.and.returnValue(of({ subscribers: [] }));
     social.listDrafts.and.returnValue(of({ drafts: [d] }));
     social.updateContent.and.callFake((id: number, content: string) => {
       calls.push('save');

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.164.0] — 2026-10-06
+
+### Added
+
+- Content has a Subscribers panel: see everyone on the email list with their status, add an address by hand, and remove one. Adding never overrides someone who unsubscribed
+
 ## [0.163.23] — 2026-10-06
 
 ### Fixed

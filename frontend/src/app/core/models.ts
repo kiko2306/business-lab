@@ -227,6 +227,14 @@ export interface AiKeyTestResponse {
 }
 
 /** A generated social-media post draft (plan.md §254 P2). */
+/** One row of the advert mailing list as the dashboard sees it (plan.md §847). */
+export interface Subscriber {
+  id: number;
+  email: string;
+  subscribedAt: string;
+  unsubscribedAt: string | null;
+}
+
 export interface SocialDraft {
   id: number;
   prompt: string;

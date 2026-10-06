@@ -59,3 +59,53 @@ export async function listActiveSubscribers(): Promise<ActiveSubscriber[]> {
   );
   return result.rows.map((r) => ({ email: r.email, unsubscribeToken: r.unsubscribe_token }));
 }
+
+export interface SubscriberRow {
+  id: number;
+  email: string;
+  subscribedAt: string;
+  unsubscribedAt: string | null;
+}
+
+/** Everyone on the list for the dashboard (plan.md §847) — never the unsubscribe token, which is the person's own key. */
+export async function listAllSubscribers(): Promise<SubscriberRow[]> {
+  const result = await query<{ id: number; email: string; subscribed_at: Date; unsubscribed_at: Date | null }>(
+    'SELECT id, email, subscribed_at, unsubscribed_at FROM advert_subscribers ORDER BY email'
+  );
+  return result.rows.map((r) => ({
+    id: r.id,
+    email: r.email,
+    subscribedAt: new Date(r.subscribed_at).toISOString(),
+    unsubscribedAt: r.unsubscribed_at ? new Date(r.unsubscribed_at).toISOString() : null,
+  }));
+}
+
+/**
+ * Adds an address by hand. Unlike the public form's `subscribe()`, it never
+ * clears an opt-out: someone who unsubscribed said no, and only they can say
+ * yes again (through the public form).
+ */
+export async function addSubscriber(email: string): Promise<'added' | 'exists' | 'unsubscribed'> {
+  const token = crypto.randomBytes(32).toString('base64url');
+  const inserted = await query<{ id: number }>(
+    `INSERT INTO advert_subscribers (email, unsubscribe_token)
+     VALUES ($1, $2)
+     ON CONFLICT (email) DO NOTHING
+     RETURNING id`,
+    [email, token]
+  );
+  if (inserted.rows.length) {
+    return 'added';
+  }
+  const existing = await query<{ unsubscribed_at: Date | null }>(
+    'SELECT unsubscribed_at FROM advert_subscribers WHERE email = $1',
+    [email]
+  );
+  return existing.rows[0]?.unsubscribed_at ? 'unsubscribed' : 'exists';
+}
+
+/** Deletes the row outright — the address is gone, not just opted out. False when it was already gone. */
+export async function removeSubscriber(id: number): Promise<boolean> {
+  const result = await query<{ id: number }>('DELETE FROM advert_subscribers WHERE id = $1 RETURNING id', [id]);
+  return result.rows.length > 0;
+}

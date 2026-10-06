@@ -3,6 +3,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { PanelComponent } from '../../components/panel/panel.component';
+import { SubscribersComponent } from '../../components/subscribers/subscribers.component';
 import { SocialService } from '../../core/social.service';
 import { SocialDraft } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
@@ -20,7 +21,7 @@ import { TranslateService } from '../../i18n/translate.service';
 @Component({
   selector: 'app-social',
   standalone: true,
-  imports: [CommonModule, FormsModule, PanelComponent, TranslatePipe],
+  imports: [CommonModule, FormsModule, PanelComponent, SubscribersComponent, TranslatePipe],
   templateUrl: './social.component.html',
   styleUrl: './social.component.css',
 })

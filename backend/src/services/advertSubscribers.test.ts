@@ -1,6 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { query } from '../utils/database';
-import { subscribe, unsubscribeByToken, listActiveSubscribers } from './advertSubscribers';
+import {
+  subscribe,
+  unsubscribeByToken,
+  listActiveSubscribers,
+  listAllSubscribers,
+  addSubscriber,
+  removeSubscriber,
+} from './advertSubscribers';
 
 vi.mock('../utils/database', () => ({ query: vi.fn() }));
 
@@ -50,5 +57,69 @@ describe('listActiveSubscribers', () => {
 
     await expect(listActiveSubscribers()).resolves.toEqual([{ email: 'a@example.com', unsubscribeToken: 'tok-a' }]);
     expect(mockedQuery.mock.calls[0][0]).toContain('WHERE unsubscribed_at IS NULL');
+  });
+});
+
+// plan.md §847/§845 fix 2: the dashboard's own view of the list.
+describe('listAllSubscribers', () => {
+  it('returns active and unsubscribed rows alike, never the unsubscribe token', async () => {
+    mockedQuery.mockResolvedValueOnce({
+      rows: [
+        { id: 1, email: 'a@example.com', subscribed_at: new Date('2026-10-01T10:00:00Z'), unsubscribed_at: null },
+        { id: 2, email: 'b@example.com', subscribed_at: new Date('2026-10-02T10:00:00Z'), unsubscribed_at: new Date('2026-10-03T10:00:00Z') },
+      ],
+    } as never);
+
+    const rows = await listAllSubscribers();
+
+    expect(rows).toEqual([
+      { id: 1, email: 'a@example.com', subscribedAt: '2026-10-01T10:00:00.000Z', unsubscribedAt: null },
+      { id: 2, email: 'b@example.com', subscribedAt: '2026-10-02T10:00:00.000Z', unsubscribedAt: '2026-10-03T10:00:00.000Z' },
+    ]);
+    expect(mockedQuery.mock.calls[0][0]).not.toContain('unsubscribe_token');
+  });
+});
+
+describe('addSubscriber', () => {
+  it('adds a new address', async () => {
+    mockedQuery.mockResolvedValueOnce({ rows: [{ id: 5 }] } as never);
+
+    await expect(addSubscriber('new@example.com')).resolves.toBe('added');
+    expect(mockedQuery.mock.calls[0][0]).toContain('ON CONFLICT (email) DO NOTHING');
+  });
+
+  it('reports an address that is already on the list, changing nothing', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [{ unsubscribed_at: null }] } as never);
+
+    await expect(addSubscriber('a@example.com')).resolves.toBe('exists');
+  });
+
+  it('does not override an opt-out: only the person can resubscribe, through the public form', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [{ unsubscribed_at: new Date() }] } as never);
+
+    await expect(addSubscriber('gone@example.com')).resolves.toBe('unsubscribed');
+    // No UPDATE ran: two queries, the insert that did nothing and the read.
+    expect(mockedQuery).toHaveBeenCalledTimes(2);
+    expect(mockedQuery.mock.calls.every(([sql]) => !String(sql).includes('UPDATE'))).toBe(true);
+  });
+});
+
+describe('removeSubscriber', () => {
+  it('deletes the row and says so', async () => {
+    mockedQuery.mockResolvedValueOnce({ rows: [{ id: 3 }] } as never);
+
+    await expect(removeSubscriber(3)).resolves.toBe(true);
+    expect(mockedQuery.mock.calls[0][0]).toContain('DELETE FROM advert_subscribers');
+    expect(mockedQuery.mock.calls[0][1]).toEqual([3]);
+  });
+
+  it('says false for a row that is not there', async () => {
+    mockedQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    await expect(removeSubscriber(99)).resolves.toBe(false);
   });
 });

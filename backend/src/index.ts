@@ -16,6 +16,7 @@ import usersRouter from './routes/users';
 import networkRouter from './routes/network';
 import selfUpdateRouter from './routes/selfUpdate';
 import socialRouter from './routes/social';
+import subscriberAdminRouter from './routes/subscriberAdmin';
 import accessRequestsRouter from './routes/accessRequests';
 import subscribersRouter from './routes/subscribers';
 import { getAppVersion } from './version';
@@ -213,6 +214,8 @@ for (const prefix of ROUTE_PREFIXES) {
   app.use(`${prefix}/users`, ...protectedGate(), requireCapability('users:manage'), usersRouter);
   app.use(`${prefix}/network`, ...protectedGate(), requireCapability('settings:manage'), networkRouter);
   app.use(`${prefix}/self-update`, ...protectedGate(), requireCapability('system:update'), selfUpdateRouter);
+  // Before /social, which would otherwise swallow /social/subscribers.
+  app.use(`${prefix}/social/subscribers`, ...protectedGate(), requireCapability('settings:manage'), subscriberAdminRouter);
   app.use(`${prefix}/social`, ...protectedGate(), requireCapability('settings:manage'), socialRouter);
   // Mounted after the public liveness probe above, so GET /health stays public
   // while GET /health/system and /health/thresholds remain protected. Its own

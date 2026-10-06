@@ -37732,3 +37732,35 @@ What follows from it, and why the README item was re-cut:
   token the dashboard can derive.
 - Rejected: splitting Content into two pages (one task, one place was the instruction); a standalone
   Subscribers page in the nav (a nav entry for a list this size).
+
+## 848. A Subscribers panel on Content (§845 fix 2, §847)
+
+[x] done. The mailing list behind "publish" is now managed on the page where the posts are written.
+`advert_subscribers` (§612) had public subscribe and unsubscribe routes and `listActiveSubscribers()`
+for the sender, and nothing for the owner.
+
+- **Backend** (`routes/subscriberAdmin.ts`, mounted at `/social/subscribers` in `index.ts` *before*
+  `/social`, which would otherwise swallow it, behind `settings:manage` like the sends): `GET` lists
+  everyone with `subscribedAt`/`unsubscribedAt` and never the unsubscribe token (the person's own
+  key); `POST {email}` adds; `DELETE /:id` removes the row outright (the address is gone, not just
+  opted out). Validation reuses the project's 422 `validateBody`/`validateParams`.
+- **Adding never overrides an opt-out.** `addSubscriber` is `INSERT … ON CONFLICT DO NOTHING`, then a
+  read: `added` (201) / `exists` (200) / `unsubscribed` (409, "Only they can sign up again"). The
+  public form's `subscribe()` still clears `unsubscribed_at`, because there it is the person
+  speaking. A hand-typed address is the owner speaking about someone else.
+- **Frontend** (`app-subscribers` inside Content): add-by-address form with the error beside the box
+  (`aria-invalid`, `aria-describedby`, `role=alert`, dropped when typing resumes), an always-present
+  `role=status` line for "Added…/Removed…", the count "N subscribed, M unsubscribed", a stacked
+  table with a state word (Subscribed / Unsubscribed <date>), Remove with the address in its
+  accessible name and a danger confirm that names it. Focus goes back to the box after an add or a
+  remove (the row that held it is gone). A failed list load shows Try again, not a permanent
+  "Loading…". Texts map the 409 and the rest to translated strings, so no backend English reaches
+  pt-PT.
+- **Rendered against the real backend** (not mocked): add two addresses and one invalid one, remove
+  one, at 1280 and 390, dark/EN and light/pt-PT: no overflow, focus on the box after each act, the
+  status line and the dialog say the right address in both languages. The opt-out (409) path is
+  unit-tested only; there is no way to unsubscribe from the page.
+- Rejected: reusing the public `subscribe()` for hand-adds (would silently re-subscribe an opt-out);
+  soft-removing (an owner who removes an address means it, and a kept row would still block the person
+  from being re-added by hand); a bulk import (no one asked; add when a real list needs moving).
+- 1361 backend tests (13 new, red first), 519 frontend tests (11 new), typecheck and build clean.

@@ -121,9 +121,15 @@ describe('page form controls carry an accessible name', () => {
     expect(unnamedControls(element)).toEqual([]);
   });
 
-  it('Content: names each draft editor', async () => {
+  it('Content: names each draft editor and the subscriber controls', async () => {
     const element = await render(SocialComponent, [
-      { provide: SocialService, useValue: { listDrafts: () => of({ drafts: [draft] }) } },
+      {
+        provide: SocialService,
+        useValue: {
+          listDrafts: () => of({ drafts: [draft] }),
+          listSubscribers: () => of({ subscribers: [{ id: 1, email: 'a@example.com', subscribedAt: '2026-10-01T10:00:00.000Z', unsubscribedAt: null }] }),
+        },
+      },
       { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
     ]);
     expect(unnamedControls(element)).toEqual([]);

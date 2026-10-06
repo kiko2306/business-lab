@@ -1,0 +1,77 @@
+<app-panel
+  key="social:subscribers"
+  anchor="subscribers"
+  [title]="'social.subscribers.title' | t"
+  [subtitle]="'social.subscribers.subtitle' | t"
+>
+  <form class="row g-2 align-items-start mb-3" (ngSubmit)="add()">
+    <div class="col-12 col-md-6 col-lg-5">
+      <label class="form-label fw-semibold" for="subscriber-email">{{ 'social.subscribers.emailLabel' | t }}</label>
+      <input
+        #emailInput
+        id="subscriber-email"
+        name="email"
+        type="email"
+        class="form-control"
+        autocomplete="off"
+        [(ngModel)]="email"
+        (input)="addError = ''"
+        [class.is-invalid]="addError"
+        [attr.aria-invalid]="addError ? 'true' : null"
+        [attr.aria-describedby]="addError ? 'subscriber-error' : null"
+      />
+      <p id="subscriber-error" role="alert" class="text-danger small mt-1 mb-0" *ngIf="addError">{{ addError }}</p>
+    </div>
+    <div class="col-12 col-md-auto align-self-md-end">
+      <button type="submit" class="btn btn-primary" [attr.aria-disabled]="adding ? 'true' : null">
+        {{ 'social.subscribers.addButton' | t }}
+      </button>
+    </div>
+  </form>
+
+  <p role="status" class="small text-body-secondary mb-3">{{ announcement }}</p>
+
+  <div class="d-flex flex-wrap align-items-center gap-2" *ngIf="loadFailed">
+    <span role="alert" class="text-danger">{{ 'social.subscribers.loadFailed' | t }}</span>
+    <button type="button" class="btn btn-sm btn-outline-primary subscribers__retry" (click)="load()">
+      {{ 'social.subscribers.retry' | t }}
+    </button>
+  </div>
+  <p class="text-body-secondary mb-0" *ngIf="!subscribers && !loadFailed">{{ 'common.loading' | t }}</p>
+  <p class="text-body-secondary mb-0" *ngIf="subscribers && !subscribers.length">{{ 'social.subscribers.none' | t }}</p>
+
+  <ng-container *ngIf="subscribers && subscribers.length">
+    <p class="small text-body-secondary mb-2">
+      {{ 'social.subscribers.counts' | t:{ active: activeCount, unsubscribed: unsubscribedCount } }}
+    </p>
+    <div class="table-responsive table-stack-wrap">
+      <table class="table table-sm table-stack align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">{{ 'social.subscribers.table.email' | t }}</th>
+            <th scope="col">{{ 'social.subscribers.table.status' | t }}</th>
+            <th scope="col"><span class="visually-hidden">{{ 'social.subscribers.table.actions' | t }}</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let s of subscribers">
+            <td [attr.data-label]="'social.subscribers.table.email' | t" class="text-break">{{ s.email }}</td>
+            <td [attr.data-label]="'social.subscribers.table.status' | t">
+              {{ s.unsubscribedAt
+                  ? ('social.subscribers.unsubscribedOn' | t:{ date: (s.unsubscribedAt | date: 'mediumDate':undefined:translate.locale()) ?? '' })
+                  : ('social.subscribers.subscribed' | t) }}
+            </td>
+            <td class="text-md-end">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-danger"
+                [attr.aria-label]="'social.subscribers.removeLabel' | t:{ email: s.email }"
+                (click)="remove(s)"
+              >{{ 'social.subscribers.removeButton' | t }}</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </ng-container>
+</app-panel>
