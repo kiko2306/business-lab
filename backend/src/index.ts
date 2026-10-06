@@ -211,7 +211,7 @@ for (const prefix of ROUTE_PREFIXES) {
   app.use(`${prefix}/audit-logs`, ...protectedGate(), requireCapability('audit:view'), auditRouter);
   app.use(`${prefix}/backups`, ...protectedGate(), requireCapability('backups:manage'), backupRouter);
   app.use(`${prefix}/users`, ...protectedGate(), requireCapability('users:manage'), usersRouter);
-  app.use(`${prefix}/network`, ...protectedGate(), requireCapability('apps:control'), networkRouter);
+  app.use(`${prefix}/network`, ...protectedGate(), requireCapability('settings:manage'), networkRouter);
   app.use(`${prefix}/self-update`, ...protectedGate(), requireCapability('system:update'), selfUpdateRouter);
   app.use(`${prefix}/social`, ...protectedGate(), requireCapability('settings:manage'), socialRouter);
   // Mounted after the public liveness probe above, so GET /health stays public

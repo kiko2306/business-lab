@@ -1,5 +1,5 @@
 /**
- * Network scan API route — Utils section of the dashboard.
+ * Network scan API route — the "Find devices" panel on Settings (plan.md §841).
  */
 
 import { Router, Request, Response } from 'express';

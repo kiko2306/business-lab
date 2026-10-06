@@ -22,6 +22,7 @@ import { AuthService } from '../../core/auth.service';
 import { SectionCollapseService } from '../../core/section-collapse.service';
 import { FixTarget, fixTarget } from './fix-target';
 import { deploymentDetailKey, deploymentLabelKey, deploymentSubtitleKey } from './deployment-check-text';
+import { NetworkScanComponent } from '../../components/network-scan/network-scan.component';
 import { PanelComponent } from '../../components/panel/panel.component';
 import { NetworkSettingsComponent } from './network-settings.component';
 import { TranslatePipe } from '../../i18n/translate.pipe';
@@ -37,7 +38,7 @@ import { FieldErrorDirective } from '../../components/field-error.directive';
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink, PanelComponent, NetworkSettingsComponent, TranslatePipe, FieldErrorDirective],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink, PanelComponent, NetworkSettingsComponent, NetworkScanComponent, TranslatePipe, FieldErrorDirective],
   templateUrl: './settings.component.html',
   styleUrl: './settings.component.css'
 })
@@ -56,6 +57,8 @@ export class SettingsComponent implements OnInit {
   // remit — `exposure:settings`, distinct from the `settings:manage` that
   // gates the rest of this page (§149).
   protected readonly canManageNetworking = inject(AuthService).hasCapability('exposure:settings');
+  // The LAN scan sweeps every device on the network, so it is a settings act, not an app-control one (plan.md §841).
+  protected readonly canScanNetwork = inject(AuthService).hasCapability('settings:manage');
 
   // Sending is required as a set; receiving is entirely optional, so only
   // the SMTP half carries validators. Clearing imapHost turns receiving off.

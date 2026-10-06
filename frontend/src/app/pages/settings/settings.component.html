@@ -40,6 +40,8 @@
 
 <app-network-settings *ngIf="canManageNetworking" />
 
+<app-network-scan *ngIf="canScanNetwork" />
+
 <app-panel
   key="settings:general"
   [title]="'settings.general.title' | t"

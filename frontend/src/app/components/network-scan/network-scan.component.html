@@ -1,0 +1,41 @@
+<app-panel
+  key="settings:network-scan"
+  anchor="network-scan"
+  [title]="'settings.networkScan.title' | t"
+  [subtitle]="'settings.networkScan.subtitle' | t"
+>
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <p class="text-body-secondary mb-0">{{ 'settings.networkScan.description' | t }}</p>
+    <button
+      type="button"
+      class="btn btn-outline-primary network-scan__button"
+      [attr.aria-disabled]="state === 'scanning' ? 'true' : null"
+      (click)="scan()"
+    >
+      <span class="spinner-border spinner-border-sm me-1" *ngIf="state === 'scanning'" aria-hidden="true"></span>
+      {{ (state === 'scanning' ? 'settings.networkScan.scanningButton' : state === 'idle' ? 'settings.networkScan.scanButton' : 'settings.networkScan.scanAgain') | t }}
+    </button>
+  </div>
+
+  <p role="status" class="mb-3" *ngIf="statusText || state !== 'failed'">{{ statusText }}</p>
+  <p role="alert" class="text-danger mb-3" *ngIf="state === 'failed'">{{ 'settings.networkScan.failed' | t }}</p>
+
+  <div class="table-responsive table-stack-wrap" *ngIf="state === 'done' && hosts.length">
+    <table class="table table-sm table-stack align-middle mb-0">
+      <thead>
+        <tr>
+          <th scope="col">{{ 'settings.networkScan.table.name' | t }}</th>
+          <th scope="col">{{ 'settings.networkScan.table.maker' | t }}</th>
+          <th scope="col">{{ 'settings.networkScan.table.address' | t }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let host of hosts">
+          <td [attr.data-label]="'settings.networkScan.table.name' | t">{{ host.hostname ?? ('settings.networkScan.unknown' | t) }}</td>
+          <td [attr.data-label]="'settings.networkScan.table.maker' | t">{{ host.type ?? ('settings.networkScan.unknown' | t) }}</td>
+          <td [attr.data-label]="'settings.networkScan.table.address' | t">{{ host.ip }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</app-panel>

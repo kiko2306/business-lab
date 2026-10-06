@@ -37583,3 +37583,30 @@ health panel until the route goes (fix 3), so nothing is lost meanwhile.
   alert text, and polls every 5 s); a second `OnPush` poll shared with the strip (more plumbing than
   two cheap reads; revisit if the poll count matters).
 - 491 frontend tests (18 new, red first), build clean.
+
+## 843. The LAN scan is a Settings panel (§841 fix 2, P1)
+
+[x] done. `app-network-scan` (Settings, "Find devices on your network") replaces the Utils scan;
+the Utils page keeps its own copy until the route goes (fix 3).
+
+- **Who may scan: `settings:manage`**, not `apps:control`. The sweep touches every device on the LAN,
+  so it is a settings act. `backend/src/index.ts` now mounts `/network` behind it, so the API and the
+  panel agree; until fix 3, an `apps:control`-only user who presses Scan on Utils gets a 403 toast.
+  The mount has no unit-test surface (the Express wiring is in `index.ts`); the README beta item
+  carries the proof.
+- **Focus (§841 finding 3):** the button uses `aria-disabled` while scanning, not `disabled`, which
+  dropped focus to `<body>`; the click guards itself. Focus stays on the button in all four outcomes,
+  measured in a render (Enter on the button, mocked API).
+- **Announced:** one always-present `role=status` line: "Scanning your network. This takes about 10
+  seconds." / "Found N devices." / the empty sentence. Failure is a `role=alert` beside the button
+  (not a distant toast), and the button becomes "Scan again".
+- **Words:** "Find devices connected to your network, such as printers and computers"; table columns
+  Name / Device maker / Address; a missing name or maker reads "Unknown", not an em dash; the empty
+  state says to check that the server and devices share a network.
+- Rejected: moving focus to the results heading (focus on the button already lets a keyboard user
+  press again, and the live region carries the result); a Retry link separate from the button
+  ("Scan again" is that); marking the server's own row (needs the host LAN IP in the payload; belongs
+  to fix 4's device list).
+- 499 frontend tests (8 new, red first), backend typecheck and frontend build clean. Rendered once
+  (mocked scan): hosts, none, failed, in flight at 1280 and 390, dark/EN and light/pt-PT; no overflow.
+  Stack removed by name.

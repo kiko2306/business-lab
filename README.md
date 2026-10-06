@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.163.20** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.163.21** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -243,9 +243,12 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       memory and server load with Fine / Needs attention beside each bar, and "Checked HH:MM"; the
       disk and memory figures match the header strip's units; in pt-PT no English; on a phone the rows
       stack with no sideways scroll; block the API (stop the backend) before first load and Try
-      again appears; (2) the scan as a Settings panel — keeps
-      focus, announces start and result, inline error with Retry, a useful empty state (note: Utils
-      needs `apps:control`, Settings `settings:manage`; decide who may scan); (3) drop `/utils`, nav,
+      again appears; (2) done (§843) — on `beta`, Settings shows "Find devices on your network" (to `settings:manage`);
+      press Find devices with the keyboard: focus stays on the button, "Scanning your network…" is read
+      out, then "Found N devices." and the table with Name / Device maker / Address; an account with
+      `apps:control` but not `settings:manage` no longer sees the panel and gets 403 from the API
+      (and from Utils' old scan until fix 3); unplug the box's network and scan: the failure shows
+      beside the button; (3) drop `/utils`, nav,
       Home tile, the strip's pointer comment, redirect; (4) device list (shape first). On `beta`, open
       Home and Settings on a phone and a laptop, EN and pt-PT.
 - [ ] **Account: fix the critique's findings (plan.md §819)** — all five done; this item is now

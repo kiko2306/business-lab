@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.163.21] — 2026-10-06
+
+### Changed
+
+- The network scan moves from Utils to Settings (Find devices on your network): it keeps keyboard focus, announces the wait and the result, shows failures beside the button, and needs the settings permission
+
 ## [0.163.20] — 2026-10-06
 
 ### Changed
