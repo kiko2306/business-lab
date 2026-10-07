@@ -454,7 +454,11 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       `apps/<name>/.env` still has its original port line, and that the app
       restarts and is reachable on that same port. Check nginx-proxy-manager's
       panel reads "No settings for this app" rather than showing an empty form.
-- [ ] **Beta-test the single settings writer (plan.md §799)** — every save
+- [ ] **Beta-test the single settings writer (plan.md §799)** — *2026-10-07, over the API on
+      the box: general (timezone, update branch), backup schedule, backup target, mail (+ its
+      Test), alerts and exposure (blank password; Test passes for NPM and Cloudflare) all come back
+      byte-identical after a save. Still to do: Cloudflare token, AI API keys, health thresholds,
+      the restore-a-backup step, and the same forms through the UI.* Every save
       into the `settings` table now goes through one batched upsert, so a
       mistake would hit every settings form at once. On `beta`, save and
       re-open each of: Settings → exposure (base domain / NPM email, leaving
@@ -465,7 +469,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       Each should come back with exactly what was typed and nothing else
       reset. Then restore a backup and confirm the settings it carried came
       back (Backups → restore, then re-check the exposure panel).
-- [ ] **Beta-test the rebuilt status poll (plan.md §798)** — the whole status
+- [ ] **Beta-test the rebuilt status poll (plan.md §798)** — *2026-10-07, API vs `docker ps`:
+      states match for all 44 apps; Pi-hole lists 53/tcp and 53/udp, netbird-vpn its four ports,
+      Home Assistant 8123. Still to do: public and secondary URLs on the card, two tabs open at
+      once, the pin badge clearing.* The whole status
       payload now comes from one `docker ps -a` and one `service_exposure`
       read, so a mistake here shows up as *every* app reading wrong at once.
       On `beta`: open Apps and confirm each app's state matches
@@ -490,7 +497,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       refresh). This was never actually working through nginx before — confirm
       it now does on the real tunnel/NPM path, not just the direct container
       path the test stack exercises.
-- [ ] **Beta-test Home's new badges (plan.md §788)** — on `beta`, with a
+- [ ] **Beta-test Home's new badges (plan.md §788)** — *2026-10-07: the data behind both is right
+      (`/backups/last-successful` is dated today; `/self-update/check` reports `commitsBehind: 1`
+      when `beta` is ahead). Still to do: how the two tiles render, and the failed-read case.* On `beta`, with a
       successful app-data backup on record, confirm the Backups tile shows
       its age ("Backed up Nd ago" / "Backed up today"), and that the Updates
       tile shows "Update available" only once `beta` is genuinely behind
