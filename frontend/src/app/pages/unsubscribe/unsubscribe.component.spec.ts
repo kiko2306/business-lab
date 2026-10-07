@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { Subject, of, throwError } from 'rxjs';
+import { NEVER, Subject, of, throwError } from 'rxjs';
 import { UnsubscribeComponent } from './unsubscribe.component';
 import { OperationsService } from '../../core/operations.service';
 import { en } from '../../i18n/en';
@@ -135,5 +135,46 @@ describe('UnsubscribeComponent', () => {
       expect(en[key]).withContext(key).toBeTruthy();
       expect(ptPT[key]).withContext(key).toBeTruthy();
     }
+  });
+
+  // plan.md §854 fix 5: failures speak the page language, never server text, and say what to do.
+  describe('failures', () => {
+    const fail = (err: unknown) => {
+      operations.unsubscribe.and.returnValue(throwError(() => err));
+      button()!.click();
+      fixture.detectChanges();
+    };
+
+    it('never shows server text, even an HTML gateway page', () => {
+      setUp();
+      TestBed.inject(TranslateService).setLocale('pt-PT');
+      fail(new HttpErrorResponse({ status: 502, error: '<html>Bad Gateway</html>' }));
+      expect(el.querySelector('[role="alert"]')?.textContent).toContain(ptPT['unsubscribe.errors.failed']);
+      expect(text()).not.toContain('Bad Gateway');
+    });
+
+    it('says a 429 is too many tries, and a lost connection is the connection', () => {
+      setUp();
+      fail(new HttpErrorResponse({ status: 429 }));
+      expect(el.querySelector('[role="alert"]')?.textContent).toContain(en['unsubscribe.errors.rateLimited']);
+      fail(new HttpErrorResponse({ status: 0 }));
+      expect(el.querySelector('[role="alert"]')?.textContent).toContain(en['unsubscribe.errors.offline']);
+    });
+
+    it('relabels the button Try again after a failure', () => {
+      setUp();
+      fail(new HttpErrorResponse({ status: 500 }));
+      expect(button()!.textContent?.trim()).toBe(en['unsubscribe.retry']);
+    });
+
+    it('gives up on a request that never answers', fakeAsync(() => {
+      setUp();
+      operations.unsubscribe.and.returnValue(NEVER);
+      button()!.click();
+      tick(15000);
+      fixture.detectChanges();
+      expect(el.querySelector('[role="alert"]')?.textContent).toContain(en['unsubscribe.errors.offline']);
+      expect(text()).not.toContain(en['unsubscribe.working']);
+    }));
   });
 });

@@ -24,7 +24,7 @@
       [attr.aria-disabled]="working ? 'true' : null"
       (click)="confirm()"
     >
-      {{ 'unsubscribe.button' | t }}
+      {{ (error ? 'unsubscribe.retry' : 'unsubscribe.button') | t }}
     </button>
 
     <!-- Mis-tapped? One tap undoes it. No sign-in link: a customer has no account here. -->

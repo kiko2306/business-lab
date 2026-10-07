@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.165.8** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.165.9** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -291,8 +291,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       (Gmail, Apple Mail) works in one tap and the address stops getting emails — that also proves
       `/api/subscribers/*` is reachable at the public dashboard URL; the page shows the host above
       the heading, after the tap says it won't email you again, "Subscribe again" brings you back,
-      and no "Go to sign in" appears; (3) done (§858) — on `beta`, open Audit logs on a phone and a laptop, EN and pt-PT: Result is the first column, actions read as sentences (hover shows the code), a long probe resource wraps, Export CSV still has the raw codes; (4) done (§859) — on `beta`, Audit logs: stop the backend for a failed load (alert + Retry, no empty-log text), filter to something with no match (message + Clear filters); (5) Unsubscribe
-      failures: translated, Retry, a timeout, a 429 that says so, the result announced; (6) Access
+      and no "Go to sign in" appears; (3) done (§858) — on `beta`, open Audit logs on a phone and a laptop, EN and pt-PT: Result is the first column, actions read as sentences (hover shows the code), a long probe resource wraps, Export CSV still has the raw codes; (4) done (§859) — on `beta`, Audit logs: stop the backend for a failed load (alert + Retry, no empty-log text), filter to something with no match (message + Clear filters); (5) done (§860) — on `beta`, open an unsubscribe link with the backend stopped (reads "could not reach the server", button says Try again, in pt-PT too); the 429 message needs 20 taps in 15 min to see; (6) Access
       denied: "signed in as X", sign in with another account, a real 44px target, the reason Request
       access is disabled, focus after submit, `<app-auth-shell>`; (7) Audit filters as a `<form>`,
       "21-40 of 200", retention stated, timezone, open by default. Decide first: is there a business

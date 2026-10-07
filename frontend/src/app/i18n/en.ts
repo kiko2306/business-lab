@@ -927,6 +927,9 @@ export const en: Record<string, string> = {
   'unsubscribe.intro': 'Tap the button to stop getting these emails. Nothing changes until you do.',
   'unsubscribe.errors.missingToken': 'This unsubscribe link is missing its token.',
   'unsubscribe.errors.failed': 'Could not process this request. Try again later.',
+  'unsubscribe.errors.rateLimited': 'Too many tries from your network. Wait a few minutes, then try again.',
+  'unsubscribe.errors.offline': 'Could not reach the server. Check your connection, then try again.',
+  'unsubscribe.retry': 'Try again',
 
   'setPassword.kicker': 'Welcome',
   'setPassword.title': 'Set your password',

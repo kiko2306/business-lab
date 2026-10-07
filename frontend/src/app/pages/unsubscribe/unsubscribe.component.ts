@@ -2,11 +2,13 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { AuthShellComponent } from '../../components/auth-shell/auth-shell.component';
-import { finalize } from 'rxjs';
-import { extractErrorMessage } from '../../core/api';
+import { finalize, timeout } from 'rxjs';
 import { OperationsService } from '../../core/operations.service';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
+
+// A request that never answers would spin for ever; a TimeoutError has no `status`, so it reads as offline.
+const REQUEST_TIMEOUT_MS = 15000;
 
 /**
  * Public landing for the unsubscribe link in every sent advert email's
@@ -61,14 +63,20 @@ export class UnsubscribeComponent implements OnInit {
     this.error = '';
     this.operations
       .resubscribe(this.token)
-      .pipe(finalize(() => (this.working = false)))
+      .pipe(timeout(REQUEST_TIMEOUT_MS), finalize(() => (this.working = false)))
       .subscribe({
         next: () => {
           this.done = false;
           this.resubscribed = true;
         },
-        error: (err) => (this.error = extractErrorMessage(err, this.translate.t('unsubscribe.errors.failed'))),
+        error: (err) => (this.error = this.failure(err)),
       });
+  }
+
+  /** Own words per cause, never the server's: it is English, and a gateway can answer with an HTML page (plan.md §854 fix 5). */
+  private failure(err: { status?: number }): string {
+    const key = err.status === 429 ? 'rateLimited' : !err.status ? 'offline' : 'failed';
+    return this.translate.t(`unsubscribe.errors.${key}`);
   }
 
   protected confirm(): void {
@@ -80,10 +88,10 @@ export class UnsubscribeComponent implements OnInit {
     this.error = '';
     this.operations
       .unsubscribe(this.token)
-      .pipe(finalize(() => (this.working = false)))
+      .pipe(timeout(REQUEST_TIMEOUT_MS), finalize(() => (this.working = false)))
       .subscribe({
         next: () => (this.done = true),
-        error: (err) => (this.error = extractErrorMessage(err, this.translate.t('unsubscribe.errors.failed'))),
+        error: (err) => (this.error = this.failure(err)),
       });
   }
 }

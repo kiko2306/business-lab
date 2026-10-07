@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.165.9] — 2026-10-07
+
+### Changed
+
+- Unsubscribe: failures translated, Try again, 15 s timeout, 429 message
+
 ## [0.165.8] — 2026-10-07
 
 ### Changed

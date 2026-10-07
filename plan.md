@@ -38067,3 +38067,13 @@ carried its own copy before) and reads, for a customer who tapped the link in an
 - Export errors still toast (a one-shot action, no table state to show).
 - Rejected: keeping the toast as well (double message, English leak); a live region on the whole table (re-announces every page change).
 - 561 frontend tests (3 new, red first), build clean.
+
+## 860. Unsubscribe failures speak the page language (§854 fix 5, P2)
+
+[x] done. Page only; the two backend items of the finding are left as they are (below).
+
+- Error text is ours, by cause: 429 → "too many tries, wait a few minutes"; no status (network down, or timeout) → "could not reach the server"; anything else → the generic line. Server text is never shown (it was English in pt-PT, and a 502 rendered a literal `<html>` page).
+- 15 s `timeout` on both requests, so a request that never answers ends in the offline message, not an endless spinner.
+- The main button reads "Try again" after a failure (it is the retry; no second button). The error is `role=alert`, the wait/result region was already `role=status`.
+- Left alone on purpose: unknown-but-well-formed token still shows "unsubscribed" (answering "no such token" would let anyone probe for subscribers); the 20-per-15-min limiter stays one bucket per IP. Both are backend/product calls, add an item if a real carrier-NAT 429 shows up.
+- 565 frontend tests (4 new, red first). One unrelated ServiceCard spec failed once on the red run and passed on the next; not reproduced.

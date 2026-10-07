@@ -927,6 +927,9 @@ export const ptPT: Record<string, string> = {
   'unsubscribe.intro': 'Toque no botão para deixar de receber estes emails. Nada muda até o fazer.',
   'unsubscribe.errors.missingToken': 'Este link de cancelamento não tem token.',
   'unsubscribe.errors.failed': 'Não foi possível processar o pedido. Tente novamente mais tarde.',
+  'unsubscribe.errors.rateLimited': 'Demasiadas tentativas a partir da sua rede. Aguarde alguns minutos e tente de novo.',
+  'unsubscribe.errors.offline': 'Não foi possível contactar o servidor. Verifique a ligação e tente de novo.',
+  'unsubscribe.retry': 'Tentar de novo',
 
   'setPassword.kicker': 'Bem-vindo',
   'setPassword.title': 'Defina a sua palavra-passe',
