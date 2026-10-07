@@ -4,15 +4,15 @@
     <p class="text-body-secondary mb-0">{{ 'auditLogs.subtitle' | t }}</p>
   </div>
 
-  <app-panel key="audit:filters" [title]="'auditLogs.filters.title' | t" [subtitle]="'auditLogs.filters.subtitle' | t">
-    <div class="row g-2">
+  <app-panel key="audit:filters" [defaultOpen]="true" [title]="'auditLogs.filters.title' | t" [subtitle]="'auditLogs.filters.subtitle' | t">
+    <form class="row g-2" (ngSubmit)="load(1)">
       <div class="col-12 col-md-3">
         <label class="form-label small mb-1" for="audit-action">{{ 'auditLogs.filters.actionLabel' | t }}</label>
-        <input id="audit-action" class="form-control" [placeholder]="'auditLogs.filters.actionPlaceholder' | t" [(ngModel)]="action" />
+        <input id="audit-action" name="action" class="form-control" [placeholder]="'auditLogs.filters.actionPlaceholder' | t" [(ngModel)]="action" />
       </div>
       <div class="col-12 col-md-2">
         <label class="form-label small mb-1" for="audit-result">{{ 'auditLogs.filters.resultLabel' | t }}</label>
-        <select id="audit-result" class="form-select" [(ngModel)]="result">
+        <select id="audit-result" name="result" class="form-select" [(ngModel)]="result">
           <option value="">{{ 'auditLogs.filters.allResults' | t }}</option>
           <option value="success">{{ 'auditLogs.filters.success' | t }}</option>
           <option value="failure">{{ 'auditLogs.filters.failure' | t }}</option>
@@ -20,20 +20,22 @@
       </div>
       <div class="col-12 col-md-3">
         <label class="form-label small mb-1" for="audit-from">{{ 'auditLogs.filters.fromLabel' | t }}</label>
-        <input id="audit-from" class="form-control" type="datetime-local" [(ngModel)]="startDate" />
+        <input id="audit-from" name="startDate" class="form-control" type="datetime-local" [(ngModel)]="startDate" />
       </div>
       <div class="col-12 col-md-3">
         <label class="form-label small mb-1" for="audit-to">{{ 'auditLogs.filters.toLabel' | t }}</label>
-        <input id="audit-to" class="form-control" type="datetime-local" [(ngModel)]="endDate" />
+        <input id="audit-to" name="endDate" class="form-control" type="datetime-local" [(ngModel)]="endDate" />
       </div>
       <div class="col-12 col-md-1 d-grid align-self-end">
-        <button class="btn btn-primary" (click)="load(1)">{{ 'auditLogs.filters.goButton' | t }}</button>
+        <button type="submit" class="btn btn-primary">{{ 'auditLogs.filters.goButton' | t }}</button>
       </div>
-    </div>
+    </form>
   </app-panel>
 
-  <app-panel key="audit:log" [title]="'auditLogs.log.title' | t" [subtitle]="'auditLogs.log.subtitle' | t">
+  <app-panel key="audit:log" [defaultOpen]="true" [title]="'auditLogs.log.title' | t" [subtitle]="'auditLogs.log.subtitle' | t">
     <button panel-actions class="btn btn-outline-primary btn-sm" (click)="downloadCsv()">{{ 'auditLogs.log.exportCsv' | t }}</button>
+
+    <p class="small text-body-secondary">{{ 'auditLogs.retention' | t:{ zone: timeZone } }}</p>
 
     <div class="table-responsive table-stack-wrap">
       <table class="table table-sm table-stack align-middle mb-0">
@@ -80,7 +82,9 @@
     </div>
 
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
-      <div class="small text-body-secondary">{{ 'auditLogs.showing' | t:{ count: items.length, total: total } }}</div>
+      <div class="small text-body-secondary" role="status">
+        <ng-container *ngIf="items.length">{{ 'auditLogs.showing' | t:{ from: rangeFrom, to: rangeTo, total: total } }}</ng-container>
+      </div>
       <div class="btn-group">
         <button class="btn btn-sm btn-outline-secondary" [disabled]="page <= 1" (click)="load(page - 1)">{{ 'auditLogs.previous' | t }}</button>
         <button class="btn btn-sm btn-outline-secondary" [disabled]="(page * pageSize) >= total" (click)="load(page + 1)">{{ 'auditLogs.next' | t }}</button>

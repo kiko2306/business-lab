@@ -38088,3 +38088,14 @@ carried its own copy before) and reads, for a customer who tapped the link in an
 - **Focus:** after send or failure the status/alert region takes focus (`data-result`), so it is read out and focus no longer falls to `<body>` when the form is removed.
 - Not done: naming the administrator and a wait time in "an administrator will be emailed" (the page does not know who; would need an API change).
 - 571 frontend tests (6 new, red first), build clean.
+
+## 862. Audit filters are a form, the range is a range, the log says what it keeps (§854 fix 7, P3; §854 complete)
+
+[x] done. All seven findings of §854 landed (§855-§862).
+
+- Filters sit in a `<form>`: Enter in any field searches (page 1); `name`s added for `ngModel`.
+- Date filters are sent as ISO instants (`new Date(local).toISOString()`), so "from 09:30" means 09:30 where the reader is, matching the times shown; before, the bare value was read in the server's zone. Same for the CSV.
+- "Showing 21–40 of 200", hidden when empty. One line under the log: kept 30 days, times in the reader's zone (named). The 30 is `RETENTION_DAYS` in `backend/src/utils/audit.ts`, duplicated in the string; change both. The CSV's 100,000-row cap is not stated: 30 days of audit rows cannot reach it on a homelab.
+- Both panels `defaultOpen`.
+- Not done: page size stays 20 (the 7,340px-tall phone list was noted, not a finding the owner asked for); the CSV keeps its fixed filename.
+- 574 frontend tests (3 new, red first), build clean.

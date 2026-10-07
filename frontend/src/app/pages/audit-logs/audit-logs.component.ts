@@ -31,6 +31,15 @@ export class AuditLogsComponent implements OnInit {
   protected total = 0;
   protected loading = false;
   protected failed = false;
+  protected readonly timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  protected get rangeFrom(): number {
+    return (this.page - 1) * this.pageSize + 1;
+  }
+
+  protected get rangeTo(): number {
+    return this.rangeFrom + this.items.length - 1;
+  }
 
   ngOnInit(): void {
     this.load();
@@ -46,8 +55,9 @@ export class AuditLogsComponent implements OnInit {
     };
     if (this.action) params['action'] = this.action;
     if (this.result) params['result'] = this.result;
-    if (this.startDate) params['startDate'] = this.startDate;
-    if (this.endDate) params['endDate'] = this.endDate;
+    // A datetime-local value has no zone; sent bare it was read in the server's, while the table shows the reader's.
+    if (this.startDate) params['startDate'] = new Date(this.startDate).toISOString();
+    if (this.endDate) params['endDate'] = new Date(this.endDate).toISOString();
 
     this.operations.getAuditLogs(params).subscribe({
       next: (response) => {
@@ -89,8 +99,8 @@ export class AuditLogsComponent implements OnInit {
     const params: Record<string, string> = {};
     if (this.action) params['action'] = this.action;
     if (this.result) params['result'] = this.result;
-    if (this.startDate) params['startDate'] = this.startDate;
-    if (this.endDate) params['endDate'] = this.endDate;
+    if (this.startDate) params['startDate'] = new Date(this.startDate).toISOString();
+    if (this.endDate) params['endDate'] = new Date(this.endDate).toISOString();
 
     this.operations.downloadAuditCsv(params).subscribe({
       next: (blob) => {

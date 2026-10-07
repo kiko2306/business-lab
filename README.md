@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.165.10** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.165.11** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -279,22 +279,22 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       should the post say?", with Drafts open too once there are drafts, and no "Brief" or "Claude"
       anywhere, in pt-PT too. All six are done; this item is now only the `beta` looks. On `beta`, after each: open Content on a phone and
       a laptop, EN and pt-PT.
-- [ ] **Small pages: fix the critique's findings (plan.md §854)** — 17/40, three pages. Decided
-      2026-10-06: no business name exists (show the Dashboard URL host as the sender) and the audit
-      log is for the **owner** (plain sentences, raw code kept for the CSV). In order, test first, one
-      commit and version bump each: (1) done (§855) — on `beta`, open an unsubscribe link from a real
-      advert email: the page shows one button and nothing happens until you tap it; reloading the
-      page does not unsubscribe either; tapping it ends the emails and a second tap is harmless;
-      (2) done (§856, §857) — on `beta`, a real advert email ends with "You are receiving this because
-      you subscribed to <dashboard host>." above the link; its headers include `List-Unsubscribe` and
-      `List-Unsubscribe-Post` (view the raw message), and the unsubscribe button your mail app shows
-      (Gmail, Apple Mail) works in one tap and the address stops getting emails — that also proves
-      `/api/subscribers/*` is reachable at the public dashboard URL; the page shows the host above
-      the heading, after the tap says it won't email you again, "Subscribe again" brings you back,
-      and no "Go to sign in" appears; (3) done (§858) — on `beta`, open Audit logs on a phone and a laptop, EN and pt-PT: Result is the first column, actions read as sentences (hover shows the code), a long probe resource wraps, Export CSV still has the raw codes; (4) done (§859) — on `beta`, Audit logs: stop the backend for a failed load (alert + Retry, no empty-log text), filter to something with no match (message + Clear filters); (5) done (§860) — on `beta`, open an unsubscribe link with the backend stopped (reads "could not reach the server", button says Try again, in pt-PT too); the 429 message needs 20 taps in 15 min to see; (6) done (§861) — on `beta`, open a denied app signed in as a person without access: the page says who you are, Request access is pressable when empty and names what is missing, after sending focus is on the confirmation, "Sign in with a different account" signs out (note: Authelia's own session stays); (7) Audit filters as a `<form>`,
-      "21-40 of 200", retention stated, timezone, open by default. Decide first: is there a business
-      name to show, and is the audit log for the owner or the reseller. On `beta`, after each: open
-      the page on a phone and a laptop, EN and pt-PT.
+- [ ] **Beta-test the small pages' fixes (plan.md §855-§862)** — all seven §854 findings are in; on
+      `beta`, EN and pt-PT, phone and laptop: (1-2) open an unsubscribe link from a real advert
+      email: one button, nothing happens until the tap, reload does not unsubscribe, a second tap is
+      harmless; the email ends "You are receiving this because you subscribed to <dashboard host>."
+      above the link, its headers include `List-Unsubscribe` and `List-Unsubscribe-Post`, the mail
+      app's own unsubscribe button works in one tap (that also proves `/api/subscribers/*` is
+      reachable at the public URL), "Subscribe again" brings you back, no "Go to sign in";
+      (5) with the backend stopped the page says it could not reach the server and the button reads
+      Try again (the 429 text needs 20 taps in 15 min); (3-4, 7) Audit logs: Result is the first column,
+      actions read as sentences (hover shows the code), a long probe resource wraps, Export CSV keeps
+      raw codes; stopping the backend gives an alert with Retry, a filter with no match gives Clear
+      filters, Enter in a filter searches, paging reads "21-40 of 200", the retention/time-zone line
+      shows, a "from" time filters in your own zone; (6) open a denied app signed in without access:
+      "signed in as", Request access pressable when empty and names what is missing, focus on the
+      confirmation after sending, "Sign in with a different account" signs out (Authelia's own
+      session stays).
 - [ ] **Account: fix the critique's findings (plan.md §819)** — all five done; this item is now
       only the `beta` look. (1) §820 — on `beta`, Turn it off asks for a code or recovery code (no
       password field), then a confirm; a wrong code is refused and 2FA stays on; (2) §821 — a wrong

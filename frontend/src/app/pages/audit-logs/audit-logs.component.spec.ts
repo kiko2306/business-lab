@@ -1,9 +1,8 @@
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Observable, NEVER, of, throwError } from 'rxjs';
 import { AuditLogsComponent } from './audit-logs.component';
 import { OperationsService } from '../../core/operations.service';
 import { TranslateService } from '../../i18n/translate.service';
-import { SectionCollapseService } from '../../core/section-collapse.service';
 import { en } from '../../i18n/en';
 import { ptPT } from '../../i18n/pt-pt';
 
@@ -24,17 +23,21 @@ const CODES = [
 ];
 
 describe('AuditLogsComponent', () => {
+  beforeEach(() => localStorage.removeItem('panels.collapsed.v2'));
+
   const row = (action: string, result: string) => ({
     id: 1, username: 'ana', action, resource: 'x'.repeat(200), result, created_at: '2026-10-07T10:00:00Z', ip: null,
   });
 
-  function render(locale: 'en' | 'pt-PT', items = [row('user_delete', 'failure')], reply?: Observable<unknown>) {
+  let fixture: ComponentFixture<AuditLogsComponent>;
+  let calls: Record<string, string | number>[];
+  function render(locale: 'en' | 'pt-PT', items = [row('user_delete', 'failure')], reply?: Observable<unknown>, total = items.length) {
+    calls = [];
     TestBed.configureTestingModule({
-      providers: [{ provide: OperationsService, useValue: { getAuditLogs: () => reply ?? of({ items, page: 1, pageSize: 20, total: items.length }) } }],
+      providers: [{ provide: OperationsService, useValue: { getAuditLogs: (p: Record<string, string | number>) => (calls.push(p), reply ?? of({ items, page: p['page'], pageSize: 20, total })) } }],
     });
     TestBed.inject(TranslateService).setLocale(locale);
-    TestBed.inject(SectionCollapseService).open('audit:log'); // panels start collapsed
-    const fixture = TestBed.createComponent(AuditLogsComponent);
+    fixture = TestBed.createComponent(AuditLogsComponent);
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   }
@@ -93,6 +96,36 @@ describe('AuditLogsComponent', () => {
       expect(body.textContent).toContain(en['auditLogs.noMatch']);
       body.querySelector('button')!.click();
       expect(cmp.result).toBe('');
+    });
+  });
+
+  // plan.md §854 fix 7.
+  describe('filters and paging', () => {
+    it('opens with both panels showing and puts the filters in a form, so Enter searches', () => {
+      const el = render('en');
+      const form = el.querySelector('form')!;
+      expect(form.querySelector('#audit-action')).not.toBeNull();
+      calls.length = 0;
+      form.dispatchEvent(new Event('submit'));
+      expect(calls.length).toBe(1);
+      expect(calls[0]['page']).toBe(1);
+    });
+
+    it('sends the date filters as instants, so they match the times the table shows', () => {
+      render('en');
+      const cmp = fixture.componentInstance as unknown as { startDate: string; load(p: number): void };
+      cmp.startDate = '2026-10-07T09:30';
+      cmp.load(1);
+      expect(calls.at(-1)!['startDate']).toBe(new Date('2026-10-07T09:30').toISOString());
+    });
+
+    it('says which rows these are, and how long they are kept, in the reader\'s time zone', () => {
+      const el = render('en', [row('login', 'success')], undefined, 200);
+      fixture.componentInstance.load(2);
+      fixture.detectChanges();
+      expect(el.textContent).toContain('21–21 of 200');
+      expect(el.textContent).toContain('30 days');
+      expect(el.textContent).toContain(Intl.DateTimeFormat().resolvedOptions().timeZone);
     });
   });
 });
