@@ -38058,3 +38058,12 @@ carried its own copy before) and reads, for a customer who tapped the link in an
 - **Resource wraps** (`td.audit-resource`, `overflow-wrap: anywhere`). Global `nowrap` pushed §840's probe paragraphs off-screen.
 - Rejected: a Result marker only (a badge column first is the same size and says the word); showing code beside the sentence (noise for the owner; `title` + CSV keep it).
 - Spec opens the panel itself: panels start collapsed (fix 7 will change that). 558 frontend tests (3 new, red first).
+
+## 859. Audit logs: loading, failed and empty are three states (§854 fix 4, P1)
+
+[x] done. Before: `loading` was never shown and a failed load read "No audit logs found." under a 5 s toast carrying server English.
+
+- **Loading** row, `role=status`. **Failed**: inline `role=alert` row, translated, with Retry (re-runs the same page); no toast, no server text. **Empty**: `role=status`; with any filter set it says "No entries match these filters." and Clear filters (resets all four, reloads page 1); unfiltered it keeps "No audit logs found.".
+- Export errors still toast (a one-shot action, no table state to show).
+- Rejected: keeping the toast as well (double message, English leak); a live region on the whole table (re-announces every page change).
+- 561 frontend tests (3 new, red first), build clean.

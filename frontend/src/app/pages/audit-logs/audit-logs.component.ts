@@ -30,6 +30,7 @@ export class AuditLogsComponent implements OnInit {
   protected pageSize = 20;
   protected total = 0;
   protected loading = false;
+  protected failed = false;
 
   ngOnInit(): void {
     this.load();
@@ -37,6 +38,7 @@ export class AuditLogsComponent implements OnInit {
 
   load(page = this.page): void {
     this.loading = true;
+    this.failed = false;
     this.page = page;
     const params: Record<string, string | number> = {
       page: this.page,
@@ -55,9 +57,19 @@ export class AuditLogsComponent implements OnInit {
       },
       error: (error) => {
         this.loading = false;
-        this.toast.error(extractErrorMessage(error, this.translate.t('auditLogs.errors.load')));
+        // An inline alert with Retry, not a toast: server text is English and a failed load must not read as an empty log.
+        this.failed = true;
       },
     });
+  }
+
+  protected get filtered(): boolean {
+    return !!(this.action || this.result || this.startDate || this.endDate);
+  }
+
+  protected clearFilters(): void {
+    this.action = this.result = this.startDate = this.endDate = '';
+    this.load(1);
   }
 
   // The CSV keeps the raw code; the table shows a sentence, and an unknown code shows as itself.

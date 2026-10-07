@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { Observable, NEVER, of, throwError } from 'rxjs';
 import { AuditLogsComponent } from './audit-logs.component';
 import { OperationsService } from '../../core/operations.service';
 import { TranslateService } from '../../i18n/translate.service';
@@ -28,9 +28,9 @@ describe('AuditLogsComponent', () => {
     id: 1, username: 'ana', action, resource: 'x'.repeat(200), result, created_at: '2026-10-07T10:00:00Z', ip: null,
   });
 
-  function render(locale: 'en' | 'pt-PT', items = [row('user_delete', 'failure')]) {
+  function render(locale: 'en' | 'pt-PT', items = [row('user_delete', 'failure')], reply?: Observable<unknown>) {
     TestBed.configureTestingModule({
-      providers: [{ provide: OperationsService, useValue: { getAuditLogs: () => of({ items, page: 1, pageSize: 20, total: items.length }) } }],
+      providers: [{ provide: OperationsService, useValue: { getAuditLogs: () => reply ?? of({ items, page: 1, pageSize: 20, total: items.length }) } }],
     });
     TestBed.inject(TranslateService).setLocale(locale);
     TestBed.inject(SectionCollapseService).open('audit:log'); // panels start collapsed
@@ -59,5 +59,40 @@ describe('AuditLogsComponent', () => {
     const el = render('en', [row('brand_new_code', 'success')]);
     expect(el.querySelector('tbody')!.textContent).toContain('brand_new_code');
     expect(el.querySelector('td.audit-resource')).not.toBeNull();
+  });
+
+  // plan.md §854 fix 4: loading, failed and empty were one silent "No audit logs found." under a toast.
+  describe('states', () => {
+    const status = (el: HTMLElement) => el.querySelector('tbody [role=status], tbody [role=alert]');
+
+    it('announces loading', () => {
+      const el = render('en', [], NEVER);
+      expect(status(el)!.getAttribute('role')).toBe('status');
+      expect(status(el)!.textContent).toContain(en['auditLogs.loading']);
+    });
+
+    it('shows a failed load as an alert with Retry, in the page language, not as an empty log', () => {
+      const el = render('pt-PT', [], throwError(() => ({ status: 500, error: { message: 'ECONNREFUSED' } })));
+      const alert = el.querySelector('tbody [role=alert]')!;
+      expect(alert.textContent).toContain(ptPT['auditLogs.errors.load']);
+      expect(alert.textContent).not.toContain('ECONNREFUSED');
+      expect(alert.querySelector('button')!.textContent).toContain(ptPT['auditLogs.retry']);
+      expect(el.querySelector('tbody')!.textContent).not.toContain(ptPT['auditLogs.empty']);
+    });
+
+    it('offers Clear filters when a filter matched nothing, and plain empty otherwise', () => {
+      const el = render('en', []);
+      expect(status(el)!.textContent).toContain(en['auditLogs.empty']);
+      expect(el.querySelector('tbody button')).toBeNull();
+      const fixture = TestBed.createComponent(AuditLogsComponent);
+      const cmp = fixture.componentInstance as unknown as { result: string };
+      cmp.result = 'failure';
+      (fixture.componentInstance as AuditLogsComponent).load(1);
+      fixture.detectChanges();
+      const body = fixture.nativeElement.querySelector('tbody')!;
+      expect(body.textContent).toContain(en['auditLogs.noMatch']);
+      body.querySelector('button')!.click();
+      expect(cmp.result).toBe('');
+    });
   });
 });

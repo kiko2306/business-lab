@@ -60,8 +60,20 @@
             <td [attr.data-label]="'auditLogs.table.action' | t" [attr.title]="item.action">{{ actionText(item.action) }}</td>
             <td class="audit-resource" [attr.data-label]="'auditLogs.table.resource' | t">{{ item.resource || '—' }}</td>
           </tr>
-          <tr *ngIf="!items.length && !loading">
-            <td colspan="6" class="text-center text-body-secondary py-4">{{ 'auditLogs.empty' | t }}</td>
+          <tr *ngIf="loading">
+            <td colspan="6" role="status" class="text-center text-body-secondary py-4">{{ 'auditLogs.loading' | t }}</td>
+          </tr>
+          <tr *ngIf="failed && !loading">
+            <td colspan="6" role="alert" class="text-center py-4">
+              {{ 'auditLogs.errors.load' | t }}
+              <button class="btn btn-sm btn-outline-primary ms-2" (click)="load()">{{ 'auditLogs.retry' | t }}</button>
+            </td>
+          </tr>
+          <tr *ngIf="!items.length && !loading && !failed">
+            <td colspan="6" role="status" class="text-center text-body-secondary py-4">
+              {{ (filtered ? 'auditLogs.noMatch' : 'auditLogs.empty') | t }}
+              <button *ngIf="filtered" class="btn btn-sm btn-outline-secondary ms-2" (click)="clearFilters()">{{ 'auditLogs.clearFilters' | t }}</button>
+            </td>
           </tr>
         </tbody>
       </table>
