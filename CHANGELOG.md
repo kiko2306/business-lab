@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.165.16] — 2026-10-07
+
+### Fixed
+
+- Watchdog probe-failed audit rows keep the Uptime Kuma verdict (it sat after the IP list and got clipped)
+
 ## [0.165.15] — 2026-10-07
 
 ### Fixed

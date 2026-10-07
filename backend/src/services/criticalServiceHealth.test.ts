@@ -251,6 +251,15 @@ describe('audit trail', () => {
     expect(row.metadata).toMatchObject({ url: FUNNEL_URL, consecutiveFailures: 1, kumaStatus: 1 });
   });
 
+  it('puts the Uptime Kuma verdict before the resolved IPs, so the audit column clip (§867) cuts IPs, not the verdict', async () => {
+    stubFetch({ probesUp: false, kuma: 1 });
+    const { checkCriticalServices } = await import('./criticalServiceHealth');
+    await checkCriticalServices();
+    const { resource } = auditRows('critical-service.probe-failed')[0];
+    expect(resource!.indexOf('Uptime Kuma')).toBeGreaterThan(-1);
+    expect(resource!.indexOf('Uptime Kuma')).toBeLessThan(resource!.indexOf('resolves to'));
+  });
+
   it('says so when Uptime Kuma gave no verdict', async () => {
     stubFetch({ probesUp: false, kuma: null });
     const { checkCriticalServices } = await import('./criticalServiceHealth');

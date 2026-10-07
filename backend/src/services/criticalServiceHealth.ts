@@ -353,7 +353,8 @@ export async function checkCriticalServices(): Promise<void> {
       if (streak <= RESTART_AFTER_DNS) {
         await writeAuditLog({
           action: 'critical-service.probe-failed',
-          resource: `${probe.name}: ${error} ${detail}; ${kumaVerdict(kuma)}`,
+          // Verdict before the IP list: the audit column is 200 chars and clips from the end.
+          resource: `${probe.name} (${kumaVerdict(kuma)}): ${error} ${detail}`,
           result: 'failure',
           metadata: { url, consecutiveFailures: count, kumaStatus: kuma, error, detail },
         });
