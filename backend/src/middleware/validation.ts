@@ -295,7 +295,7 @@ export const schemas = {
   auditQuery: Joi.object({
     page: Joi.number().integer().min(1).max(100000).optional(),
     pageSize: Joi.number().integer().min(1).max(100).optional(),
-    action: Joi.string().trim().min(1).max(64).pattern(/^[a-zA-Z0-9:_-]+$/).optional(),
+    action: Joi.string().trim().min(1).max(64).pattern(/^[a-zA-Z0-9:._-]+$/).optional(),
     result: Joi.string().trim().min(1).max(64).pattern(/^[a-zA-Z0-9:_-]+$/).optional(),
     startDate: Joi.date().iso().optional(),
     endDate: Joi.date().iso().optional(),

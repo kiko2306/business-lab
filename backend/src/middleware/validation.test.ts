@@ -16,3 +16,17 @@ describe('public token schemas give a plain-language message on a bad token', ()
     expect(error?.details[0].message).toBe('This link is invalid or has expired.');
   });
 });
+
+describe('auditQuery action filter', () => {
+  // Real audit actions are dotted (critical-service.probe-failed); a pattern without '.' made
+  // filtering for them 422 in the Audit logs page.
+  it('accepts a dotted action', () => {
+    const { error } = schemas.auditQuery.validate({ action: 'critical-service.probe-failed' });
+    expect(error).toBeUndefined();
+  });
+
+  it('still rejects spaces and quotes', () => {
+    expect(schemas.auditQuery.validate({ action: "a b" }).error).toBeDefined();
+    expect(schemas.auditQuery.validate({ action: "a'b" }).error).toBeDefined();
+  });
+});

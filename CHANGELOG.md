@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.165.14] — 2026-10-07
+
+### Fixed
+
+- Audit logs: filtering by a dotted action such as critical-service.probe-failed no longer fails with 422
+
 ## [0.165.13] — 2026-10-07
 
 ### Added

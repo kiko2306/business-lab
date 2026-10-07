@@ -38137,3 +38137,7 @@ Plan:
 - [ ] 8. Verify: counts 54 / 322 / 3, a ticket attachment opens, a vault password decrypts, cron jobs fire.
 
 Cut-over: live URL, DNS and tunnel untouched by this plan.
+
+## 866. Audit logs: dotted action filter 422
+
+[x] done. Found while beta-testing §840 via API on the dev box: `GET /api/audit-logs?action=critical-service.probe-failed` → 422. Cause: `schemas.auditQuery.action` pattern `/^[a-zA-Z0-9:_-]+$/` had no `.`, but real actions are dotted (`critical-service.*`). Fix: pattern now `[a-zA-Z0-9:._-]`; test in `validation.test.ts`. `result` left alone (no dotted values). Missed because §840 only unit-tested the writer, never the filter.
