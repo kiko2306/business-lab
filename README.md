@@ -318,11 +318,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       characters." is under new passwords, the cursor starts in the first field, `/recovery` inputs
       are 44px; (5) §832 — the card is centred (equal space either side at every width) and all four
       pages look like the same card, `/recovery` included.
-- [ ] **Beta-test the watchdog's audit rows (plan.md §840)** — on `beta`, Audit logs, filter
-      Action `critical-service.probe-failed` (the filter returned 422 on the dot before §866; it must now apply). Re-run after §867: a first run on 2026-10-07 showed `restarted`/`recovered` but no `probe-failed` rows, because the 223-char row hit `VARCHAR(200)`: nothing while Tailscale is healthy. To see a row,
-      `docker stop tailscale-tailscale-1` on the host for ~3 min (dev/test box only): rows appear
-      naming the probe, `ECONNRESET`/timeout, ms, "resolves to …" and an Uptime Kuma verdict; a
-      `critical-service.restarted` row follows, and `critical-service.recovered` once it answers.
 - [ ] **Updates page: fix the critique's findings (plan.md §834)** — all five done; this item is now
       only the `beta` look, on a phone and a laptop, EN and pt-PT. (5) §839 — the page opens with the
       panel open and leads with one badge: "Up to date" / "N updates available" / "Updating…" /
