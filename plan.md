@@ -38117,3 +38117,23 @@ carried its own copy before) and reads, for a customer who tapped the link in an
 - **Frontend:** order is This server, then devices with a name or maker, then a "Not recognised" row and the rest; each group keeps address order (stable sort). "This server" is a badge in the name cell. No heading when everything is recognised.
 - Rejected: owner-given device names stored by MAC (a table, API and edit UI to give "known" a meaning nobody asked for yet; add if the owner wants to label the TV); counting "known" from Pi-hole/DHCP data (not on every box).
 - 1390 backend (3 new), 579 frontend (2 new + one adjusted), builds clean, red first.
+
+## 865. One-off: move the live ITFlow data onto the dev box (planned, not run)
+
+[-] active. Planned only; nothing run on either host. Owner decisions (2026-10-07): one-off by hand, dest is empty, do not run yet.
+
+**WARNING — users: owner must check how they merge before step 5.** Live has 3 users (2 admins, 1 technician-role bot); dev has 2 different ones (wizard admin id 1, `claude` id 4). Wholesale replace of `users` drops both dev users and dev's id 1 clashes with live's id 1. No live user exists in dev. How the dev logins (Authelia-admin bootstrap, `itflowUserProvisioning.ts`) behave on a non-empty DB is unread. Do not import until the owner decides.
+
+State found (read-only): live = own compose project on a Pi, schema 2.4.4, MariaDB 12.3.2, 54 clients, 322 tickets, 3 users, uploads 87M, cron runs in a sidecar. Dev = repo `apps/itflow`, schema 2.7.8, MariaDB 13.0.2, 0 clients/tickets, 2 users. Dev is newer, so this is a forward upgrade (ITFlow Admin → Update runs the migrations).
+
+Plan:
+- [ ] 1. Stop live `itflow` + `itflow-cron`, leave `itflow-db` up. Live stays intact as rollback.
+- [ ] 2. `mariadb-dump --single-transaction --routines --triggers itflow` inside the live DB container, as the `itflow` user (root password is random). No client on the host.
+- [ ] 3. rsync live `uploads/` to dev `apps/itflow/data/app/uploads/`; keep ownership/mode.
+- [ ] 4. Back up dev `data/db` + `data/app/uploads` first; stop dev `itflow`.
+- [ ] 5. **BLOCKED on user merge decision.** Drop/recreate dev DB `itflow`, load dump. `users` carries per-user vault keys, so it must come with the data.
+- [ ] 6. Start dev `itflow`, log in as a live admin, run Admin → Update (2.4.4 → 2.7.8).
+- [ ] 7. Reconcile automation: admin bootstrap and user provisioning vs imported `users`; `settings` carries live mail/IMAP/base URL, check `itflowMailCron.ts` and `ITFLOW_URL` re-assert dev values; live `config.php` per-install values unchecked.
+- [ ] 8. Verify: counts 54 / 322 / 3, a ticket attachment opens, a vault password decrypts, cron jobs fire.
+
+Cut-over: live URL, DNS and tunnel untouched by this plan.

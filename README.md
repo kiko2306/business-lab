@@ -537,6 +537,11 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
 
 ### Exposure and platform
 
+- [ ] **One-off: move the live ITFlow data onto the dev box (plan.md §865)** — planned,
+      not run. **Blocked: owner must decide how the 3 live users merge with the 2 dev users
+      before the import (step 5).** Then run §865 steps 1–8 and delete this item once the
+      counts (54 clients, 322 tickets, 3 users), an attachment and a vault password check out.
+
 - [ ] **Beta-test that a bumped image-check date moves exactly one app (plan.md §750, §751)**
       — the code-only half is **confirmed** (§751: run 113, 1m47s, zero
       `SERVICE_UPDATE` audit rows). What is left is the positive case: bump one
