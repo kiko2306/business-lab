@@ -60,6 +60,19 @@ export class AuditLogsComponent implements OnInit {
     });
   }
 
+  // The CSV keeps the raw code; the table shows a sentence, and an unknown code shows as itself.
+  protected actionText(code: string): string {
+    const key = `auditLogs.action.${code}`;
+    const text = this.translate.t(key);
+    return text === key ? code : text;
+  }
+
+  protected resultText(result: string): string {
+    const key = `auditLogs.result.${result}`;
+    const text = this.translate.t(key);
+    return text === key ? result : text;
+  }
+
   downloadCsv(): void {
     const params: Record<string, string> = {};
     if (this.action) params['action'] = this.action;

@@ -38048,3 +38048,13 @@ carried its own copy before) and reads, for a customer who tapped the link in an
   token is the capability, and a customer on a phone will not retype an address).
 - Still open from §854: the failure text (fix 5) and everything on Audit logs and Access denied.
 - 555 frontend tests (5 new, red first), build clean.
+
+## 858. Audit logs read as sentences, Result first (§854 fix 3, P1)
+
+[x] done. Table only; filters, states and paging are §854 fixes 4 and 7.
+
+- **Result is the first column**, badge translated ("Falhou", not "failure"). A failed login no longer hides at the right edge.
+- **Action is a sentence** (`auditLogs.action.<code>`, 48 codes, EN + pt-PT, written for the owner). The raw code is the cell `title`; the CSV still carries the raw code. Unknown code shows as itself, so a new backend action never blanks a cell. A spec lists every code the backend writes, so a missed sentence fails it.
+- **Resource wraps** (`td.audit-resource`, `overflow-wrap: anywhere`). Global `nowrap` pushed §840's probe paragraphs off-screen.
+- Rejected: a Result marker only (a badge column first is the same size and says the word); showing code beside the sentence (noise for the owner; `title` + CSV keep it).
+- Spec opens the panel itself: panels start collapsed (fix 7 will change that). 558 frontend tests (3 new, red first).

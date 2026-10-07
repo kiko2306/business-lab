@@ -39,26 +39,26 @@
       <table class="table table-sm table-stack align-middle mb-0">
         <thead>
           <tr>
+            <th scope="col">{{ 'auditLogs.table.result' | t }}</th>
             <th scope="col">{{ 'auditLogs.table.time' | t }}</th>
             <th scope="col">{{ 'auditLogs.table.user' | t }}</th>
             <th scope="col">{{ 'auditLogs.table.ip' | t }}</th>
             <th scope="col">{{ 'auditLogs.table.action' | t }}</th>
             <th scope="col">{{ 'auditLogs.table.resource' | t }}</th>
-            <th scope="col">{{ 'auditLogs.table.result' | t }}</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let item of items">
+            <td [attr.data-label]="'auditLogs.table.result' | t">
+              <span class="badge" [class.text-bg-success]="item.result === 'success'" [class.text-bg-danger]="item.result !== 'success'">
+                {{ resultText(item.result) }}
+              </span>
+            </td>
             <td [attr.data-label]="'auditLogs.table.time' | t">{{ item.created_at | date:'dd/MM/yyyy, HH:mm':undefined:translate.locale() }}</td>
             <td [attr.data-label]="'auditLogs.table.user' | t">{{ item.username || ('auditLogs.systemUser' | t) }}</td>
             <td [attr.data-label]="'auditLogs.table.ip' | t">{{ item.ip || '—' }}</td>
-            <td [attr.data-label]="'auditLogs.table.action' | t">{{ item.action }}</td>
-            <td [attr.data-label]="'auditLogs.table.resource' | t">{{ item.resource || '—' }}</td>
-            <td [attr.data-label]="'auditLogs.table.result' | t">
-              <span class="badge" [class.text-bg-success]="item.result === 'success'" [class.text-bg-danger]="item.result !== 'success'">
-                {{ item.result }}
-              </span>
-            </td>
+            <td [attr.data-label]="'auditLogs.table.action' | t" [attr.title]="item.action">{{ actionText(item.action) }}</td>
+            <td class="audit-resource" [attr.data-label]="'auditLogs.table.resource' | t">{{ item.resource || '—' }}</td>
           </tr>
           <tr *ngIf="!items.length && !loading">
             <td colspan="6" class="text-center text-body-secondary py-4">{{ 'auditLogs.empty' | t }}</td>

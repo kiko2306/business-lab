@@ -2,3 +2,9 @@
 .table th {
   white-space: nowrap;
 }
+
+/* A probe row's resource can be a paragraph; nowrap pushed the table off-screen (plan.md §854). */
+.table td.audit-resource {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
