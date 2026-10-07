@@ -1,67 +1,60 @@
-<main class="auth-page container py-5">
-  <div class="row justify-content-center">
-    <div class="col-12 col-md-9 col-lg-8 col-xl-7">
-      <section class="card border-0 shadow auth-card">
-        <div class="card-body p-4 p-lg-5">
-          <div class="text-center mb-4">
-            <span class="auth-kicker">{{ 'accessDenied.kicker' | t }}</span>
-            <h1 class="h3 mt-2 mb-2">{{ 'accessDenied.title' | t }}</h1>
-            <p class="text-body-secondary mb-0" *ngIf="hostname">
-              {{ 'accessDenied.triedToReachPrefix' | t }} <strong>{{ hostname }}</strong>{{ 'accessDenied.triedToReachSuffix' | t }}
-            </p>
-          </div>
+<app-auth-shell [kicker]="'accessDenied.kicker' | t" [title]="'accessDenied.title' | t" size="wide">
+  <ng-container auth-subtitle>
+    <span *ngIf="hostname">{{ 'accessDenied.triedToReachPrefix' | t }} <strong>{{ hostname }}</strong>{{ 'accessDenied.triedToReachSuffix' | t }}</span>
+    <span class="d-block small mt-1" *ngIf="user$ | async as user">{{ 'accessDenied.signedInAs' | t:{ user: user.username } }}</span>
+  </ng-container>
 
-          <div *ngIf="sent" class="alert alert-success">
-            {{ 'accessDenied.requestSent' | t }}
-          </div>
-
-          <form *ngIf="!sent" [formGroup]="form" (ngSubmit)="submit()" novalidate>
-            <p class="text-body-secondary">
-              {{ 'accessDenied.askPrompt' | t }}
-            </p>
-
-            <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
-
-            <div class="mb-3">
-              <label class="form-label fw-semibold" for="adEmail">{{ 'accessDenied.emailLabel' | t }}</label>
-              <input
-                id="adEmail"
-                type="email"
-                class="form-control form-control-lg"
-                formControlName="email"
-                autocomplete="email"
-                maxlength="255"
-              />
-              <div *ngIf="form.controls.email.touched && form.controls.email.invalid" class="text-danger small mt-1" appFieldError="adEmail">
-                {{ 'accessDenied.emailError' | t }}
-              </div>
-            </div>
-
-            <div class="mb-4">
-              <label class="form-label fw-semibold" for="adReason">{{ 'accessDenied.reasonLabel' | t }}</label>
-              <textarea
-                id="adReason"
-                class="form-control"
-                rows="4"
-                formControlName="reason"
-                maxlength="2000"
-              ></textarea>
-              <div *ngIf="form.controls.reason.touched && form.controls.reason.invalid" class="text-danger small mt-1" appFieldError="adReason">
-                {{ 'accessDenied.reasonError' | t }}
-              </div>
-            </div>
-
-            <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting || form.invalid">
-              <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-              {{ 'accessDenied.submitButton' | t }}
-            </button>
-          </form>
-
-          <p class="text-center text-body-secondary small mt-4 mb-0">
-            <a routerLink="/login">{{ 'accessDenied.signInLink' | t }}</a>
-          </p>
-        </div>
-      </section>
-    </div>
+  <div *ngIf="sent" role="status" tabindex="-1" data-result class="alert alert-success">
+    {{ 'accessDenied.requestSent' | t }}
   </div>
-</main>
+
+  <form *ngIf="!sent" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <p class="text-body-secondary">
+      {{ 'accessDenied.askPrompt' | t }}
+    </p>
+
+    <div *ngIf="error" role="alert" tabindex="-1" data-result class="alert alert-danger">{{ error }}</div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" for="adEmail">{{ 'accessDenied.emailLabel' | t }}</label>
+      <input
+        id="adEmail"
+        type="email"
+        class="form-control form-control-lg"
+        formControlName="email"
+        autocomplete="email"
+        maxlength="255"
+      />
+      <div *ngIf="form.controls.email.touched && form.controls.email.invalid" class="text-danger small mt-1" appFieldError="adEmail">
+        {{ 'accessDenied.emailError' | t }}
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label class="form-label fw-semibold" for="adReason">{{ 'accessDenied.reasonLabel' | t }}</label>
+      <textarea
+        id="adReason"
+        class="form-control"
+        rows="4"
+        formControlName="reason"
+        maxlength="2000"
+      ></textarea>
+      <div *ngIf="form.controls.reason.touched && form.controls.reason.invalid" class="text-danger small mt-1" appFieldError="adReason">
+        {{ 'accessDenied.reasonError' | t }}
+      </div>
+    </div>
+
+    <!-- Not disabled when the form is invalid: a greyed button gives no reason; pressing it shows what is missing. -->
+    <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting">
+      <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+      {{ 'accessDenied.submitButton' | t }}
+    </button>
+  </form>
+
+  <div auth-footer class="mt-4">
+    <button *ngIf="user$ | async" type="button" class="btn btn-outline-secondary w-100 access-denied__other" (click)="otherAccount()">
+      {{ 'accessDenied.otherAccount' | t }}
+    </button>
+    <a *ngIf="!(user$ | async)" class="btn btn-outline-secondary w-100" routerLink="/login">{{ 'accessDenied.signInLink' | t }}</a>
+  </div>
+</app-auth-shell>

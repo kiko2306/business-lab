@@ -38077,3 +38077,14 @@ carried its own copy before) and reads, for a customer who tapped the link in an
 - The main button reads "Try again" after a failure (it is the retry; no second button). The error is `role=alert`, the wait/result region was already `role=status`.
 - Left alone on purpose: unknown-but-well-formed token still shows "unsubscribed" (answering "no such token" would let anyone probe for subscribers); the 20-per-15-min limiter stays one bucket per IP. Both are backend/product calls, add an item if a real carrier-NAT 429 shows up.
 - 565 frontend tests (4 new, red first). One unrelated ServiceCard spec failed once on the red run and passed on the next; not reproduced.
+
+## 861. Access denied: the next step fits the person (§854 fix 6, P2)
+
+[x] done. Page now sits in `<app-auth-shell>` (one main/h1, product mark; the kicker-above-heading detector hit stays, it is the shell's shared pattern).
+
+- **Who:** "You're signed in as X" under the title, from the dashboard session (`AuthService.user$`) when there is one. Authelia's own identity is not visible to this page (the redirect carries only `?host=`), so a visitor with no dashboard session gets no line rather than a guess. Dashboard and Authelia usernames are the same accounts (§autheliaUsers sync), so the name is right in practice; if they ever drift this line is the place to look.
+- **Another account:** with a dashboard session, a full-width `btn` (44px on a phone via §824) "Sign in with a different account" runs `logout()` (clears the session, lands on /login). Without one, the old link becomes the same kind of button. Limit: this ends the dashboard session only; the Authelia cookie for the denied app host is separate and Authelia's own sign-out is not linked (URL not known to the page). Add if a tester gets stuck on the wrong Authelia account.
+- **Request access is never greyed out for an empty form.** Pressing it marks the fields and shows "Enter a valid email address" / "Tell the administrator why". Only `submitting` disables it.
+- **Focus:** after send or failure the status/alert region takes focus (`data-result`), so it is read out and focus no longer falls to `<body>` when the form is removed.
+- Not done: naming the administrator and a wait time in "an administrator will be emailed" (the page does not know who; would need an API change).
+- 571 frontend tests (6 new, red first), build clean.

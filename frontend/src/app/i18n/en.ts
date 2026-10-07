@@ -912,6 +912,8 @@ export const en: Record<string, string> = {
   'accessDenied.reasonError': 'Tell the administrator why you need this.',
   'accessDenied.submitButton': 'Request access',
   'accessDenied.signInLink': 'Go to sign in',
+  'accessDenied.signedInAs': 'You’re signed in as {{user}}.',
+  'accessDenied.otherAccount': 'Sign in with a different account',
   'accessDenied.errors.submitFailed': 'Could not send the request. Try again later.',
 
   'unsubscribe.title': 'Unsubscribe',

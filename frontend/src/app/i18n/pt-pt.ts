@@ -912,6 +912,8 @@ export const ptPT: Record<string, string> = {
   'accessDenied.reasonError': 'Diga ao administrador porque precisa disto.',
   'accessDenied.submitButton': 'Pedir acesso',
   'accessDenied.signInLink': 'Iniciar sessão',
+  'accessDenied.signedInAs': 'Sessão iniciada como {{user}}.',
+  'accessDenied.otherAccount': 'Iniciar sessão com outra conta',
   'accessDenied.errors.submitFailed': 'Não foi possível enviar o pedido. Tente novamente mais tarde.',
 
   'unsubscribe.title': 'Cancelar subscrição',
