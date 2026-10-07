@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseNmapOutput } from './networkScan';
+import { markServer, parseNmapOutput } from './networkScan';
 
 describe('parseNmapOutput', () => {
   // Verbatim `nmap -sn` output captured against this host's real LAN.
@@ -62,5 +62,28 @@ describe('parseNmapOutput', () => {
 
   it('returns an empty list when nothing was up', () => {
     expect(parseNmapOutput('Nmap done: 0 IP addresses (0 hosts up) scanned in 0.00 seconds')).toEqual([]);
+  });
+});
+
+// plan.md §841 fix 4: the list says which row is the box the dashboard runs on.
+describe('markServer', () => {
+  const hosts = [
+    { ip: '192.168.1.1', hostname: 'router', type: 'Sagemcom' },
+    { ip: '192.168.1.236', hostname: null, type: null },
+  ];
+
+  it('flags the host whose IP is the server\'s', () => {
+    const out = markServer(hosts, '192.168.1.236');
+    expect(out.map((h) => h.isServer)).toEqual([false, true]);
+  });
+
+  it('adds the server when the sweep did not list itself', () => {
+    const out = markServer(hosts, '192.168.1.50');
+    expect(out[0]).toEqual({ ip: '192.168.1.50', hostname: null, type: null, isServer: true });
+    expect(out).toHaveLength(3);
+  });
+
+  it('flags nothing when the server\'s IP is not known yet', () => {
+    expect(markServer(hosts, null).every((h) => !h.isServer)).toBe(true);
   });
 });

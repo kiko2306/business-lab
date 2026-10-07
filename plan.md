@@ -38108,3 +38108,12 @@ carried its own copy before) and reads, for a customer who tapped the link in an
 (b) **Found while testing:** the page never reached the backend. `updateNow()` force-checks, and at 0 behind it toasted "Already up to date" and returned, so the §835 resume ("press Update now" after a failed build) was unreachable from the page too, only from the API. Now at 0 behind with a retryable last run (error past the pull, i.e. `failedPhase` not checking/pulling; or `done` with failed apps) it calls trigger directly, with no confirm (nothing new is fetched and the headline already said to press it). A failure before anything was downloaded still says up to date. The rule is duplicated in `retryable()` and the backend; the backend stays the authority (a non-resumable error just ends `done` fast).
 - Rejected: a separate "Retry failed apps" button (a second control for the same intent; the headline already says press Update now); retrying on the 6 h sweeper (a broken app would be hammered unattended).
 - 1387 backend tests (2 new), 577 frontend (3 new), all red first; both builds clean.
+
+## 864. The device list knows its own server and sets unknowns apart (§841 fix 4, P3; §841 complete)
+
+[x] done. Shaped with the owner (2026-10-07): server first, unrecognised last; no stored names.
+
+- **Backend:** `markServer(hosts, serverIp)` tags the row whose IP is the box's (`getCachedHostLanIp`, the cache the app links use), and adds one when the sweep did not list its own host. Unknown IP (cache fills on boot) tags nothing rather than guessing. `isServer` is optional on `DiscoveredHost`, set only by `/network/scan`.
+- **Frontend:** order is This server, then devices with a name or maker, then a "Not recognised" row and the rest; each group keeps address order (stable sort). "This server" is a badge in the name cell. No heading when everything is recognised.
+- Rejected: owner-given device names stored by MAC (a table, API and edit UI to give "known" a meaning nobody asked for yet; add if the owner wants to label the TV); counting "known" from Pi-hole/DHCP data (not on every box).
+- 1390 backend (3 new), 579 frontend (2 new + one adjusted), builds clean, red first.

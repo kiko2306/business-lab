@@ -30,6 +30,8 @@ export interface DiscoveredHost {
   ip: string;
   hostname: string | null;
   type: string | null;
+  /** Set by `markServer` only: this is the box the dashboard runs on. */
+  isServer?: boolean;
 }
 
 function run(command: string, args: string[]): Promise<string> {
@@ -76,6 +78,17 @@ export function parseNmapOutput(output: string): DiscoveredHost[] {
 
 function ipSortKey(ip: string): number {
   return ip.split('.').reduce((acc, octet) => acc * 256 + Number(octet), 0);
+}
+
+/**
+ * Tags the row for this server, adding one when the sweep did not list its own
+ * host (nmap skips the scanning machine in some setups). With no known LAN IP
+ * yet (the cache fills on boot) nothing is tagged rather than guessed.
+ */
+export function markServer(hosts: DiscoveredHost[], serverIp: string | null): DiscoveredHost[] {
+  if (!serverIp) return hosts.map((h) => ({ ...h, isServer: false }));
+  const marked = hosts.map((h) => ({ ...h, isServer: h.ip === serverIp }));
+  return marked.some((h) => h.isServer) ? marked : [{ ip: serverIp, hostname: null, type: null, isServer: true }, ...marked];
 }
 
 export async function scanLan(): Promise<DiscoveredHost[]> {

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.165.12** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.165.13** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -250,7 +250,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       unplug the box's network and scan: the failure shows beside the button; (3) done (§844) — on `beta`,
       the nav and Home have no Utils, Home has seven tiles in even rows (two wide: Apps, Backups),
       the Settings tile's text mentions finding devices, and opening `/utils` by hand lands on Home;
-      (4) still open — the device list (shape it first: "this server", known and unknown devices).
+      (4) done (§864) — on `beta`, press Find devices: the first row is this server with a "This server" badge,
+      named devices follow, devices with no name or maker sit under "Not recognised".
       On `beta`, open Home and Settings on a phone and a laptop, EN and pt-PT.
 - [ ] **Content: fix the critique's findings (plan.md §845, §847)** — 16/40, all six done. Decided 2026-10-06:
       Content is a **post generator**, and **subscribers are managed on the same page**. In order,

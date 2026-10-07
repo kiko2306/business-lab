@@ -42,6 +42,20 @@ export class NetworkScanComponent {
     });
   }
 
+  private static recognised(host: DiscoveredHost): boolean {
+    return !!(host.hostname || host.type);
+  }
+
+  /** This server, then devices with a name or maker, then the rest; each group keeps the scan's address order. */
+  protected get sorted(): DiscoveredHost[] {
+    const rank = (h: DiscoveredHost) => (h.isServer ? 0 : NetworkScanComponent.recognised(h) ? 1 : 2);
+    return [...this.hosts].sort((a, b) => rank(a) - rank(b));
+  }
+
+  protected get firstUnrecognised(): DiscoveredHost | undefined {
+    return this.sorted.find((h) => !h.isServer && !NetworkScanComponent.recognised(h));
+  }
+
   /** One sentence for the live region: what is happening, or what came back and what to try. */
   protected get statusText(): string {
     switch (this.state) {

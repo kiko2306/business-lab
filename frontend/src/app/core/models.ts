@@ -639,6 +639,7 @@ export interface DiscoveredHost {
   ip: string;
   hostname: string | null;
   type: string | null;
+  isServer?: boolean;
 }
 
 export type MailEncryption = 'tls' | 'ssl' | 'none';

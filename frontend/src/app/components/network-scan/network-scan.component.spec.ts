@@ -73,11 +73,40 @@ describe('NetworkScanComponent', () => {
     fixture.detectChanges();
     expect(status()).toBe('Found 2 devices.');
     const rows = Array.from(el.querySelectorAll('tbody tr')).map((r) => r.textContent?.replace(/\s+/g, ' ').trim());
-    expect(rows[1]).toContain('Unknown');
-    expect(rows[1]).not.toContain('—');
+    expect(rows[2]).toContain('Unknown');
+    expect(rows[2]).not.toContain('—');
     expect(text()).toContain('Device maker');
     expect(scanButton().getAttribute('aria-disabled')).toBeNull();
     expect(scanButton().textContent).toContain('Scan again');
+  });
+
+  // plan.md §841 fix 4: this server first, devices with a name or maker next, the rest under a heading.
+  it('puts this server first, tags it, and sets unrecognised devices apart at the end', () => {
+    scanButton().click();
+    scan$.next({
+      hosts: [
+        { ip: '192.168.1.40', hostname: null, type: null },
+        { ip: '192.168.1.1', hostname: 'router.lan', type: 'Router' },
+        { ip: '192.168.1.236', hostname: null, type: null, isServer: true },
+        { ip: '192.168.1.9', hostname: null, type: 'Printer Co' },
+      ],
+    });
+    fixture.detectChanges();
+    const rows = Array.from(el.querySelectorAll('tbody tr')).map((r) => r.textContent?.replace(/\s+/g, ' ').trim() ?? '');
+    expect(rows[0]).toContain('192.168.1.236');
+    expect(rows[0]).toContain(en['settings.networkScan.thisServer']);
+    expect(rows[1]).toContain('192.168.1.1');
+    expect(rows[2]).toContain('192.168.1.9');
+    expect(rows[3]).toContain(en['settings.networkScan.notRecognised']);
+    expect(rows[4]).toContain('192.168.1.40');
+    expect(rows).toHaveSize(5);
+  });
+
+  it('shows no heading when every device is recognised', () => {
+    scanButton().click();
+    scan$.next({ hosts: [{ ip: '192.168.1.1', hostname: 'router.lan', type: null }] });
+    fixture.detectChanges();
+    expect(text()).not.toContain(en['settings.networkScan.notRecognised']);
   });
 
   it('says "1 device" for one', () => {

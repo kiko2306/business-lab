@@ -4,7 +4,7 @@
 
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { scanLan } from '../services/networkScan';
+import { getCachedHostLanIp, markServer, scanLan } from '../services/networkScan';
 import logger from '../utils/logger';
 
 const router = Router();
@@ -26,7 +26,7 @@ const scanLimiter = rateLimit({
  */
 router.post('/scan', scanLimiter, async (_req: Request, res: Response) => {
   try {
-    const hosts = await scanLan();
+    const hosts = markServer(await scanLan(), getCachedHostLanIp());
     res.json({ hosts });
   } catch (error) {
     logger.error('Network scan failed', { error: error instanceof Error ? error.message : error });

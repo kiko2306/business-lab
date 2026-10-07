@@ -142,6 +142,8 @@ export const en: Record<string, string> = {
   'settings.networkScan.table.maker': 'Device maker',
   'settings.networkScan.table.address': 'Address',
   'settings.networkScan.unknown': 'Unknown',
+  'settings.networkScan.thisServer': 'This server',
+  'settings.networkScan.notRecognised': 'Not recognised',
   'home.tiles.apps.title': 'Apps',
   'home.tiles.apps.description': 'Start, stop and set up your business apps.',
   'home.tiles.backups.title': 'Backups & restore',

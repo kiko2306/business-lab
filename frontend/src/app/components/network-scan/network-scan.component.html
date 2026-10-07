@@ -30,11 +30,19 @@
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let host of hosts">
-          <td [attr.data-label]="'settings.networkScan.table.name' | t">{{ host.hostname ?? ('settings.networkScan.unknown' | t) }}</td>
-          <td [attr.data-label]="'settings.networkScan.table.maker' | t">{{ host.type ?? ('settings.networkScan.unknown' | t) }}</td>
-          <td [attr.data-label]="'settings.networkScan.table.address' | t">{{ host.ip }}</td>
-        </tr>
+        <ng-container *ngFor="let host of sorted">
+          <tr *ngIf="host === firstUnrecognised">
+            <td colspan="3" class="fw-semibold text-body-secondary">{{ 'settings.networkScan.notRecognised' | t }}</td>
+          </tr>
+          <tr>
+            <td [attr.data-label]="'settings.networkScan.table.name' | t">
+              {{ host.hostname ?? ('settings.networkScan.unknown' | t) }}
+              <span *ngIf="host.isServer" class="badge text-bg-primary ms-1">{{ 'settings.networkScan.thisServer' | t }}</span>
+            </td>
+            <td [attr.data-label]="'settings.networkScan.table.maker' | t">{{ host.type ?? ('settings.networkScan.unknown' | t) }}</td>
+            <td [attr.data-label]="'settings.networkScan.table.address' | t">{{ host.ip }}</td>
+          </tr>
+        </ng-container>
       </tbody>
     </table>
   </div>

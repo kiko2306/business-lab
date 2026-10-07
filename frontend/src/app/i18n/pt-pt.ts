@@ -142,6 +142,8 @@ export const ptPT: Record<string, string> = {
   'settings.networkScan.table.maker': 'Fabricante',
   'settings.networkScan.table.address': 'Endereço',
   'settings.networkScan.unknown': 'Desconhecido',
+  'settings.networkScan.thisServer': 'Este servidor',
+  'settings.networkScan.notRecognised': 'Não reconhecidos',
   'home.tiles.apps.title': 'Aplicações',
   'home.tiles.apps.description': 'Inicie, pare e configure as suas aplicações.',
   'home.tiles.backups.title': 'Cópias de segurança e restauro',
