@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.165.14** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.165.15** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -319,7 +319,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       are 44px; (5) §832 — the card is centred (equal space either side at every width) and all four
       pages look like the same card, `/recovery` included.
 - [ ] **Beta-test the watchdog's audit rows (plan.md §840)** — on `beta`, Audit logs, filter
-      Action `critical-service.probe-failed` (the filter returned 422 on the dot before §866; it must now apply): nothing while Tailscale is healthy. To see a row,
+      Action `critical-service.probe-failed` (the filter returned 422 on the dot before §866; it must now apply). Re-run after §867: a first run on 2026-10-07 showed `restarted`/`recovered` but no `probe-failed` rows, because the 223-char row hit `VARCHAR(200)`: nothing while Tailscale is healthy. To see a row,
       `docker stop tailscale-tailscale-1` on the host for ~3 min (dev/test box only): rows appear
       naming the probe, `ECONNRESET`/timeout, ms, "resolves to …" and an Uptime Kuma verdict; a
       `critical-service.restarted` row follows, and `critical-service.recovered` once it answers.

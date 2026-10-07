@@ -48,6 +48,11 @@ export function startAuditLogPurgeSweeper(): void {
   setInterval(run, SWEEP_INTERVAL_MS).unref();
 }
 
+// audit_logs.resource is VARCHAR(200) (database/init.sql). Postgres rejects a longer value, and
+// since writeAuditLog never throws the row would just vanish — the watchdog's probe-failed rows
+// did exactly that (§867). Full detail belongs in `metadata`, which has no limit.
+const RESOURCE_MAX = 200;
+
 interface WriteAuditLogOptions {
   userId?: number | null;
   action: string;
@@ -70,10 +75,11 @@ export async function writeAuditLog({
   metadata = {},
 }: WriteAuditLogOptions): Promise<void> {
   try {
+    const clipped = resource && resource.length > RESOURCE_MAX ? `${resource.slice(0, RESOURCE_MAX - 1)}…` : resource;
     await query(
       `INSERT INTO audit_logs (user_id, action, resource, result, metadata)
        VALUES ($1, $2, $3, $4, $5)`,
-      [userId, action, resource, result, JSON.stringify(metadata ?? {})]
+      [userId, action, clipped, result, JSON.stringify(metadata ?? {})]
     );
   } catch (error) {
     logger.error('Audit log write failed', { action, resource, error: (error as Error).message });

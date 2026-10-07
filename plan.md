@@ -38141,3 +38141,7 @@ Cut-over: live URL, DNS and tunnel untouched by this plan.
 ## 866. Audit logs: dotted action filter 422
 
 [x] done. Found while beta-testing §840 via API on the dev box: `GET /api/audit-logs?action=critical-service.probe-failed` → 422. Cause: `schemas.auditQuery.action` pattern `/^[a-zA-Z0-9:_-]+$/` had no `.`, but real actions are dotted (`critical-service.*`). Fix: pattern now `[a-zA-Z0-9:._-]`; test in `validation.test.ts`. `result` left alone (no dotted values). Missed because §840 only unit-tested the writer, never the filter.
+
+## 867. Audit rows over 200 chars silently dropped (watchdog probe-failed)
+
+[x] done. §840 beta test on the dev box (stopped `tailscale-tailscale-1` ~11 min): `restarted` and `recovered` rows appeared, **no `probe-failed` rows** despite 7 failed passes. Backend log: `Audit log write failed … value too long for type character varying(200)`. Cause: `audit_logs.resource` is `VARCHAR(200)`; the row lists all six resolved IPs and was 223 chars. `writeAuditLog` never throws, so the loss was invisible outside the log. Fix once in `writeAuditLog` (clip to 199 chars + `…`), not in the watchdog — any long-resource caller was exposed. Full detail already rides in `metadata`. Rejected: widening the column (needs migration, same trap returns at the new limit). Tests in `audit.test.ts`. Also §866 (dotted action filter) came from the same beta run.

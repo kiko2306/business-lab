@@ -34,6 +34,28 @@ describe('writeAuditLog', () => {
   });
 });
 
+describe('writeAuditLog resource length', () => {
+  // audit_logs.resource is VARCHAR(200). The watchdog's probe-failed row lists every resolved IP
+  // and hit 223 chars, so Postgres refused it and the row silently never existed (§867).
+  it('clips an over-long resource to the column width so the row is still written', async () => {
+    db.query.mockResolvedValueOnce({ rowCount: 1 });
+
+    await writeAuditLog({ action: 'critical-service.probe-failed', resource: 'x'.repeat(223) });
+
+    const [, params] = db.query.mock.calls.at(-1)!;
+    expect(params[2]).toHaveLength(200);
+    expect(params[2].endsWith('…')).toBe(true);
+  });
+
+  it('leaves a resource that fits untouched', async () => {
+    db.query.mockResolvedValueOnce({ rowCount: 1 });
+
+    await writeAuditLog({ action: 'login', resource: 'auth' });
+
+    expect(db.query.mock.calls.at(-1)![1][2]).toBe('auth');
+  });
+});
+
 describe('purgeDeadRefreshTokens', () => {
   // Only rows /auth/refresh would already refuse: expired or revoked.
   it('deletes expired or revoked refresh tokens and reports the count', async () => {
