@@ -573,6 +573,63 @@ describe('triggerSelfUpdate', () => {
     });
   });
 
+  // A run where some apps failed still lands (`done`, appsFailed set) and HEAD is then the remote, so
+  // "Update now" found nothing behind and never retried them (plan.md §835, README item).
+  describe('retrying apps that failed to update', () => {
+    const calls = (word: string) => backup.runCommand.mock.calls.filter(([, args]: [string, string[]]) => args.includes(word));
+
+    async function landWithFailedApp() {
+      let head = 'old111';
+      backup.runCommand.mockImplementation(async (_cmd: string, args: string[]) => {
+        if (args.includes('pull')) {
+          head = 'new222';
+          return '';
+        }
+        if (args.includes('rev-parse') && args.includes('HEAD')) return `${head}\n`;
+        if (args.includes('rev-parse') && args.includes('origin/main')) return 'new222\n';
+        if (args.includes('rev-list')) return head === 'new222' ? '0\n' : '1\n';
+        if (args.includes('diff') && args.includes('--name-only')) return 'apps/mealie/docker-compose.yml\n';
+        return '';
+      });
+      executor.updateAllInstalledApps.mockResolvedValueOnce([{ serviceName: 'mealie', ok: false, error: 'pull failed' }]);
+      await triggerSelfUpdate(7);
+      await flush();
+      expect((await getSelfUpdateStatus()).latestRun).toMatchObject({ state: 'done', appsFailed: ['mealie'] });
+    }
+
+    it('re-runs only the failed apps when Update now is pressed with nothing behind', async () => {
+      await landWithFailedApp();
+      executor.updateAllInstalledApps.mockClear();
+      executor.updateAllInstalledApps.mockResolvedValueOnce([{ serviceName: 'mealie', ok: true }]);
+      backup.runCommand.mockClear();
+
+      await triggerSelfUpdate(7);
+      await flush();
+
+      expect(executor.updateAllInstalledApps).toHaveBeenCalledWith(7, new Set(['mealie']), expect.any(Function));
+      expect(calls('build')).toHaveLength(0);
+      expect(calls('pull')).toHaveLength(0);
+      expect((await getSelfUpdateStatus()).latestRun).toMatchObject({ state: 'done', appsFailed: [] });
+    });
+
+    it('keeps the app listed when it fails again, and stops retrying once it works', async () => {
+      await landWithFailedApp();
+      executor.updateAllInstalledApps.mockClear();
+      executor.updateAllInstalledApps.mockResolvedValueOnce([{ serviceName: 'mealie', ok: false, error: 'still broken' }]);
+      await triggerSelfUpdate(7);
+      await flush();
+      expect((await getSelfUpdateStatus()).latestRun).toMatchObject({ state: 'done', appsFailed: ['mealie'] });
+
+      executor.updateAllInstalledApps.mockResolvedValueOnce([{ serviceName: 'mealie', ok: true }]);
+      await triggerSelfUpdate(7);
+      await flush();
+      executor.updateAllInstalledApps.mockClear();
+      await triggerSelfUpdate(7);
+      await flush();
+      expect(executor.updateAllInstalledApps).not.toHaveBeenCalled();
+    });
+  });
+
   it('prunes dangling images and build cache after the build and after updating apps', async () => {
     mockAnUpdateFrom('old111', 'new222', 1);
 

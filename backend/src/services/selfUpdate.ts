@@ -492,6 +492,27 @@ async function runSelfUpdateSequence(
       : null;
 
   if (check.commitsBehind === 0 && !resumeFrom) {
+    // A run whose apps failed still landed (`done`) and HEAD is now the remote, so nothing is behind; without this
+    // the failed apps could never be retried from the page. Only those apps, no pull or build. Any later
+    // successful run becomes `previous` with an empty list, which ends the retrying.
+    const retryApps = previous?.state === 'done' ? previous.appsFailed : [];
+    if (retryApps.length) {
+      try {
+        await updateRun(runId, { state: 'updating_apps', toCommit: check.currentCommit });
+        const results = await updateAllInstalledApps(userId, new Set(retryApps), (label) => updateRun(runId, { detail: label }));
+        await updateRun(runId, {
+          state: 'done',
+          detail: null,
+          appsFailed: results.filter((r) => !r.ok).map((r) => r.serviceName),
+          finished: true,
+        });
+      } catch (error) {
+        const message = (error as Error).message || 'Retrying the apps failed.';
+        await updateRun(runId, { state: 'error', errorMessage: message, failedPhase: 'updating_apps', finished: true });
+        logger.error('Self-update: retrying failed apps failed', { runId, error: message });
+      }
+      return;
+    }
     await updateRun(runId, { state: 'done', toCommit: check.currentCommit, finished: true });
     return;
   }

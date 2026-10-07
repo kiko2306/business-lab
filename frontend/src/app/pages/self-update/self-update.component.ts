@@ -218,6 +218,11 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
         if (this.status) {
           this.status = { ...this.status, check };
         }
+        if (check.commitsBehind === 0 && this.retryable(this.status?.latestRun)) {
+          // Nothing is behind, but the last run left work undone; the backend re-runs just that (no confirm: nothing new is fetched).
+          this.trigger();
+          return;
+        }
         if (check.commitsBehind === 0) {
           this.toast.success(this.translate.t('selfUpdate.toast.alreadyUpToDate'));
           this.refocus('update-now');
@@ -248,23 +253,34 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
           this.refocus('update-now');
           return;
         }
-        this.triggering = true;
-        this.operations.triggerSelfUpdate().subscribe({
-          next: (run) => {
-            this.triggering = false;
-            if (this.status) {
-              this.status = { ...this.status, latestRun: run };
-            }
-            this.startPolling();
-            this.refocus('update-progress');
-          },
-          error: (error) => {
-            this.triggering = false;
-            this.toast.error(this.translate.t(selfUpdateErrorKey(error, 'selfUpdate.errors.startFailed')));
-            this.refocus('update-now');
-          },
-        });
+        this.trigger();
       });
+  }
+
+  /** Mirrors the backend's resume/retry rule (selfUpdate.ts): failed past the pull, or landed with failed apps. */
+  private retryable(run: SelfUpdateRun | null | undefined): boolean {
+    if (!run) return false;
+    if (run.state === 'error') return !!run.failedPhase && run.failedPhase !== 'checking' && run.failedPhase !== 'pulling';
+    return run.state === 'done' && (run.appsFailed?.length ?? 0) > 0;
+  }
+
+  private trigger(): void {
+    this.triggering = true;
+    this.operations.triggerSelfUpdate().subscribe({
+      next: (run) => {
+        this.triggering = false;
+        if (this.status) {
+          this.status = { ...this.status, latestRun: run };
+        }
+        this.startPolling();
+        this.refocus('update-progress');
+      },
+      error: (error) => {
+        this.triggering = false;
+        this.toast.error(this.translate.t(selfUpdateErrorKey(error, 'selfUpdate.errors.startFailed')));
+        this.refocus('update-now');
+      },
+    });
   }
 
   /**

@@ -38099,3 +38099,12 @@ carried its own copy before) and reads, for a customer who tapped the link in an
 - Both panels `defaultOpen`.
 - Not done: page size stays 20 (the 7,340px-tall phone list was noted, not a finding the owner asked for); the CSV keeps its fixed filename.
 - 574 frontend tests (3 new, red first), build clean.
+
+## 863. Update now retries what the last run left undone (§835 README item)
+
+[x] done. Decided: yes, Update now re-runs the apps the latest run recorded as failed.
+
+**Two gaps, one cause.** (a) Backend: a run that landed with `appsFailed` is `done` and HEAD is the remote, so the next run saw "0 behind" and ended `done` with nothing done. Now `runSelfUpdateSequence`, at 0 behind and no §835 resume, takes the previous run's `appsFailed` (only if it is `done`) and runs `updateAllInstalledApps` for just those apps: no pull, no build, no restart. The new run records its own `appsFailed`; still failing keeps them listed, success empties the list, which is what ends the retrying. An exception ends `error` / `failedPhase: updating_apps`.
+(b) **Found while testing:** the page never reached the backend. `updateNow()` force-checks, and at 0 behind it toasted "Already up to date" and returned, so the §835 resume ("press Update now" after a failed build) was unreachable from the page too, only from the API. Now at 0 behind with a retryable last run (error past the pull, i.e. `failedPhase` not checking/pulling; or `done` with failed apps) it calls trigger directly, with no confirm (nothing new is fetched and the headline already said to press it). A failure before anything was downloaded still says up to date. The rule is duplicated in `retryable()` and the backend; the backend stays the authority (a non-resumable error just ends `done` fast).
+- Rejected: a separate "Retry failed apps" button (a second control for the same intent; the headline already says press Update now); retrying on the 6 h sweeper (a broken app would be hammered unattended).
+- 1387 backend tests (2 new), 577 frontend (3 new), all red first; both builds clean.

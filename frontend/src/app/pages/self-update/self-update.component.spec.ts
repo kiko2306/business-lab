@@ -131,6 +131,35 @@ describe('SelfUpdateComponent', () => {
     expect(toast.success).toHaveBeenCalled();
   });
 
+  // plan.md §835 + README item: a run that failed past its pull, or landed with failed apps, leaves
+  // HEAD == remote, so the fresh check says 0 behind. Update now must still retry, not say "up to date".
+  describe('Update now with nothing behind but a retryable last run', () => {
+    const press = (latestRun: object) => {
+      operations.getSelfUpdateStatus.and.returnValue(of({ ...upToDateStatus, latestRun: latestRun as SelfUpdateRun }));
+      fixture.detectChanges();
+      operations.checkForSelfUpdate.and.returnValue(of(upToDateStatus.check!));
+      operations.triggerSelfUpdate.and.returnValue(of(runningRun));
+      component.updateNow();
+    };
+
+    it('retries when the last run landed with failed apps', () => {
+      press({ ...runningRun, state: 'done', appsFailed: ['mealie'], finishedAt: '2026-09-04T10:05:00.000Z' });
+      expect(operations.triggerSelfUpdate).toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it('retries when the last run failed after its pull', () => {
+      press({ ...runningRun, state: 'error', failedPhase: 'building', finishedAt: '2026-09-04T10:05:00.000Z' });
+      expect(operations.triggerSelfUpdate).toHaveBeenCalled();
+    });
+
+    it('still says up to date when the last run failed before anything was downloaded', () => {
+      press({ ...runningRun, state: 'error', failedPhase: 'checking', finishedAt: '2026-09-04T10:05:00.000Z' });
+      expect(operations.triggerSelfUpdate).not.toHaveBeenCalled();
+      expect(toast.success).toHaveBeenCalled();
+    });
+  });
+
   it('force-checks before updating, then requires confirmation before triggering', () => {
     operations.getSelfUpdateStatus.and.returnValue(of(upToDateStatus));
     fixture.detectChanges();

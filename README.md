@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.165.11** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.165.12** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -335,11 +335,12 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       and the progress line says "os ecrãs do painel" / "o motor do painel"; (4) §838 — during a real
       update the line reads "Step 2 of 5. Getting the update ready…" with "You can leave this page
       open…", Tab lands on it after you confirm, and when the run ends focus lands on the result.
-- [ ] **Updates: apps that failed to update cannot be retried from the page (found at plan.md §835)** —
-      a run where some apps failed still lands (`done`, `appsFailed` set); HEAD is then the remote, so
-      Update now reports "up to date" and never retries those apps (`updateAllInstalledApps` runs only
-      inside a run that has a diff). Decide whether Update now should re-run the apps recorded as failed
-      by the latest run, test it first, and check on `beta` by breaking one app's pull.
+- [ ] **Beta-test that Update now retries failed apps (plan.md §863)** — on `beta`, break one app's
+      pull (e.g. point its image at a missing tag in a throwaway state, or stop the registry reach),
+      press Update now after a pull that touches that app: the run lands with a warning naming it; fix
+      the cause and press Update now again: the box says nothing is behind but runs, only that app
+      updates, the warning goes away, and a third press says "Already up to date". Also after a build
+      failure (§835) pressing Update now rebuilds instead of saying up to date.
 - [ ] **Tally: the hero figure and the comparison (plan.md §806, items 1-2)** —
       on `beta`, open a shop's day view on a phone: today's takings must be the
       largest thing on the page, readable at arm's length, with "€X more/less
