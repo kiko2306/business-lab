@@ -1,14 +1,15 @@
 <div class="toast-stack">
-  <div
-    *ngFor="let toast of toastService.toasts$ | async"
-    class="toast-card alert alert-dismissible show shadow-sm border-0"
-    [ngClass]="'alert-' + toast.variant"
-    role="alert"
-  >
-    <div class="d-flex align-items-start gap-3">
-      <span class="fw-semibold">{{ ('toast.variant.' + toast.variant) | t }}</span>
-      <span class="flex-grow-1">{{ toast.text }}</span>
-      <button type="button" class="btn-close" [attr.aria-label]="'common.close' | t" (click)="dismiss(toast.id)"></button>
+  @for (toast of toastService.toasts$ | async; track toast) {
+    <div
+      class="toast-card alert alert-dismissible show shadow-sm border-0"
+      [ngClass]="'alert-' + toast.variant"
+      role="alert"
+      >
+      <div class="d-flex align-items-start gap-3">
+        <span class="fw-semibold">{{ ('toast.variant.' + toast.variant) | t }}</span>
+        <span class="flex-grow-1">{{ toast.text }}</span>
+        <button type="button" class="btn-close" [attr.aria-label]="'common.close' | t" (click)="dismiss(toast.id)"></button>
+      </div>
     </div>
-  </div>
+  }
 </div>

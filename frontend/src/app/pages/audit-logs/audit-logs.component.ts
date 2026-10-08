@@ -10,11 +10,10 @@ import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
 
 @Component({
-  selector: 'app-audit-logs',
-  standalone: true,
-  imports: [CommonModule, FormsModule, PanelComponent, TranslatePipe],
-  templateUrl: './audit-logs.component.html',
-  styleUrl: './audit-logs.component.css'
+    selector: 'app-audit-logs',
+    imports: [CommonModule, FormsModule, PanelComponent, TranslatePipe],
+    templateUrl: './audit-logs.component.html',
+    styleUrl: './audit-logs.component.css'
 })
 export class AuditLogsComponent implements OnInit {
   private readonly operations = inject(OperationsService);

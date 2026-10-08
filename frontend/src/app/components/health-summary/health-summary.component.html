@@ -3,41 +3,52 @@
     <h2 id="health-summary-title" class="h6 text-body-secondary mb-2">{{ 'home.health.title' | t }}</h2>
 
     <div role="status">
-      <ng-container *ngIf="summary as s">
+      @if (summary; as s) {
         <p class="health-summary__headline mb-3" [class.health-summary__headline--issue]="!s.ok">
           <span aria-hidden="true">{{ s.ok ? '✓' : '!' }}</span>
           {{ s.headline }}
         </p>
-      </ng-container>
-      <p class="text-body-secondary mb-0" *ngIf="!health && !failed">{{ 'home.health.loading' | t }}</p>
+      }
+      @if (!health && !failed) {
+        <p class="text-body-secondary mb-0">{{ 'home.health.loading' | t }}</p>
+      }
     </div>
 
-    <div class="d-flex flex-wrap align-items-center gap-2" *ngIf="failed">
-      <span class="text-danger">{{ 'home.health.loadFailed' | t }}</span>
-      <button type="button" class="btn btn-sm btn-outline-primary health-summary__retry" (click)="load()">
-        {{ 'home.health.retry' | t }}
-      </button>
-    </div>
+    @if (failed) {
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="text-danger">{{ 'home.health.loadFailed' | t }}</span>
+        <button type="button" class="btn btn-sm btn-outline-primary health-summary__retry" (click)="load()">
+          {{ 'home.health.retry' | t }}
+        </button>
+      </div>
+    }
 
-    <ul class="health-summary__rows list-unstyled mb-0" *ngIf="summary as s">
-      <li class="health-row" *ngFor="let row of s.rows" [class.health-row--issue]="!row.ok">
-        <span class="health-row__label">{{ row.label }}</span>
-        <span class="health-row__state">{{ (row.ok ? 'home.health.state.ok' : 'home.health.state.attention') | t }}</span>
-        <div
-          *ngIf="row.percent !== null"
-          class="progress health-row__bar"
-          role="progressbar"
-          [attr.aria-label]="row.label"
-          [attr.aria-valuenow]="row.percent"
-          aria-valuemin="0"
-          aria-valuemax="100"
-        >
-          <div class="progress-bar" [ngClass]="barClass(row.ok)" [style.width.%]="row.percent"></div>
-        </div>
-        <span class="health-row__detail text-body-secondary small">{{ row.detail }}</span>
-      </li>
-    </ul>
+    @if (summary; as s) {
+      <ul class="health-summary__rows list-unstyled mb-0">
+        @for (row of s.rows; track row) {
+          <li class="health-row" [class.health-row--issue]="!row.ok">
+            <span class="health-row__label">{{ row.label }}</span>
+            <span class="health-row__state">{{ (row.ok ? 'home.health.state.ok' : 'home.health.state.attention') | t }}</span>
+            @if (row.percent !== null) {
+              <div
+                class="progress health-row__bar"
+                role="progressbar"
+                [attr.aria-label]="row.label"
+                [attr.aria-valuenow]="row.percent"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                >
+                <div class="progress-bar" [ngClass]="barClass(row.ok)" [style.width.%]="row.percent"></div>
+              </div>
+            }
+            <span class="health-row__detail text-body-secondary small">{{ row.detail }}</span>
+          </li>
+        }
+      </ul>
+    }
 
-    <p class="text-body-secondary small mt-2 mb-0" *ngIf="health">{{ 'home.health.checked' | t:{ time: checkedAt } }}</p>
+    @if (health) {
+      <p class="text-body-secondary small mt-2 mb-0">{{ 'home.health.checked' | t:{ time: checkedAt } }}</p>
+    }
   </div>
 </section>

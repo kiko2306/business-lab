@@ -1,38 +1,51 @@
 <app-auth-shell [kicker]="kicker" [title]="'unsubscribe.title' | t" size="wide">
   <div class="text-center">
-    <p class="text-body-secondary" *ngIf="!done && !resubscribed && token">
-      {{ (sender ? 'unsubscribe.introFrom' : 'unsubscribe.intro') | t:{ sender: sender ?? '' } }}
-    </p>
+    @if (!done && !resubscribed && token) {
+      <p class="text-body-secondary">
+        {{ (sender ? 'unsubscribe.introFrom' : 'unsubscribe.intro') | t:{ sender: sender ?? '' } }}
+      </p>
+    }
 
     <!-- One live region for the wait and the result, present from the start so a change is announced. -->
     <div role="status" class="mb-3">
-      <span *ngIf="working" class="text-body-secondary">
-        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>{{ 'unsubscribe.working' | t }}
-      </span>
-      <div *ngIf="done" class="alert alert-success mb-0">
-        {{ (sender ? 'unsubscribe.doneFrom' : 'unsubscribe.done') | t:{ sender: sender ?? '' } }}
-      </div>
-      <div *ngIf="resubscribed" class="alert alert-success mb-0">{{ 'unsubscribe.resubscribed' | t }}</div>
+      @if (working) {
+        <span class="text-body-secondary">
+          <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>{{ 'unsubscribe.working' | t }}
+        </span>
+      }
+      @if (done) {
+        <div class="alert alert-success mb-0">
+          {{ (sender ? 'unsubscribe.doneFrom' : 'unsubscribe.done') | t:{ sender: sender ?? '' } }}
+        </div>
+      }
+      @if (resubscribed) {
+        <div class="alert alert-success mb-0">{{ 'unsubscribe.resubscribed' | t }}</div>
+      }
     </div>
 
-    <div *ngIf="error" role="alert" class="alert alert-danger">{{ error }}</div>
+    @if (error) {
+      <div role="alert" class="alert alert-danger">{{ error }}</div>
+    }
 
-    <button
-      *ngIf="token && !done && !resubscribed"
-      type="button"
-      class="btn btn-primary btn-lg unsubscribe__confirm"
-      [attr.aria-disabled]="working ? 'true' : null"
-      (click)="confirm()"
-    >
-      {{ (error ? 'unsubscribe.retry' : 'unsubscribe.button') | t }}
-    </button>
+    @if (token && !done && !resubscribed) {
+      <button
+        type="button"
+        class="btn btn-primary btn-lg unsubscribe__confirm"
+        [attr.aria-disabled]="working ? 'true' : null"
+        (click)="confirm()"
+        >
+        {{ (error ? 'unsubscribe.retry' : 'unsubscribe.button') | t }}
+      </button>
+    }
 
     <!-- Mis-tapped? One tap undoes it. No sign-in link: a customer has no account here. -->
-    <p class="mt-3 mb-0" *ngIf="done">
-      <span class="text-body-secondary">{{ 'unsubscribe.changedMind' | t }}</span>
-      <button type="button" class="btn btn-link unsubscribe__undo" [attr.aria-disabled]="working ? 'true' : null" (click)="undo()">
-        {{ 'unsubscribe.undo' | t }}
-      </button>
-    </p>
+    @if (done) {
+      <p class="mt-3 mb-0">
+        <span class="text-body-secondary">{{ 'unsubscribe.changedMind' | t }}</span>
+        <button type="button" class="btn btn-link unsubscribe__undo" [attr.aria-disabled]="working ? 'true' : null" (click)="undo()">
+          {{ 'unsubscribe.undo' | t }}
+        </button>
+      </p>
+    }
   </div>
 </app-auth-shell>

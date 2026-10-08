@@ -1,4 +1,4 @@
-import { AsyncPipe, NgIf } from '@angular/common';
+import { AsyncPipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
@@ -15,11 +15,10 @@ import { ResourceStripComponent } from './resource-strip.component';
  * onto their own routes one slice at a time without each re-inventing a nav.
  */
 @Component({
-  selector: 'app-shell',
-  standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, AsyncPipe, NgIf, TranslatePipe, ResourceStripComponent],
-  templateUrl: './shell.component.html',
-  styleUrl: './shell.component.css',
+    selector: 'app-shell',
+    imports: [RouterOutlet, RouterLink, RouterLinkActive, AsyncPipe, TranslatePipe, ResourceStripComponent],
+    templateUrl: './shell.component.html',
+    styleUrl: './shell.component.css'
 })
 export class ShellComponent implements OnInit {
   private readonly authService = inject(AuthService);

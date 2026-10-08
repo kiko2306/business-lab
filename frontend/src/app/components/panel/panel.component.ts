@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, Input, inject } from '@angular/core';
 import { SectionCollapseService } from '../../core/section-collapse.service';
 
@@ -17,11 +17,10 @@ import { SectionCollapseService } from '../../core/section-collapse.service';
  *   </app-panel>
  */
 @Component({
-  selector: 'app-panel',
-  standalone: true,
-  imports: [CommonModule],
-  templateUrl: './panel.component.html',
-  styleUrl: './panel.component.css',
+    selector: 'app-panel',
+    imports: [],
+    templateUrl: './panel.component.html',
+    styleUrl: './panel.component.css'
 })
 export class PanelComponent {
   @Input({ required: true }) key!: string;

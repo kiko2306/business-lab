@@ -7,106 +7,134 @@
   </div>
 
   <app-panel key="users:add" [title]="'users.addPanel.title' | t" [subtitle]="'users.addPanel.subtitle' | t">
-    <div class="alert alert-warning" *ngIf="mailConfigured === false">
-      {{ 'users.mailWarning.text' | t }}
-      <a routerLink="/settings">{{ 'users.mailWarning.link' | t }}</a>.
-    </div>
+    @if (mailConfigured === false) {
+      <div class="alert alert-warning">
+        {{ 'users.mailWarning.text' | t }}
+        <a routerLink="/settings">{{ 'users.mailWarning.link' | t }}</a>.
+      </div>
+    }
     <form class="row g-3 align-items-start" [formGroup]="createForm" (ngSubmit)="createUser()">
       <div class="col-12 col-md-6">
         <label class="form-label small mb-1" for="new-user-username">{{ 'users.form.usernameLabel' | t }}</label>
         <input id="new-user-username" class="form-control" [placeholder]="'users.form.usernamePlaceholder' | t" formControlName="username" autocomplete="off" />
-        <div class="form-text text-danger" *ngIf="createForm.controls.username.touched && createForm.controls.username.invalid" appFieldError="new-user-username">
-          {{ 'users.form.usernameError' | t }}
-        </div>
+        @if (createForm.controls.username.touched && createForm.controls.username.invalid) {
+          <div class="form-text text-danger" appFieldError="new-user-username">
+            {{ 'users.form.usernameError' | t }}
+          </div>
+        }
       </div>
       <div class="col-12 col-md-6">
         <label class="form-label small mb-1" for="new-user-email">{{ 'users.form.emailLabel' | t }}</label>
         <input id="new-user-email" class="form-control" type="email" [placeholder]="'users.form.emailPlaceholder' | t" formControlName="email" autocomplete="off" />
-        <div class="form-text" *ngIf="createForm.controls.email.valid || !createForm.controls.email.touched">
-          {{ 'users.form.emailHint' | t }}
-        </div>
-        <div class="form-text text-danger" *ngIf="createForm.controls.email.touched && createForm.controls.email.invalid" appFieldError="new-user-email">
-          {{ 'users.form.emailError' | t }}
-        </div>
+        @if (createForm.controls.email.valid || !createForm.controls.email.touched) {
+          <div class="form-text">
+            {{ 'users.form.emailHint' | t }}
+          </div>
+        }
+        @if (createForm.controls.email.touched && createForm.controls.email.invalid) {
+          <div class="form-text text-danger" appFieldError="new-user-email">
+            {{ 'users.form.emailError' | t }}
+          </div>
+        }
       </div>
       <div class="col-12">
         <span class="form-label small fw-semibold d-block mb-1">{{ 'users.form.rolesLabel' | t }}</span>
         <div class="d-flex flex-wrap gap-3">
-          <div class="form-check" *ngFor="let role of allRoles">
-            <input
-              class="form-check-input"
-              type="checkbox"
-              [id]="'new-role-' + role"
-              [(ngModel)]="newRoles[role]"
-              [ngModelOptions]="{ standalone: true }"
-            />
-            <label class="form-check-label" [for]="'new-role-' + role">{{ ('users.role.' + role) | t }}<span class="d-block form-text mt-0">{{ ('users.roleHint.' + role) | t }}</span></label>
-          </div>
+          @for (role of allRoles; track role) {
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                [id]="'new-role-' + role"
+                [(ngModel)]="newRoles[role]"
+                [ngModelOptions]="{ standalone: true }"
+                />
+              <label class="form-check-label" [for]="'new-role-' + role">{{ ('users.role.' + role) | t }}<span class="d-block form-text mt-0">{{ ('users.roleHint.' + role) | t }}</span></label>
+            </div>
+          }
         </div>
-        <div class="form-text text-danger" role="alert" *ngIf="!newRolesValid()">{{ 'users.form.rolesError' | t }}</div>
+        @if (!newRolesValid()) {
+          <div class="form-text text-danger" role="alert">{{ 'users.form.rolesError' | t }}</div>
+        }
       </div>
-      <div class="col-12" *ngIf="newCapsShown()">
-        <span class="form-label small fw-semibold d-block mb-1">{{ 'users.form.featuresLabel' | t }}</span>
-        <p class="form-text mt-0 mb-2">
-          {{ 'users.form.featuresHint' | t }}
-        </p>
-        <ng-container *ngTemplateOutlet="presetBar; context: { $implicit: newCaps }"></ng-container>
-        <div class="d-flex flex-wrap gap-3">
-          <div class="form-check" *ngFor="let cap of allCapabilities">
-            <input
-              class="form-check-input"
-              type="checkbox"
-              [id]="'new-cap-' + cap"
-              [(ngModel)]="newCaps[cap]"
-              [ngModelOptions]="{ standalone: true }"
-            />
-            <label class="form-check-label" [for]="'new-cap-' + cap">{{ ('users.capability.' + cap) | t }}</label>
+      @if (newCapsShown()) {
+        <div class="col-12">
+          <span class="form-label small fw-semibold d-block mb-1">{{ 'users.form.featuresLabel' | t }}</span>
+          <p class="form-text mt-0 mb-2">
+            {{ 'users.form.featuresHint' | t }}
+          </p>
+          <ng-container *ngTemplateOutlet="presetBar; context: { $implicit: newCaps }"></ng-container>
+          <div class="d-flex flex-wrap gap-3">
+            @for (cap of allCapabilities; track cap) {
+              <div class="form-check">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  [id]="'new-cap-' + cap"
+                  [(ngModel)]="newCaps[cap]"
+                  [ngModelOptions]="{ standalone: true }"
+                  />
+                <label class="form-check-label" [for]="'new-cap-' + cap">{{ ('users.capability.' + cap) | t }}</label>
+              </div>
+            }
           </div>
+          @if (!newCapsValid()) {
+            <div class="form-text text-danger" role="alert">{{ 'users.form.featuresError' | t }}</div>
+          }
         </div>
-        <div class="form-text text-danger" role="alert" *ngIf="!newCapsValid()">{{ 'users.form.featuresError' | t }}</div>
-      </div>
-      <div class="col-12" *ngIf="appOptions.length">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
-          <span class="form-label small fw-semibold mb-0">
-            {{ 'users.form.appAccessLabel' | t }}
-            <span class="text-body-secondary fw-normal">· {{ 'users.appAccess.count' | t:{ picked: pickedAppCount(newAppAccess), total: appOptions.length } }}</span>
-          </span>
-          <div class="d-flex gap-2">
-            <input
-              type="search"
-              class="form-control form-control-sm field-filter"
-              [attr.aria-label]="'users.form.appFilterPlaceholder' | t"
-              [placeholder]="'users.form.appFilterPlaceholder' | t"
-              [(ngModel)]="newAppFilter"
-              [ngModelOptions]="{ standalone: true }"
-            />
-            <div class="btn-group btn-group-sm">
-              <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(newAppAccess, true)">{{ 'users.selectAllButton' | t }}</button>
-              <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(newAppAccess, false)">{{ 'users.clearButton' | t }}</button>
+      }
+      @if (appOptions.length) {
+        <div class="col-12">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+            <span class="form-label small fw-semibold mb-0">
+              {{ 'users.form.appAccessLabel' | t }}
+              <span class="text-body-secondary fw-normal">· {{ 'users.appAccess.count' | t:{ picked: pickedAppCount(newAppAccess), total: appOptions.length } }}</span>
+            </span>
+            <div class="d-flex gap-2">
+              <input
+                type="search"
+                class="form-control form-control-sm field-filter"
+                [attr.aria-label]="'users.form.appFilterPlaceholder' | t"
+                [placeholder]="'users.form.appFilterPlaceholder' | t"
+                [(ngModel)]="newAppFilter"
+                [ngModelOptions]="{ standalone: true }"
+                />
+              <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(newAppAccess, true)">{{ 'users.selectAllButton' | t }}</button>
+                <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(newAppAccess, false)">{{ 'users.clearButton' | t }}</button>
+              </div>
             </div>
           </div>
-        </div>
-        <p class="form-text mt-0 mb-2">
-          {{ 'users.form.appAccessHint' | t }}
-        </p>
-        <div class="app-access-grid">
-          <div class="form-check app-access-chip" *ngFor="let option of filterAppOptions(newAppFilter)">
-            <input
-              class="form-check-input"
-              type="checkbox"
-              [id]="'new-app-' + option.serviceName"
-              [(ngModel)]="newAppAccess[option.serviceName]"
-              [ngModelOptions]="{ standalone: true }"
-            />
-            <label class="form-check-label" [for]="'new-app-' + option.serviceName">
-              {{ option.label }}
-              <span class="text-body-secondary small" *ngIf="option.hostname"> · {{ option.hostname }}</span>
-              <span class="badge text-bg-secondary ms-1" *ngFor="let group of option.requiredGroups">{{ group }}</span>
-            </label>
+          <p class="form-text mt-0 mb-2">
+            {{ 'users.form.appAccessHint' | t }}
+          </p>
+          <div class="app-access-grid">
+            @for (option of filterAppOptions(newAppFilter); track option) {
+              <div class="form-check app-access-chip">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  [id]="'new-app-' + option.serviceName"
+                  [(ngModel)]="newAppAccess[option.serviceName]"
+                  [ngModelOptions]="{ standalone: true }"
+                  />
+                <label class="form-check-label" [for]="'new-app-' + option.serviceName">
+                  {{ option.label }}
+                  @if (option.hostname) {
+                    <span class="text-body-secondary small"> · {{ option.hostname }}</span>
+                  }
+                  @for (group of option.requiredGroups; track group) {
+                    <span class="badge text-bg-secondary ms-1">{{ group }}</span>
+                  }
+                </label>
+              </div>
+            }
+            @if (newAppFilter && !filterAppOptions(newAppFilter).length) {
+              <p class="form-text mb-0">{{ 'users.noAppsMatch' | t:{ query: newAppFilter } }}</p>
+            }
           </div>
-          <p class="form-text mb-0" *ngIf="newAppFilter && !filterAppOptions(newAppFilter).length">{{ 'users.noAppsMatch' | t:{ query: newAppFilter } }}</p>
         </div>
-      </div>
+      }
       <div class="col-12 col-md-4 d-grid">
         <button class="btn btn-primary" type="submit" [disabled]="creating || mailConfigured === false">
           {{ (creating ? 'users.form.submitting' : 'users.form.submitButton') | t }}
@@ -128,200 +156,254 @@
           </tr>
         </thead>
         <tbody>
-          <ng-container *ngFor="let user of items">
+          @for (user of items; track user) {
             <tr>
               <td [attr.data-label]="'users.table.username' | t">
                 {{ user.username }}
-                <span class="badge text-bg-secondary ms-1" *ngIf="user.id === currentUserId">{{ 'users.youBadge' | t }}</span>
-                <span class="badge text-bg-warning ms-1" *ngIf="user.active === false">{{ 'users.pendingInviteBadge' | t }}</span>
+                @if (user.id === currentUserId) {
+                  <span class="badge text-bg-secondary ms-1">{{ 'users.youBadge' | t }}</span>
+                }
+                @if (user.active === false) {
+                  <span class="badge text-bg-warning ms-1">{{ 'users.pendingInviteBadge' | t }}</span>
+                }
               </td>
               <td [attr.data-label]="'users.table.email' | t">
-                <span *ngIf="user.email">{{ user.email }}</span>
-                <span class="text-body-secondary" *ngIf="!user.email">—</span>
-                <div class="form-text mt-0" *ngIf="user.appAccess?.length">
-                  {{ (user.appAccess?.length === 1 ? 'users.appCount.one' : 'users.appCount.other') | t:{ count: user.appAccess?.length ?? 0 } }}
-                </div>
-                <div class="form-text mt-0" *ngIf="user.pendingApps?.length">
-                  {{ 'users.pendingApps' | t:{ apps: pendingAppsLabel(user) } }}
-                </div>
+                @if (user.email) {
+                  <span>{{ user.email }}</span>
+                }
+                @if (!user.email) {
+                  <span class="text-body-secondary">—</span>
+                }
+                @if (user.appAccess?.length) {
+                  <div class="form-text mt-0">
+                    {{ (user.appAccess?.length === 1 ? 'users.appCount.one' : 'users.appCount.other') | t:{ count: user.appAccess?.length ?? 0 } }}
+                  </div>
+                }
+                @if (user.pendingApps?.length) {
+                  <div class="form-text mt-0">
+                    {{ 'users.pendingApps' | t:{ apps: pendingAppsLabel(user) } }}
+                  </div>
+                }
               </td>
               <td [attr.data-label]="'users.table.roles' | t">
                 <div class="d-flex flex-wrap gap-1">
-                  <span class="badge text-bg-secondary" *ngFor="let role of user.roles">{{ ('users.role.' + role) | t }}</span>
+                  @for (role of user.roles; track role) {
+                    <span class="badge text-bg-secondary">{{ ('users.role.' + role) | t }}</span>
+                  }
                 </div>
-                <div class="form-text mt-1" *ngIf="showFeatures(user)">
-                  {{ 'users.featuresCount' | t:{ picked: user.capabilities?.length ?? 0, total: allCapabilities.length } }}
-                </div>
-                <div class="form-text mt-1" *ngIf="user.id === currentUserId">{{ 'users.cannotChangeOwnRoles' | t }}</div>
+                @if (showFeatures(user)) {
+                  <div class="form-text mt-1">
+                    {{ 'users.featuresCount' | t:{ picked: user.capabilities?.length ?? 0, total: allCapabilities.length } }}
+                  </div>
+                }
+                @if (user.id === currentUserId) {
+                  <div class="form-text mt-1">{{ 'users.cannotChangeOwnRoles' | t }}</div>
+                }
               </td>
               <td [attr.data-label]="'users.table.created' | t">{{ user.created_at | date:'dd/MM/yyyy':undefined:translate.locale() }}</td>
               <td [attr.data-label]="'users.table.actions' | t" class="text-end">
                 <div class="btn-group btn-group-sm">
-                  <button
-                    class="btn btn-outline-secondary"
-                    *ngIf="user.active === false"
-                    [disabled]="resendingId === user.id"
-                    (click)="resendInvite(user)"
-                  >
-                    {{ (resendingId === user.id ? 'users.resendInvite.sending' : 'users.resendInviteButton') | t }}
-                  </button>
-                  <button class="btn btn-outline-secondary edit-roles" *ngIf="user.id !== currentUserId && canAdminister(user)" (click)="startRolesEdit(user)">{{ 'users.editRolesButton' | t }}</button>
-                  <button class="btn btn-outline-secondary" (click)="startAccessEdit(user)">{{ 'users.editAccessButton' | t }}</button>
-                  <button class="btn btn-outline-secondary" *ngIf="user.active !== false && canAdminister(user)" (click)="startPasswordReset(user.id)">{{ 'users.resetPasswordButton' | t }}</button>
-                  <button
-                    class="btn btn-outline-danger"
-                    *ngIf="canAdminister(user)"
-                    (click)="deleteUser(user)"
-                    [disabled]="user.id === currentUserId"
-                    [attr.title]="'users.deleteTitleAttr' | t"
-                  >
-                    {{ 'users.deleteButton' | t }}
-                  </button>
-                </div>
-              </td>
-            </tr>
-            <tr class="roles-editor" *ngIf="rolesEditId === user.id">
-              <td colspan="5">
-                <div class="d-flex flex-wrap gap-2 align-items-center">
-                  <div class="form-check form-check-inline m-0" *ngFor="let role of allRoles">
-                    <input
-                      class="form-check-input"
-                      type="checkbox"
-                      [id]="'role-' + user.id + '-' + role"
-                      [(ngModel)]="roleDraft[user.id][role]"
-                      [ngModelOptions]="{ standalone: true }"
-                    />
-                    <label class="form-check-label small" [for]="'role-' + user.id + '-' + role">{{ ('users.role.' + role) | t }}<span class="d-block form-text mt-0">{{ ('users.roleHint.' + role) | t }}</span></label>
-                  </div>
-                  <button
-                    class="btn btn-sm btn-primary"
-                    *ngIf="rolesDirty(user)"
-                    [disabled]="savingRolesId === user.id"
-                    (click)="saveRoles(user)"
-                  >
-                    {{ (savingRolesId === user.id ? 'common.saving' : 'users.saveRolesButton') | t }}
-                  </button>
-                </div>
-
-                <div class="mt-2" *ngIf="showFeatures(user)">
-                  <span class="form-label small fw-semibold d-block mb-1">{{ 'users.form.featuresLabel' | t }}</span>
-                  <ng-container *ngTemplateOutlet="presetBar; context: { $implicit: capDraft[user.id] }"></ng-container>
-                  <div class="d-flex flex-wrap gap-2 align-items-center">
-                    <div class="form-check form-check-inline m-0" *ngFor="let cap of allCapabilities">
-                      <input
-                        class="form-check-input"
-                        type="checkbox"
-                        [id]="'cap-' + user.id + '-' + cap"
-                        [(ngModel)]="capDraft[user.id][cap]"
-                        [ngModelOptions]="{ standalone: true }"
-                      />
-                      <label class="form-check-label small" [for]="'cap-' + user.id + '-' + cap">{{ ('users.capability.' + cap) | t }}</label>
-                    </div>
+                  @if (user.active === false) {
                     <button
-                      class="btn btn-sm btn-primary"
-                      *ngIf="capsDirty(user)"
-                      [disabled]="savingCapsId === user.id"
-                      (click)="saveCaps(user)"
-                    >
-                      {{ (savingCapsId === user.id ? 'common.saving' : 'users.saveFeaturesButton') | t }}
+                      class="btn btn-outline-secondary"
+                      [disabled]="resendingId === user.id"
+                      (click)="resendInvite(user)"
+                      >
+                      {{ (resendingId === user.id ? 'users.resendInvite.sending' : 'users.resendInviteButton') | t }}
                     </button>
+                  }
+                  @if (user.id !== currentUserId && canAdminister(user)) {
+                    <button class="btn btn-outline-secondary edit-roles" (click)="startRolesEdit(user)">{{ 'users.editRolesButton' | t }}</button>
+                  }
+                  <button class="btn btn-outline-secondary" (click)="startAccessEdit(user)">{{ 'users.editAccessButton' | t }}</button>
+                  @if (user.active !== false && canAdminister(user)) {
+                    <button class="btn btn-outline-secondary" (click)="startPasswordReset(user.id)">{{ 'users.resetPasswordButton' | t }}</button>
+                  }
+                  @if (canAdminister(user)) {
+                    <button
+                      class="btn btn-outline-danger"
+                      (click)="deleteUser(user)"
+                      [disabled]="user.id === currentUserId"
+                      [attr.title]="'users.deleteTitleAttr' | t"
+                      >
+                      {{ 'users.deleteButton' | t }}
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+            @if (rolesEditId === user.id) {
+              <tr class="roles-editor">
+                <td colspan="5">
+                  <div class="d-flex flex-wrap gap-2 align-items-center">
+                    @for (role of allRoles; track role) {
+                      <div class="form-check form-check-inline m-0">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          [id]="'role-' + user.id + '-' + role"
+                          [(ngModel)]="roleDraft[user.id][role]"
+                          [ngModelOptions]="{ standalone: true }"
+                          />
+                        <label class="form-check-label small" [for]="'role-' + user.id + '-' + role">{{ ('users.role.' + role) | t }}<span class="d-block form-text mt-0">{{ ('users.roleHint.' + role) | t }}</span></label>
+                      </div>
+                    }
+                    @if (rolesDirty(user)) {
+                      <button
+                        class="btn btn-sm btn-primary"
+                        [disabled]="savingRolesId === user.id"
+                        (click)="saveRoles(user)"
+                        >
+                        {{ (savingRolesId === user.id ? 'common.saving' : 'users.saveRolesButton') | t }}
+                      </button>
+                    }
                   </div>
-                </div>
-                <div class="mt-2">
-                  <button class="btn btn-sm btn-outline-secondary roles-cancel" (click)="cancelRolesEdit(user)">{{ 'common.cancel' | t }}</button>
-                </div>
-              </td>
-            </tr>
-            <tr *ngIf="resetPasswordId === user.id">
-              <td colspan="5">
-                <div class="d-flex gap-2 align-items-center flex-wrap">
-                  <input
-                    class="form-control form-control-sm field-password"
-                    type="password"
-                    [attr.aria-label]="'users.newPasswordPlaceholder' | t"
-                    [placeholder]="'users.newPasswordPlaceholder' | t"
-                    [(ngModel)]="resetPasswordValue"
-                    [ngModelOptions]="{ standalone: true }"
-                    autocomplete="new-password"
-                    [attr.aria-describedby]="'reset-hint-' + user.id"
-                  />
-                  <button class="btn btn-sm btn-primary reset-save" [disabled]="resetting || resetPasswordValue.length < 8" (click)="submitPasswordReset()">{{ 'users.saveButton' | t }}</button>
-                  <button class="btn btn-sm btn-outline-secondary" (click)="cancelPasswordReset()">{{ 'common.cancel' | t }}</button>
-                </div>
-                <p class="form-text mb-0 mt-1 reset-hint" [id]="'reset-hint-' + user.id">{{ 'users.resetHint' | t }}</p>
-              </td>
-            </tr>
-            <tr *ngIf="accessEditId === user.id">
-              <td colspan="5">
-                <div class="mb-2">
-                  <label class="form-label small fw-semibold mb-1" [for]="'access-email-' + user.id">{{ 'users.accessEmailLabel' | t }}</label>
-                  <input
-                    class="form-control form-control-sm field-email"
-                    type="email"
-                    [id]="'access-email-' + user.id"
-                    [placeholder]="'users.accessEmailPlaceholder' | t"
-                    [(ngModel)]="accessEmail"
-                    [ngModelOptions]="{ standalone: true }"
-                    autocomplete="off"
-                  />
-                </div>
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1" *ngIf="appOptions.length">
-                  <span class="form-label small fw-semibold mb-0">
-                    {{ 'users.form.appAccessLabel' | t }}
-                    <span class="text-body-secondary fw-normal">· {{ 'users.appAccess.count' | t:{ picked: pickedAppCount(accessApps), total: appOptions.length } }}</span>
-                  </span>
-                  <div class="d-flex gap-2">
-                    <input
-                      type="search"
-                      class="form-control form-control-sm field-filter"
-                      [attr.aria-label]="'users.form.appFilterPlaceholder' | t"
-                      [placeholder]="'users.form.appFilterPlaceholder' | t"
-                      [(ngModel)]="accessAppFilter"
-                      [ngModelOptions]="{ standalone: true }"
-                    />
-                    <div class="btn-group btn-group-sm">
-                      <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(accessApps, true)">{{ 'users.selectAllButton' | t }}</button>
-                      <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(accessApps, false)">{{ 'users.clearButton' | t }}</button>
+                  @if (showFeatures(user)) {
+                    <div class="mt-2">
+                      <span class="form-label small fw-semibold d-block mb-1">{{ 'users.form.featuresLabel' | t }}</span>
+                      <ng-container *ngTemplateOutlet="presetBar; context: { $implicit: capDraft[user.id] }"></ng-container>
+                      <div class="d-flex flex-wrap gap-2 align-items-center">
+                        @for (cap of allCapabilities; track cap) {
+                          <div class="form-check form-check-inline m-0">
+                            <input
+                              class="form-check-input"
+                              type="checkbox"
+                              [id]="'cap-' + user.id + '-' + cap"
+                              [(ngModel)]="capDraft[user.id][cap]"
+                              [ngModelOptions]="{ standalone: true }"
+                              />
+                            <label class="form-check-label small" [for]="'cap-' + user.id + '-' + cap">{{ ('users.capability.' + cap) | t }}</label>
+                          </div>
+                        }
+                        @if (capsDirty(user)) {
+                          <button
+                            class="btn btn-sm btn-primary"
+                            [disabled]="savingCapsId === user.id"
+                            (click)="saveCaps(user)"
+                            >
+                            {{ (savingCapsId === user.id ? 'common.saving' : 'users.saveFeaturesButton') | t }}
+                          </button>
+                        }
+                      </div>
                     </div>
+                  }
+                  <div class="mt-2">
+                    <button class="btn btn-sm btn-outline-secondary roles-cancel" (click)="cancelRolesEdit(user)">{{ 'common.cancel' | t }}</button>
                   </div>
-                </div>
-                <div class="app-access-grid" *ngIf="appOptions.length; else noAppOptions">
-                  <div class="form-check app-access-chip" *ngFor="let option of filterAppOptions(accessAppFilter)">
+                </td>
+              </tr>
+            }
+            @if (resetPasswordId === user.id) {
+              <tr>
+                <td colspan="5">
+                  <div class="d-flex gap-2 align-items-center flex-wrap">
                     <input
-                      class="form-check-input"
-                      type="checkbox"
-                      [id]="'access-app-' + user.id + '-' + option.serviceName"
-                      [(ngModel)]="accessApps[option.serviceName]"
+                      class="form-control form-control-sm field-password"
+                      type="password"
+                      [attr.aria-label]="'users.newPasswordPlaceholder' | t"
+                      [placeholder]="'users.newPasswordPlaceholder' | t"
+                      [(ngModel)]="resetPasswordValue"
                       [ngModelOptions]="{ standalone: true }"
-                    />
-                    <label class="form-check-label" [for]="'access-app-' + user.id + '-' + option.serviceName">
-                      {{ option.label }}
-                      <span class="text-body-secondary small" *ngIf="option.hostname"> · {{ option.hostname }}</span>
-                      <span class="badge text-bg-secondary ms-1" *ngFor="let group of option.requiredGroups">{{ group }}</span>
-                    </label>
+                      autocomplete="new-password"
+                      [attr.aria-describedby]="'reset-hint-' + user.id"
+                      />
+                    <button class="btn btn-sm btn-primary reset-save" [disabled]="resetting || resetPasswordValue.length < 8" (click)="submitPasswordReset()">{{ 'users.saveButton' | t }}</button>
+                    <button class="btn btn-sm btn-outline-secondary" (click)="cancelPasswordReset()">{{ 'common.cancel' | t }}</button>
                   </div>
-                  <p class="form-text mb-0" *ngIf="accessAppFilter && !filterAppOptions(accessAppFilter).length">{{ 'users.noAppsMatch' | t:{ query: accessAppFilter } }}</p>
-                </div>
-                <ng-template #noAppOptions>
-                  <p class="form-text mt-0">{{ 'users.noAppsExposed' | t }}</p>
-                </ng-template>
-                <!-- What Save will do, before it is done: revoking access used to read only "Access updated." -->
-                <div class="small mt-2" aria-live="polite">
-                  <p class="access-change access-change--remove text-danger-emphasis mb-1" *ngIf="accessRemoved(user) as removed">{{ 'users.accessChange.remove' | t:{ apps: removed } }}</p>
-                  <p class="access-change access-change--add mb-1" *ngIf="accessAdded(user) as added">{{ 'users.accessChange.add' | t:{ apps: added } }}</p>
-                </div>
-                <div class="d-flex gap-2 mt-2">
-                  <button class="btn btn-sm btn-primary" [disabled]="savingAccess" (click)="submitAccessEdit()">
-                    {{ (savingAccess ? 'common.saving' : 'users.saveAccessButton') | t }}
-                  </button>
-                  <button class="btn btn-sm btn-outline-secondary" (click)="cancelAccessEdit()">{{ 'common.cancel' | t }}</button>
-                </div>
-              </td>
+                  <p class="form-text mb-0 mt-1 reset-hint" [id]="'reset-hint-' + user.id">{{ 'users.resetHint' | t }}</p>
+                </td>
+              </tr>
+            }
+            @if (accessEditId === user.id) {
+              <tr>
+                <td colspan="5">
+                  <div class="mb-2">
+                    <label class="form-label small fw-semibold mb-1" [for]="'access-email-' + user.id">{{ 'users.accessEmailLabel' | t }}</label>
+                    <input
+                      class="form-control form-control-sm field-email"
+                      type="email"
+                      [id]="'access-email-' + user.id"
+                      [placeholder]="'users.accessEmailPlaceholder' | t"
+                      [(ngModel)]="accessEmail"
+                      [ngModelOptions]="{ standalone: true }"
+                      autocomplete="off"
+                      />
+                  </div>
+                  @if (appOptions.length) {
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+                      <span class="form-label small fw-semibold mb-0">
+                        {{ 'users.form.appAccessLabel' | t }}
+                        <span class="text-body-secondary fw-normal">· {{ 'users.appAccess.count' | t:{ picked: pickedAppCount(accessApps), total: appOptions.length } }}</span>
+                      </span>
+                      <div class="d-flex gap-2">
+                        <input
+                          type="search"
+                          class="form-control form-control-sm field-filter"
+                          [attr.aria-label]="'users.form.appFilterPlaceholder' | t"
+                          [placeholder]="'users.form.appFilterPlaceholder' | t"
+                          [(ngModel)]="accessAppFilter"
+                          [ngModelOptions]="{ standalone: true }"
+                          />
+                        <div class="btn-group btn-group-sm">
+                          <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(accessApps, true)">{{ 'users.selectAllButton' | t }}</button>
+                          <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(accessApps, false)">{{ 'users.clearButton' | t }}</button>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                  @if (appOptions.length) {
+                    <div class="app-access-grid">
+                      @for (option of filterAppOptions(accessAppFilter); track option) {
+                        <div class="form-check app-access-chip">
+                          <input
+                            class="form-check-input"
+                            type="checkbox"
+                            [id]="'access-app-' + user.id + '-' + option.serviceName"
+                            [(ngModel)]="accessApps[option.serviceName]"
+                            [ngModelOptions]="{ standalone: true }"
+                            />
+                          <label class="form-check-label" [for]="'access-app-' + user.id + '-' + option.serviceName">
+                            {{ option.label }}
+                            @if (option.hostname) {
+                              <span class="text-body-secondary small"> · {{ option.hostname }}</span>
+                            }
+                            @for (group of option.requiredGroups; track group) {
+                              <span class="badge text-bg-secondary ms-1">{{ group }}</span>
+                            }
+                          </label>
+                        </div>
+                      }
+                      @if (accessAppFilter && !filterAppOptions(accessAppFilter).length) {
+                        <p class="form-text mb-0">{{ 'users.noAppsMatch' | t:{ query: accessAppFilter } }}</p>
+                      }
+                    </div>
+                  } @else {
+                    <p class="form-text mt-0">{{ 'users.noAppsExposed' | t }}</p>
+                  }
+                  <!-- What Save will do, before it is done: revoking access used to read only "Access updated." -->
+                  <div class="small mt-2" aria-live="polite">
+                    @if (accessRemoved(user); as removed) {
+                      <p class="access-change access-change--remove text-danger-emphasis mb-1">{{ 'users.accessChange.remove' | t:{ apps: removed } }}</p>
+                    }
+                    @if (accessAdded(user); as added) {
+                      <p class="access-change access-change--add mb-1">{{ 'users.accessChange.add' | t:{ apps: added } }}</p>
+                    }
+                  </div>
+                  <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-primary" [disabled]="savingAccess" (click)="submitAccessEdit()">
+                      {{ (savingAccess ? 'common.saving' : 'users.saveAccessButton') | t }}
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" (click)="cancelAccessEdit()">{{ 'common.cancel' | t }}</button>
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+          @if (!items.length && !loading) {
+            <tr>
+              <td colspan="5" class="text-center text-body-secondary py-4">{{ 'users.noUsersFound' | t }}</td>
             </tr>
-          </ng-container>
-          <tr *ngIf="!items.length && !loading">
-            <td colspan="5" class="text-center text-body-secondary py-4">{{ 'users.noUsersFound' | t }}</td>
-          </tr>
+          }
         </tbody>
       </table>
     </div>
@@ -332,15 +414,18 @@
 <ng-template #presetBar let-record>
   <div class="d-flex flex-wrap gap-2 align-items-center mb-2" role="group" [attr.aria-label]="'users.preset.label' | t">
     <span class="small text-body-secondary">{{ 'users.preset.label' | t }}</span>
-    <button
-      *ngFor="let preset of presets"
-      type="button"
-      class="preset btn btn-sm"
-      [class.btn-primary]="activePreset(record) === preset.id"
-      [class.btn-outline-secondary]="activePreset(record) !== preset.id"
-      [attr.aria-pressed]="activePreset(record) === preset.id"
-      (click)="applyPreset(record, preset)"
-    >{{ 'users.preset.' + preset.id | t }}</button>
-    <span class="small text-body-secondary" *ngIf="activePreset(record) === 'custom'">{{ 'users.preset.custom' | t }}</span>
+    @for (preset of presets; track preset) {
+      <button
+        type="button"
+        class="preset btn btn-sm"
+        [class.btn-primary]="activePreset(record) === preset.id"
+        [class.btn-outline-secondary]="activePreset(record) !== preset.id"
+        [attr.aria-pressed]="activePreset(record) === preset.id"
+        (click)="applyPreset(record, preset)"
+      >{{ 'users.preset.' + preset.id | t }}</button>
+    }
+    @if (activePreset(record) === 'custom') {
+      <span class="small text-body-secondary">{{ 'users.preset.custom' | t }}</span>
+    }
   </div>
 </ng-template>

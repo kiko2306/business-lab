@@ -17,10 +17,9 @@ import { Component, Input } from '@angular/core';
  * markup in auth-layout.spec.ts measures that the card is centred.
  */
 @Component({
-  selector: 'app-auth-shell',
-  standalone: true,
-  imports: [CommonModule],
-  templateUrl: './auth-shell.component.html',
+    selector: 'app-auth-shell',
+    imports: [CommonModule],
+    templateUrl: './auth-shell.component.html'
 })
 export class AuthShellComponent {
   @Input({ required: true }) kicker!: string;

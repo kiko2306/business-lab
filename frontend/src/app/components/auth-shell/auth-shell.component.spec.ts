@@ -6,14 +6,13 @@ import { AuthShellComponent } from './auth-shell.component';
 // of the card, and /recovery was a different design again. One shell, so the
 // four pages read as one flow.
 @Component({
-  standalone: true,
-  imports: [AuthShellComponent],
-  template: `
+    imports: [AuthShellComponent],
+    template: `
     <app-auth-shell kicker="Initial setup" title="Create the first administrator" [size]="size">
       <span auth-subtitle>A subtitle</span>
       <p id="body">The body</p>
       <a auth-footer id="footer" href="/login">Back</a>
-    </app-auth-shell>`,
+    </app-auth-shell>`
 })
 class HostComponent {
   size: 'narrow' | 'wide' = 'narrow';

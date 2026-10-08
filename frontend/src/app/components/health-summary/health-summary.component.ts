@@ -1,4 +1,4 @@
-import { NgClass, NgFor, NgIf } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { interval } from 'rxjs';
@@ -15,11 +15,10 @@ import { TranslateService } from '../../i18n/translate.service';
  * a later poll fails (the header strip behaves the same way).
  */
 @Component({
-  selector: 'app-health-summary',
-  standalone: true,
-  imports: [NgClass, NgFor, NgIf, TranslatePipe],
-  templateUrl: './health-summary.component.html',
-  styleUrl: './health-summary.component.css',
+    selector: 'app-health-summary',
+    imports: [NgClass, TranslatePipe],
+    templateUrl: './health-summary.component.html',
+    styleUrl: './health-summary.component.css'
 })
 export class HealthSummaryComponent implements OnInit {
   private readonly operations = inject(OperationsService);
@@ -47,9 +46,19 @@ export class HealthSummaryComponent implements OnInit {
     });
   }
 
-  // A getter, not a field: it re-reads the active language on every render.
+  private summaryCache?: { health: HealthStatus; locale: string; summary: HealthSummary };
+
+  // A getter so it follows the active language, but memoised on (read, language):
+  // a fresh object per call made `@if (summary; as s)` trip NG0100 in dev mode,
+  // since the alias is re-evaluated by the check-no-changes pass (Angular 21).
   protected get summary(): HealthSummary | null {
-    return this.health && summarizeHealth(this.health, (key, params) => this.translate.t(key, params));
+    if (!this.health) return null;
+    const locale = this.translate.locale();
+    if (this.summaryCache?.health !== this.health || this.summaryCache.locale !== locale) {
+      const summary = summarizeHealth(this.health, (key, params) => this.translate.t(key, params));
+      this.summaryCache = { health: this.health, locale, summary };
+    }
+    return this.summaryCache.summary;
   }
 
   protected get checkedAt(): string {

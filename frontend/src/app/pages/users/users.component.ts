@@ -34,11 +34,10 @@ function capsRecord(caps: readonly string[] | undefined): Record<Capability, boo
 }
 
 @Component({
-  selector: 'app-users',
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink, PanelComponent, TranslatePipe, FieldErrorDirective],
-  templateUrl: './users.component.html',
-  styleUrl: './users.component.css'
+    selector: 'app-users',
+    imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink, PanelComponent, TranslatePipe, FieldErrorDirective],
+    templateUrl: './users.component.html',
+    styleUrl: './users.component.css'
 })
 export class UsersComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);

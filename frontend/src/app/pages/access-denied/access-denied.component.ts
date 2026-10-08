@@ -19,11 +19,10 @@ import { FieldErrorDirective } from '../../components/field-error.directive';
  * whole point is that the visitor may hold no dashboard session at all.
  */
 @Component({
-  selector: 'app-access-denied',
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective, AuthShellComponent],
-  templateUrl: './access-denied.component.html',
-  styleUrl: './access-denied.component.css',
+    selector: 'app-access-denied',
+    imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective, AuthShellComponent],
+    templateUrl: './access-denied.component.html',
+    styleUrl: './access-denied.component.css'
 })
 export class AccessDeniedComponent {
   private readonly formBuilder = inject(FormBuilder);

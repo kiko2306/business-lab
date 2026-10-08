@@ -21,11 +21,10 @@ import { TranslateService } from '../../i18n/translate.service';
  * social-platform posting (slice 2) are still later phases.
  */
 @Component({
-  selector: 'app-social',
-  standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, PanelComponent, SubscribersComponent, TranslatePipe],
-  templateUrl: './social.component.html',
-  styleUrl: './social.component.css',
+    selector: 'app-social',
+    imports: [CommonModule, FormsModule, RouterLink, PanelComponent, SubscribersComponent, TranslatePipe],
+    templateUrl: './social.component.html',
+    styleUrl: './social.component.css'
 })
 export class SocialComponent implements OnInit {
   private readonly social = inject(SocialService);

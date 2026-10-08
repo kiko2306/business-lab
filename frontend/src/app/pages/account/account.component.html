@@ -1,132 +1,142 @@
 <main class="container-fluid py-4">
   <div class="mb-4">
     <h1 class="h3 mb-1">{{ 'account.title' | t }}</h1>
-    <p class="text-body-secondary mb-0">{{ 'account.subtitle.main' | t }}<span *ngIf="canManageBans">{{ 'account.subtitle.bansSuffix' | t }}</span>.</p>
+    <p class="text-body-secondary mb-0">{{ 'account.subtitle.main' | t }}@if (canManageBans) {
+      <span>{{ 'account.subtitle.bansSuffix' | t }}</span>
+    }.</p>
   </div>
 
-  <div *ngIf="errorMessage" class="alert alert-danger" role="alert">{{ errorMessage }}</div>
+  @if (errorMessage) {
+    <div class="alert alert-danger" role="alert">{{ errorMessage }}</div>
+  }
 
   <app-panel
     key="account:2fa"
     [defaultOpen]="true"
     [title]="'account.panel.title' | t"
     [subtitle]="'account.panel.subtitle' | t"
-  >
+    >
 
-      <p *ngIf="view === 'loading'" class="text-body-secondary mb-0">{{ 'common.loading' | t }}</p>
+    @if (view === 'loading') {
+      <p class="text-body-secondary mb-0">{{ 'common.loading' | t }}</p>
+    }
 
-      <!-- Current state, and the disable form when it's on -->
-      <ng-container *ngIf="view === 'status' && status">
-        <ng-container *ngIf="status.enabled; else disabledBlock">
-          <p class="mb-1" id="status-summary" tabindex="-1">
-            <span class="badge text-bg-success">{{ 'account.status.enabledBadge' | t }}</span>
-            <span class="ms-2 text-body-secondary">{{ 'account.status.enabledSince' | t:{ date: (status.enrolledAt | date:'dd/MM/yyyy':undefined:translate.locale()) ?? '' } }}</span>
-          </p>
-          <p class="text-body-secondary small">
-            {{ (status.recoveryCodesRemaining === 1 ? 'account.status.recoveryCodesRemaining.one' : 'account.status.recoveryCodesRemaining.other') | t:{ count: status.recoveryCodesRemaining } }}
-          </p>
-
-          <hr />
-          <h2 class="h6">{{ 'account.disable.heading' | t }}</h2>
-          <p class="text-body-secondary small">{{ 'account.disable.description' | t }}</p>
-          <form [formGroup]="disableForm" (ngSubmit)="disable()" class="row g-2 align-items-end">
-            <div class="col-12 col-sm-6">
-              <label class="form-label small mb-1" for="disable-code">{{ 'account.disable.codeLabel' | t }}</label>
-              <!-- No maxlength and no numeric keypad: a recovery code is longer and has letters. -->
-              <input
-                id="disable-code"
-                class="form-control"
-                formControlName="code"
-                autocomplete="one-time-code"
-                autocapitalize="none"
-                spellcheck="false"
-              />
-              <div class="text-danger small mt-1" appFieldError="disable-code" *ngIf="disableError">{{ disableError }}</div>
-            </div>
-            <div class="col-12 col-sm-auto">
-              <button class="btn btn-outline-danger" type="submit" [disabled]="busy">
-                {{ (busy ? 'account.disable.submitting' : 'account.disable.submitButton') | t }}
-              </button>
-            </div>
-          </form>
-        </ng-container>
-
-        <ng-template #disabledBlock>
-          <p class="mb-2" id="status-summary" tabindex="-1"><span class="badge text-bg-secondary">{{ 'account.disabledBlock.offBadge' | t }}</span></p>
-          <p class="text-body-secondary">
-            {{ 'account.disabledBlock.description' | t }}
-          </p>
-          <button class="btn btn-primary" (click)="beginSetup()" [disabled]="busy">
-            {{ (busy ? 'account.disabledBlock.starting' : 'account.disabledBlock.setupButton') | t }}
-          </button>
-        </ng-template>
-      </ng-container>
-
-      <!-- Enrolment: scan, then confirm a code -->
-      <ng-container *ngIf="view === 'enrolling'">
-        <h2 class="h6" id="enrolling-heading" tabindex="-1">{{ 'account.enrolling.heading' | t }}</h2>
-        <p class="mb-2">{{ 'account.enrolling.scanPrompt' | t }}</p>
-        <div class="qr my-3" role="img" [attr.aria-label]="'account.enrolling.qrLabel' | t" [innerHTML]="qrSvg"></div>
-        <p class="mb-2"><a class="open-in-app" [href]="otpauthUrl">{{ 'account.enrolling.openInApp' | t }}</a></p>
-        <p class="small text-body-secondary mb-2">
-          {{ 'account.enrolling.manualEntry' | t }}
-          <code class="user-select-all">{{ secret }}</code>
+    <!-- Current state, and the disable form when it's on -->
+    @if (view === 'status' && status) {
+      @if (status.enabled) {
+        <p class="mb-1" id="status-summary" tabindex="-1">
+          <span class="badge text-bg-success">{{ 'account.status.enabledBadge' | t }}</span>
+          <span class="ms-2 text-body-secondary">{{ 'account.status.enabledSince' | t:{ date: (status.enrolledAt | date:'dd/MM/yyyy':undefined:translate.locale()) ?? '' } }}</span>
         </p>
-        <button class="copy-key btn btn-outline-secondary btn-sm" type="button" (click)="copyKey()">{{ 'account.enrolling.copyKey' | t }}</button>
-        <p class="small text-body-secondary mt-2 mb-0">{{ 'account.enrolling.leaveWarning' | t }}</p>
-        <form [formGroup]="activateForm" (ngSubmit)="activate()" class="mt-3">
-          <label class="form-label fw-semibold" for="activate-code">{{ 'account.enrolling.codeLabel' | t }}</label>
-          <input
-            id="activate-code"
-            class="form-control form-control-lg activate-code"
-            formControlName="code"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            placeholder="123456"
-            maxlength="6"
-          />
-          <div
-            class="text-danger small mt-1"
-            appFieldError="activate-code"
-            *ngIf="activateError || (activateForm.controls.code.touched && activateForm.controls.code.invalid)"
-          >
-            {{ activateError || ('account.enrolling.codeError' | t) }}
+        <p class="text-body-secondary small">
+          {{ (status.recoveryCodesRemaining === 1 ? 'account.status.recoveryCodesRemaining.one' : 'account.status.recoveryCodesRemaining.other') | t:{ count: status.recoveryCodesRemaining } }}
+        </p>
+        <hr />
+        <h2 class="h6">{{ 'account.disable.heading' | t }}</h2>
+        <p class="text-body-secondary small">{{ 'account.disable.description' | t }}</p>
+        <form [formGroup]="disableForm" (ngSubmit)="disable()" class="row g-2 align-items-end">
+          <div class="col-12 col-sm-6">
+            <label class="form-label small mb-1" for="disable-code">{{ 'account.disable.codeLabel' | t }}</label>
+            <!-- No maxlength and no numeric keypad: a recovery code is longer and has letters. -->
+            <input
+              id="disable-code"
+              class="form-control"
+              formControlName="code"
+              autocomplete="one-time-code"
+              autocapitalize="none"
+              spellcheck="false"
+              />
+            @if (disableError) {
+              <div class="text-danger small mt-1" appFieldError="disable-code">{{ disableError }}</div>
+            }
           </div>
-          <div class="d-flex gap-2 mt-3">
-            <button class="btn btn-primary" type="submit" [disabled]="busy || activateForm.invalid">
-              {{ (busy ? 'account.enrolling.verifying' : 'account.enrolling.activateButton') | t }}
-            </button>
-            <button class="btn btn-outline-secondary" type="button" (click)="cancelSetup()" [disabled]="busy">
-              {{ 'common.cancel' | t }}
+          <div class="col-12 col-sm-auto">
+            <button class="btn btn-outline-danger" type="submit" [disabled]="busy">
+              {{ (busy ? 'account.disable.submitting' : 'account.disable.submitButton') | t }}
             </button>
           </div>
         </form>
-      </ng-container>
-
-      <!-- Recovery codes: shown once, right after activation -->
-      <ng-container *ngIf="view === 'recovery-codes'">
-        <h2 class="h6" id="recovery-heading" tabindex="-1">{{ 'account.recoveryCodes.heading' | t }}</h2>
-        <!-- The one fact that matters, loud: they are shown once. -->
-        <p class="recovery-warning fw-semibold text-warning-emphasis mb-1">{{ 'account.recoveryCodes.warning' | t }}</p>
-        <p class="text-body-secondary small">
-          {{ 'account.recoveryCodes.description' | t }}
+      } @else {
+        <p class="mb-2" id="status-summary" tabindex="-1"><span class="badge text-bg-secondary">{{ 'account.disabledBlock.offBadge' | t }}</span></p>
+        <p class="text-body-secondary">
+          {{ 'account.disabledBlock.description' | t }}
         </p>
-        <ul class="recovery-codes list-unstyled border rounded p-3" [attr.aria-label]="'account.recoveryCodes.heading' | t">
-          <li *ngFor="let rc of recoveryCodes"><code>{{ rc }}</code></li>
-        </ul>
-        <div class="recovery-actions d-flex flex-wrap gap-2">
-          <button class="btn btn-outline-secondary btn-sm" (click)="copyRecoveryCodes()">{{ 'account.recoveryCodes.copyButton' | t }}</button>
-          <button class="btn btn-outline-secondary btn-sm" (click)="downloadRecoveryCodes()">{{ 'account.recoveryCodes.downloadButton' | t }}</button>
-          <button class="recovery-done btn btn-primary btn-sm ms-auto" [disabled]="!codesStored" (click)="finishRecoveryCodes()">{{ 'account.recoveryCodes.doneButton' | t }}</button>
+        <button class="btn btn-primary" (click)="beginSetup()" [disabled]="busy">
+          {{ (busy ? 'account.disabledBlock.starting' : 'account.disabledBlock.setupButton') | t }}
+        </button>
+      }
+    }
+
+    <!-- Enrolment: scan, then confirm a code -->
+    @if (view === 'enrolling') {
+      <h2 class="h6" id="enrolling-heading" tabindex="-1">{{ 'account.enrolling.heading' | t }}</h2>
+      <p class="mb-2">{{ 'account.enrolling.scanPrompt' | t }}</p>
+      <div class="qr my-3" role="img" [attr.aria-label]="'account.enrolling.qrLabel' | t" [innerHTML]="qrSvg"></div>
+      <p class="mb-2"><a class="open-in-app" [href]="otpauthUrl">{{ 'account.enrolling.openInApp' | t }}</a></p>
+      <p class="small text-body-secondary mb-2">
+        {{ 'account.enrolling.manualEntry' | t }}
+        <code class="user-select-all">{{ secret }}</code>
+      </p>
+      <button class="copy-key btn btn-outline-secondary btn-sm" type="button" (click)="copyKey()">{{ 'account.enrolling.copyKey' | t }}</button>
+      <p class="small text-body-secondary mt-2 mb-0">{{ 'account.enrolling.leaveWarning' | t }}</p>
+      <form [formGroup]="activateForm" (ngSubmit)="activate()" class="mt-3">
+        <label class="form-label fw-semibold" for="activate-code">{{ 'account.enrolling.codeLabel' | t }}</label>
+        <input
+          id="activate-code"
+          class="form-control form-control-lg activate-code"
+          formControlName="code"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          placeholder="123456"
+          maxlength="6"
+          />
+        @if (activateError || (activateForm.controls.code.touched && activateForm.controls.code.invalid)) {
+          <div
+            class="text-danger small mt-1"
+            appFieldError="activate-code"
+            >
+            {{ activateError || ('account.enrolling.codeError' | t) }}
+          </div>
+        }
+        <div class="d-flex gap-2 mt-3">
+          <button class="btn btn-primary" type="submit" [disabled]="busy || activateForm.invalid">
+            {{ (busy ? 'account.enrolling.verifying' : 'account.enrolling.activateButton') | t }}
+          </button>
+          <button class="btn btn-outline-secondary" type="button" (click)="cancelSetup()" [disabled]="busy">
+            {{ 'common.cancel' | t }}
+          </button>
         </div>
-        <!-- Copying or downloading ticks this; so does writing them down. -->
-        <div class="form-check mt-2">
-          <input class="form-check-input" type="checkbox" id="codes-stored" [checked]="codesStored" (change)="codesStored = $any($event.target).checked" />
-          <label class="form-check-label small" for="codes-stored">{{ 'account.recoveryCodes.storedLabel' | t }}</label>
-        </div>
-      </ng-container>
+      </form>
+    }
+
+    <!-- Recovery codes: shown once, right after activation -->
+    @if (view === 'recovery-codes') {
+      <h2 class="h6" id="recovery-heading" tabindex="-1">{{ 'account.recoveryCodes.heading' | t }}</h2>
+      <!-- The one fact that matters, loud: they are shown once. -->
+      <p class="recovery-warning fw-semibold text-warning-emphasis mb-1">{{ 'account.recoveryCodes.warning' | t }}</p>
+      <p class="text-body-secondary small">
+        {{ 'account.recoveryCodes.description' | t }}
+      </p>
+      <ul class="recovery-codes list-unstyled border rounded p-3" [attr.aria-label]="'account.recoveryCodes.heading' | t">
+        @for (rc of recoveryCodes; track rc) {
+          <li><code>{{ rc }}</code></li>
+        }
+      </ul>
+      <div class="recovery-actions d-flex flex-wrap gap-2">
+        <button class="btn btn-outline-secondary btn-sm" (click)="copyRecoveryCodes()">{{ 'account.recoveryCodes.copyButton' | t }}</button>
+        <button class="btn btn-outline-secondary btn-sm" (click)="downloadRecoveryCodes()">{{ 'account.recoveryCodes.downloadButton' | t }}</button>
+        <button class="recovery-done btn btn-primary btn-sm ms-auto" [disabled]="!codesStored" (click)="finishRecoveryCodes()">{{ 'account.recoveryCodes.doneButton' | t }}</button>
+      </div>
+      <!-- Copying or downloading ticks this; so does writing them down. -->
+      <div class="form-check mt-2">
+        <input class="form-check-input" type="checkbox" id="codes-stored" [checked]="codesStored" (change)="codesStored = $any($event.target).checked" />
+        <label class="form-check-label small" for="codes-stored">{{ 'account.recoveryCodes.storedLabel' | t }}</label>
+      </div>
+    }
 
   </app-panel>
 
-  <app-crowdsec-bans *ngIf="canManageBans"></app-crowdsec-bans>
+  @if (canManageBans) {
+    <app-crowdsec-bans></app-crowdsec-bans>
+  }
 </main>

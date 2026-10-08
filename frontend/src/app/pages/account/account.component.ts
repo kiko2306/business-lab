@@ -21,11 +21,10 @@ import { FieldErrorDirective } from '../../components/field-error.directive';
 type View = 'loading' | 'status' | 'enrolling' | 'recovery-codes';
 
 @Component({
-  selector: 'app-account',
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, PanelComponent, CrowdsecBansComponent, TranslatePipe, FieldErrorDirective],
-  templateUrl: './account.component.html',
-  styleUrl: './account.component.css',
+    selector: 'app-account',
+    imports: [CommonModule, ReactiveFormsModule, PanelComponent, CrowdsecBansComponent, TranslatePipe, FieldErrorDirective],
+    templateUrl: './account.component.html',
+    styleUrl: './account.component.css'
 })
 export class AccountComponent implements OnInit {
   private readonly operations = inject(OperationsService);

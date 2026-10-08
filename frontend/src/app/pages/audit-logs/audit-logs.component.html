@@ -50,40 +50,52 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let item of items">
-            <td [attr.data-label]="'auditLogs.table.result' | t">
-              <span class="badge" [class.text-bg-success]="item.result === 'success'" [class.text-bg-danger]="item.result !== 'success'">
-                {{ resultText(item.result) }}
-              </span>
-            </td>
-            <td [attr.data-label]="'auditLogs.table.time' | t">{{ item.created_at | date:'dd/MM/yyyy, HH:mm':undefined:translate.locale() }}</td>
-            <td [attr.data-label]="'auditLogs.table.user' | t">{{ item.username || ('auditLogs.systemUser' | t) }}</td>
-            <td [attr.data-label]="'auditLogs.table.ip' | t">{{ item.ip || '—' }}</td>
-            <td [attr.data-label]="'auditLogs.table.action' | t" [attr.title]="item.action">{{ actionText(item.action) }}</td>
-            <td class="audit-resource" [attr.data-label]="'auditLogs.table.resource' | t">{{ item.resource || '—' }}</td>
-          </tr>
-          <tr *ngIf="loading">
-            <td colspan="6" role="status" class="text-center text-body-secondary py-4">{{ 'auditLogs.loading' | t }}</td>
-          </tr>
-          <tr *ngIf="failed && !loading">
-            <td colspan="6" role="alert" class="text-center py-4">
-              {{ 'auditLogs.errors.load' | t }}
-              <button class="btn btn-sm btn-outline-primary ms-2" (click)="load()">{{ 'auditLogs.retry' | t }}</button>
-            </td>
-          </tr>
-          <tr *ngIf="!items.length && !loading && !failed">
-            <td colspan="6" role="status" class="text-center text-body-secondary py-4">
-              {{ (filtered ? 'auditLogs.noMatch' : 'auditLogs.empty') | t }}
-              <button *ngIf="filtered" class="btn btn-sm btn-outline-secondary ms-2" (click)="clearFilters()">{{ 'auditLogs.clearFilters' | t }}</button>
-            </td>
-          </tr>
+          @for (item of items; track item) {
+            <tr>
+              <td [attr.data-label]="'auditLogs.table.result' | t">
+                <span class="badge" [class.text-bg-success]="item.result === 'success'" [class.text-bg-danger]="item.result !== 'success'">
+                  {{ resultText(item.result) }}
+                </span>
+              </td>
+              <td [attr.data-label]="'auditLogs.table.time' | t">{{ item.created_at | date:'dd/MM/yyyy, HH:mm':undefined:translate.locale() }}</td>
+              <td [attr.data-label]="'auditLogs.table.user' | t">{{ item.username || ('auditLogs.systemUser' | t) }}</td>
+              <td [attr.data-label]="'auditLogs.table.ip' | t">{{ item.ip || '—' }}</td>
+              <td [attr.data-label]="'auditLogs.table.action' | t" [attr.title]="item.action">{{ actionText(item.action) }}</td>
+              <td class="audit-resource" [attr.data-label]="'auditLogs.table.resource' | t">{{ item.resource || '—' }}</td>
+            </tr>
+          }
+          @if (loading) {
+            <tr>
+              <td colspan="6" role="status" class="text-center text-body-secondary py-4">{{ 'auditLogs.loading' | t }}</td>
+            </tr>
+          }
+          @if (failed && !loading) {
+            <tr>
+              <td colspan="6" role="alert" class="text-center py-4">
+                {{ 'auditLogs.errors.load' | t }}
+                <button class="btn btn-sm btn-outline-primary ms-2" (click)="load()">{{ 'auditLogs.retry' | t }}</button>
+              </td>
+            </tr>
+          }
+          @if (!items.length && !loading && !failed) {
+            <tr>
+              <td colspan="6" role="status" class="text-center text-body-secondary py-4">
+                {{ (filtered ? 'auditLogs.noMatch' : 'auditLogs.empty') | t }}
+                @if (filtered) {
+                  <button class="btn btn-sm btn-outline-secondary ms-2" (click)="clearFilters()">{{ 'auditLogs.clearFilters' | t }}</button>
+                }
+              </td>
+            </tr>
+          }
         </tbody>
       </table>
     </div>
 
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
       <div class="small text-body-secondary" role="status">
-        <ng-container *ngIf="items.length">{{ 'auditLogs.showing' | t:{ from: rangeFrom, to: rangeTo, total: total } }}</ng-container>
+        @if (items.length) {
+          {{ 'auditLogs.showing' | t:{ from: rangeFrom, to: rangeTo, total: total } }}
+        }
       </div>
       <div class="btn-group">
         <button class="btn btn-sm btn-outline-secondary" [disabled]="page <= 1" (click)="load(page - 1)">{{ 'auditLogs.previous' | t }}</button>

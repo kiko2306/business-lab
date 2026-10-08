@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { DatePipe, NgFor, NgIf } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { Component, ElementRef, OnInit, ViewChild, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
@@ -17,10 +17,9 @@ import { TranslateService } from '../../i18n/translate.service';
  * panel lets the owner see the list, add an address by hand and remove one.
  */
 @Component({
-  selector: 'app-subscribers',
-  standalone: true,
-  imports: [DatePipe, FormsModule, NgFor, NgIf, PanelComponent, TranslatePipe],
-  templateUrl: './subscribers.component.html',
+    selector: 'app-subscribers',
+    imports: [DatePipe, FormsModule, PanelComponent, TranslatePipe],
+    templateUrl: './subscribers.component.html'
 })
 export class SubscribersComponent implements OnInit {
   private readonly social = inject(SocialService);

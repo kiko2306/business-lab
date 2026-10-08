@@ -13,11 +13,10 @@ import { ModalFocusDirective } from '../modal-focus.directive';
  * Focus moves into the dialog and Enter works on the focused button, as usual.
  */
 @Component({
-  selector: 'app-confirm-dialog',
-  standalone: true,
-  imports: [CommonModule, TranslatePipe, ModalFocusDirective],
-  templateUrl: './confirm-dialog.component.html',
-  styleUrl: './confirm-dialog.component.css',
+    selector: 'app-confirm-dialog',
+    imports: [CommonModule, TranslatePipe, ModalFocusDirective],
+    templateUrl: './confirm-dialog.component.html',
+    styleUrl: './confirm-dialog.component.css'
 })
 export class ConfirmDialogComponent {
   protected readonly confirm = inject(ConfirmService);

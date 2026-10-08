@@ -33,11 +33,10 @@ function trimmedMaxLength(max: number): (control: AbstractControl) => Validation
  * automatically (§331).
  */
 @Component({
-  selector: 'app-network-settings',
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, PanelComponent, TranslatePipe, FieldErrorDirective],
-  templateUrl: './network-settings.component.html',
-  styleUrl: './network-settings.component.css',
+    selector: 'app-network-settings',
+    imports: [CommonModule, ReactiveFormsModule, FormsModule, PanelComponent, TranslatePipe, FieldErrorDirective],
+    templateUrl: './network-settings.component.html',
+    styleUrl: './network-settings.component.css'
 })
 export class NetworkSettingsComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);

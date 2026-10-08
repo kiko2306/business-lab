@@ -4,13 +4,12 @@ import { ConfirmService } from '../../core/confirm.service';
 import { ConfirmDialogComponent } from './confirm-dialog.component';
 
 @Component({
-  standalone: true,
-  imports: [ConfirmDialogComponent],
-  template: `
+    imports: [ConfirmDialogComponent],
+    template: `
     <button id="opener" type="button">Delete</button>
     <input id="behind" type="text" />
     <app-confirm-dialog />
-  `,
+  `
 })
 class HostComponent {}
 

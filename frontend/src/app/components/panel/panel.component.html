@@ -1,31 +1,37 @@
 <section class="card panel" [class.panel--open]="!collapsed" [attr.id]="anchor">
   <div class="panel__head">
     <!-- A heading, not a styled span: panels are a page's structure, and
-         heading navigation is how a screen-reader user moves through one.
-         Every in-panel heading is an h3, so this level keeps them in order. -->
+    heading navigation is how a screen-reader user moves through one.
+    Every in-panel heading is an h3, so this level keeps them in order. -->
     <h2 class="panel__heading">
-    <button
-      type="button"
-      class="panel__toggle"
-      [class.collapsed]="collapsed"
-      [attr.aria-expanded]="!collapsed"
-      (click)="toggle()"
-    >
-      <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-      <span class="panel__titles">
-        <span class="panel__title">{{ title }}</span>
-        <span class="panel__subtitle" *ngIf="subtitle">{{ subtitle }}</span>
-      </span>
-    </button>
+      <button
+        type="button"
+        class="panel__toggle"
+        [class.collapsed]="collapsed"
+        [attr.aria-expanded]="!collapsed"
+        (click)="toggle()"
+        >
+        <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span class="panel__titles">
+          <span class="panel__title">{{ title }}</span>
+          @if (subtitle) {
+            <span class="panel__subtitle">{{ subtitle }}</span>
+          }
+        </span>
+      </button>
     </h2>
-    <div class="panel__actions" *ngIf="!collapsed">
-      <ng-content select="[panel-actions]"></ng-content>
-    </div>
+    @if (!collapsed) {
+      <div class="panel__actions">
+        <ng-content select="[panel-actions]"></ng-content>
+      </div>
+    }
   </div>
 
-  <div class="panel__body card-body" *ngIf="!collapsed">
-    <ng-content></ng-content>
-  </div>
+  @if (!collapsed) {
+    <div class="panel__body card-body">
+      <ng-content></ng-content>
+    </div>
+  }
 </section>

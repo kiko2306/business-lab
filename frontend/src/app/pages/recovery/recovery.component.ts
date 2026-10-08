@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -10,11 +10,10 @@ import { TranslateService } from '../../i18n/translate.service';
 import { AuthShellComponent } from '../../components/auth-shell/auth-shell.component';
 
 @Component({
-  selector: 'app-recovery',
-  standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TranslatePipe, AuthShellComponent],
-  templateUrl: './recovery.component.html',
-  styleUrl: './recovery.component.css'
+    selector: 'app-recovery',
+    imports: [FormsModule, RouterLink, TranslatePipe, AuthShellComponent],
+    templateUrl: './recovery.component.html',
+    styleUrl: './recovery.component.css'
 })
 export class RecoveryComponent implements OnInit {
   private readonly operations = inject(OperationsService);

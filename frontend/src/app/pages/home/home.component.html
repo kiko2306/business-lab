@@ -1,32 +1,46 @@
 <main class="container-fluid py-4">
   <section class="mb-4">
     <h1 class="h3 mb-1">{{ 'home.title' | t }}</h1>
-    <p class="home-status text-body-secondary mb-0" aria-live="polite" *ngIf="showStatus && (serviceState.summary$ | async) as s; else subtitle">
-      <a *ngIf="s.total > 0; else subtitle" routerLink="/apps" class="home-status__link" [class.home-status__link--issue]="s.error > 0">
-        {{ (s.error ? 'apps.headline.needYou' : 'apps.headline.allFine') | t:{ count: s.error, total: s.total } }}
-      </a>
-    </p>
-    <ng-template #subtitle><p class="text-body-secondary mb-0">{{ 'home.subtitle' | t }}</p></ng-template>
+    @if (showStatus && (serviceState.summary$ | async); as s) {
+      <p class="home-status text-body-secondary mb-0" aria-live="polite">
+        @if (s.total > 0) {
+          <a routerLink="/apps" class="home-status__link" [class.home-status__link--issue]="s.error > 0">
+            {{ (s.error ? 'apps.headline.needYou' : 'apps.headline.allFine') | t:{ count: s.error, total: s.total } }}
+          </a>
+        } @else {
+          <p class="text-body-secondary mb-0">{{ 'home.subtitle' | t }}</p>
+        }
+      </p>
+    } @else {
+      <p class="text-body-secondary mb-0">{{ 'home.subtitle' | t }}</p>
+    }
   </section>
 
-  <app-health-summary class="d-block mb-4" *ngIf="showStatus"></app-health-summary>
+  @if (showStatus) {
+    <app-health-summary class="d-block mb-4"></app-health-summary>
+  }
 
   <div class="menu-grid">
-    <a
-      *ngFor="let tile of visibleTiles"
-      class="menu-tile card text-decoration-none text-reset"
-      [class.menu-tile--wide]="tile.wide && useBento"
-      [routerLink]="tile.link"
-    >
-      <span *ngIf="tile.badgeFor === 'updates' && updateAvailable" class="menu-tile__badge">{{ 'home.badge.updateAvailable' | t }}</span>
-      <span *ngIf="tile.badgeFor === 'backups' && lastBackupDaysAgo !== null" class="menu-tile__badge">
-        {{ (lastBackupDaysAgo === 0 ? 'home.badge.backupToday' : 'home.badge.backupDaysAgo') | t:{ days: lastBackupDaysAgo } }}
-      </span>
-      <div class="card-body">
-        <span class="menu-tile__icon" aria-hidden="true">{{ tile.initials }}</span>
-        <h2 class="h5 mb-1">{{ tile.titleKey | t }}</h2>
-        <p class="menu-tile__desc text-body-secondary small mb-0">{{ tile.descriptionKey | t }}</p>
-      </div>
-    </a>
+    @for (tile of visibleTiles; track tile) {
+      <a
+        class="menu-tile card text-decoration-none text-reset"
+        [class.menu-tile--wide]="tile.wide && useBento"
+        [routerLink]="tile.link"
+        >
+        @if (tile.badgeFor === 'updates' && updateAvailable) {
+          <span class="menu-tile__badge">{{ 'home.badge.updateAvailable' | t }}</span>
+        }
+        @if (tile.badgeFor === 'backups' && lastBackupDaysAgo !== null) {
+          <span class="menu-tile__badge">
+            {{ (lastBackupDaysAgo === 0 ? 'home.badge.backupToday' : 'home.badge.backupDaysAgo') | t:{ days: lastBackupDaysAgo } }}
+          </span>
+        }
+        <div class="card-body">
+          <span class="menu-tile__icon" aria-hidden="true">{{ tile.initials }}</span>
+          <h2 class="h5 mb-1">{{ tile.titleKey | t }}</h2>
+          <p class="menu-tile__desc text-body-secondary small mb-0">{{ tile.descriptionKey | t }}</p>
+        </div>
+      </a>
+    }
   </div>
 </main>

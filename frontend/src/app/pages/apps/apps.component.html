@@ -3,46 +3,53 @@
     <div>
       <h1 class="h3 mb-1">{{ 'apps.title' | t }}</h1>
       <p class="text-body-secondary mb-0" aria-live="polite">
-        <ng-container *ngIf="serviceState.summary$ | async as s; else subtitle">
+        @if (serviceState.summary$ | async; as s) {
           {{ (s.error ? 'apps.headline.needYou' : 'apps.headline.allFine') | t:{ count: s.error, total: s.total } }}
-        </ng-container>
-        <ng-template #subtitle>{{ 'apps.subtitle' | t }}</ng-template>
+        } @else {
+          {{ 'apps.subtitle' | t }}
+        }
       </p>
     </div>
     <button type="button" class="btn btn-outline-primary align-self-start" (click)="refresh()" [disabled]="serviceState.refreshing$ | async">
-      <span *ngIf="serviceState.refreshing$ | async" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+      @if (serviceState.refreshing$ | async) {
+        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+      }
       {{ 'apps.refresh' | t }}
     </button>
   </section>
 
-  <section class="summary-grid mb-3" *ngIf="serviceState.summary$ | async as summary">
-    <button type="button" class="summary-card text-start" [class.active]="stateFilter() === 'running'" [attr.aria-pressed]="stateFilter() === 'running'" (click)="toggleStateFilter('running')">
-      <span class="summary-label text-success">{{ 'apps.summary.running' | t }}</span>
-      <strong>{{ summary.running }}</strong>
-    </button>
-    <button type="button" class="summary-card text-start" [class.active]="stateFilter() === 'stopped'" [attr.aria-pressed]="stateFilter() === 'stopped'" (click)="toggleStateFilter('stopped')">
-      <span class="summary-label text-secondary">{{ 'apps.summary.stopped' | t }}</span>
-      <strong>{{ summary.stopped }}</strong>
-    </button>
-    <button type="button" class="summary-card text-start" [class.active]="stateFilter() === 'error'" [attr.aria-pressed]="stateFilter() === 'error'" (click)="toggleStateFilter('error')">
-      <span class="summary-label text-danger">{{ 'apps.summary.issues' | t }}</span>
-      <strong>{{ summary.error }}</strong>
-    </button>
-  </section>
+  @if (serviceState.summary$ | async; as summary) {
+    <section class="summary-grid mb-3">
+      <button type="button" class="summary-card text-start" [class.active]="stateFilter() === 'running'" [attr.aria-pressed]="stateFilter() === 'running'" (click)="toggleStateFilter('running')">
+        <span class="summary-label text-success">{{ 'apps.summary.running' | t }}</span>
+        <strong>{{ summary.running }}</strong>
+      </button>
+      <button type="button" class="summary-card text-start" [class.active]="stateFilter() === 'stopped'" [attr.aria-pressed]="stateFilter() === 'stopped'" (click)="toggleStateFilter('stopped')">
+        <span class="summary-label text-secondary">{{ 'apps.summary.stopped' | t }}</span>
+        <strong>{{ summary.stopped }}</strong>
+      </button>
+      <button type="button" class="summary-card text-start" [class.active]="stateFilter() === 'error'" [attr.aria-pressed]="stateFilter() === 'error'" (click)="toggleStateFilter('error')">
+        <span class="summary-label text-danger">{{ 'apps.summary.issues' | t }}</span>
+        <strong>{{ summary.error }}</strong>
+      </button>
+    </section>
+  }
 
-  <section class="mb-4 small text-body-secondary d-flex align-items-center gap-2" *ngIf="serviceState.lastUpdated$ | async as lastUpdated">
-    <span class="badge text-bg-secondary border">{{ ('apps.status.' + (serviceState.connectionStatus$ | async)) | t }}</span>
-    {{ 'apps.lastRefresh' | t:{ time: (lastUpdated | date:'short':undefined:translate.locale()) ?? '' } }}
-  </section>
+  @if (serviceState.lastUpdated$ | async; as lastUpdated) {
+    <section class="mb-4 small text-body-secondary d-flex align-items-center gap-2">
+      <span class="badge text-bg-secondary border">{{ ('apps.status.' + (serviceState.connectionStatus$ | async)) | t }}</span>
+      {{ 'apps.lastRefresh' | t:{ time: (lastUpdated | date:'short':undefined:translate.locale()) ?? '' } }}
+    </section>
+  }
 
   <app-panel
     anchor="apps"
     key="apps"
     [title]="'apps.allPanel.title' | t"
     [subtitle]="'apps.allPanel.subtitle' | t"
-  >
-    <ng-container *ngIf="serviceState.services$ | async as services; else loadingState">
-      <ng-container *ngIf="services.length; else emptyState">
+    >
+    @if (serviceState.services$ | async; as services) {
+      @if (services.length) {
         <div class="app-search input-group mb-4">
           <span class="input-group-text" aria-hidden="true">
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
@@ -58,65 +65,70 @@
             [ngModel]="appFilter()"
             (ngModelChange)="appFilter.set($event)"
             maxlength="64"
-          />
-          <button
-            *ngIf="appFilter()"
-            type="button"
-            class="btn btn-outline-secondary"
-            (click)="clearAppFilter()"
-          >
-            {{ 'apps.search.clear' | t }}
-          </button>
-        </div>
-
-        <!-- One subscription each for the two per-row inputs: they were inside
-             the row binding, so the page opened ~50 subscriptions to each of
-             the same two observables and re-made them on every re-render. -->
-        <ng-container *ngIf="{ operating: serviceState.operating$ | async, hostLanIp: serviceState.hostLanIp$ | async } as shared">
-          <p *ngIf="!matchCount()" class="text-body-secondary">
-            {{ (appFilter().trim() ? 'apps.search.noMatches' : 'apps.search.noneInState') | t:{ query: appFilter() } }}
-          </p>
-          <div class="service-group mb-4" *ngFor="let group of groups(); trackBy: trackByCategory">
-            <h3 class="h6 text-body-secondary text-uppercase mb-2">
-              <button
-                type="button"
-                class="section-toggle"
-                [class.collapsed]="isAppGroupCollapsed('apps:' + group.category, group.services)"
-                [attr.aria-expanded]="!isAppGroupCollapsed('apps:' + group.category, group.services)"
-                (click)="toggleAppGroup('apps:' + group.category)"
+            />
+          @if (appFilter()) {
+            <button
+              type="button"
+              class="btn btn-outline-secondary"
+              (click)="clearAppFilter()"
               >
-                <svg class="chevron" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-                <span>{{ 'apps.category.' + group.category | t }}</span>
-                <span class="badge rounded-pill text-bg-secondary border fw-normal">{{ group.services.length }}</span>
-              </button>
-            </h3>
-            <div class="service-rows" *ngIf="!isAppGroupCollapsed('apps:' + group.category, group.services)">
-              <app-service-card
-                *ngFor="let service of group.services; trackBy: trackByService"
-                [service]="service"
-                [allServices]="services"
-                [loadingAction]="shared.operating?.[service.name] ?? null"
-                [hostLanIp]="shared.hostLanIp"
-                (actionRequested)="handleAction(service.name, $event)"
-                (startWithNeedsRequested)="startWithNeeds(service.name)"
-              ></app-service-card>
+              {{ 'apps.search.clear' | t }}
+            </button>
+          }
+        </div>
+        <!-- One subscription each for the two per-row inputs: they were inside
+        the row binding, so the page opened ~50 subscriptions to each of
+        the same two observables and re-made them on every re-render. -->
+        @if ({ operating: serviceState.operating$ | async, hostLanIp: serviceState.hostLanIp$ | async }; as shared) {
+          @if (!matchCount()) {
+            <p class="text-body-secondary">
+              {{ (appFilter().trim() ? 'apps.search.noMatches' : 'apps.search.noneInState') | t:{ query: appFilter() } }}
+            </p>
+          }
+          @for (group of groups(); track trackByCategory($index, group)) {
+            <div class="service-group mb-4">
+              <h3 class="h6 text-body-secondary text-uppercase mb-2">
+                <button
+                  type="button"
+                  class="section-toggle"
+                  [class.collapsed]="isAppGroupCollapsed('apps:' + group.category, group.services)"
+                  [attr.aria-expanded]="!isAppGroupCollapsed('apps:' + group.category, group.services)"
+                  (click)="toggleAppGroup('apps:' + group.category)"
+                  >
+                  <svg class="chevron" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                  <span>{{ 'apps.category.' + group.category | t }}</span>
+                  <span class="badge rounded-pill text-bg-secondary border fw-normal">{{ group.services.length }}</span>
+                </button>
+              </h3>
+              @if (!isAppGroupCollapsed('apps:' + group.category, group.services)) {
+                <div class="service-rows">
+                  @for (service of group.services; track trackByService($index, service)) {
+                    <app-service-card
+                      [service]="service"
+                      [allServices]="services"
+                      [loadingAction]="shared.operating?.[service.name] ?? null"
+                      [hostLanIp]="shared.hostLanIp"
+                      (actionRequested)="handleAction(service.name, $event)"
+                      (startWithNeedsRequested)="startWithNeeds(service.name)"
+                    ></app-service-card>
+                  }
+                </div>
+              }
             </div>
-          </div>
-        </ng-container>
-      </ng-container>
-    </ng-container>
+          }
+        }
+      } @else {
+        <p class="text-body-secondary mb-0">{{ 'apps.empty' | t }}</p>
+      }
+    } @else {
+      <div class="d-flex align-items-center gap-3 text-body-secondary">
+        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+        <span>{{ 'apps.loading' | t }}</span>
+      </div>
+    }
   </app-panel>
 </main>
 
-<ng-template #loadingState>
-  <div class="d-flex align-items-center gap-3 text-body-secondary">
-    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-    <span>{{ 'apps.loading' | t }}</span>
-  </div>
-</ng-template>
 
-<ng-template #emptyState>
-  <p class="text-body-secondary mb-0">{{ 'apps.empty' | t }}</p>
-</ng-template>

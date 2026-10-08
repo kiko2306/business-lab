@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.169.0] — 2026-10-08
+
+### Security
+
+- Angular 18 → 21 for the dashboard (closes four high-severity advisories)
+
 ## [0.168.0] — 2026-10-08
 
 ### Security

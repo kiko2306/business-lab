@@ -31,11 +31,10 @@ const IN_PROGRESS_STATES: SelfUpdateRunState[] = [
  * keeps working if `settings:manage` is ever narrowed independently.
  */
 @Component({
-  selector: 'app-self-update',
-  standalone: true,
-  imports: [CommonModule, PanelComponent, TranslatePipe],
-  templateUrl: './self-update.component.html',
-  styleUrl: './self-update.component.css',
+    selector: 'app-self-update',
+    imports: [CommonModule, PanelComponent, TranslatePipe],
+    templateUrl: './self-update.component.html',
+    styleUrl: './self-update.component.css'
 })
 export class SelfUpdateComponent implements OnInit, OnDestroy {
   private readonly operations = inject(OperationsService);

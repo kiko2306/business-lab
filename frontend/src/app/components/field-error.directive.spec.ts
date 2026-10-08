@@ -3,15 +3,14 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FieldErrorDirective } from './field-error.directive';
 
 @Component({
-  standalone: true,
-  imports: [FieldErrorDirective],
-  template: `
+    imports: [FieldErrorDirective],
+    template: `
     <label for="smtpHost">Mail server</label>
     <input id="smtpHost" />
     @if (invalid) {
       <div class="form-text text-danger" appFieldError="smtpHost">Enter a hostname.</div>
     }
-  `,
+  `
 })
 class HostComponent {
   invalid = false;

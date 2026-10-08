@@ -25,75 +25,91 @@
         </button>
       </div>
       <p role="status" class="small text-body-secondary mt-2 mb-0 social-generate-status">{{ generating ? ('social.generateWait' | t) : '' }}</p>
-      <p role="alert" class="text-danger small mt-2 mb-0 social-generate-error" *ngIf="generateError">
-        {{ (generateError === 'noKey' ? 'social.errors.noAiKey' : 'social.errors.generate') | t }}
-        <a *ngIf="generateError === 'noKey'" routerLink="/settings" class="link-danger">{{ 'social.errors.settingsLink' | t }}</a>
-      </p>
+      @if (generateError) {
+        <p role="alert" class="text-danger small mt-2 mb-0 social-generate-error">
+          {{ (generateError === 'noKey' ? 'social.errors.noAiKey' : 'social.errors.generate') | t }}
+          @if (generateError === 'noKey') {
+            <a routerLink="/settings" class="link-danger">{{ 'social.errors.settingsLink' | t }}</a>
+          }
+        </p>
+      }
     </form>
   </app-panel>
 
   <app-panel key="social:drafts" [defaultOpen]="!!drafts?.length" [title]="'social.draftsPanel.title' | t" [subtitle]="'social.draftsPanel.subtitle' | t">
-    <div *ngIf="drafts === null && !loadFailed" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
-    <div *ngIf="loadFailed" role="alert" class="d-flex flex-wrap align-items-center gap-2 social-load-error">
-      <span class="text-danger">{{ 'social.errors.loadDrafts' | t }}</span>
-      <button type="button" class="btn btn-sm btn-outline-primary" (click)="loadDrafts()">{{ 'social.errors.retryLoad' | t }}</button>
-    </div>
-    <div *ngIf="drafts && drafts.length === 0" class="text-body-secondary small">
-      {{ 'social.noDraftsYet' | t }}
-    </div>
-
-    <div *ngFor="let draft of drafts" class="border rounded p-3 mb-3">
-      <p class="small text-body-secondary mb-2">
-        <span class="fw-semibold">{{ 'social.briefPrefix' | t }}</span> {{ draft.prompt }}
-      </p>
-      <textarea
-        class="form-control mb-2"
-        [id]="'draft-' + draft.id"
-        [attr.aria-label]="'social.draftEditorLabel' | t:{ brief: draft.prompt }"
-        rows="4"
-        [ngModel]="edits[draft.id]"
-        (ngModelChange)="edits[draft.id] = $event"
-        [ngModelOptions]="{ standalone: true }"
-      ></textarea>
-      <p class="small text-body-secondary mb-2 social-sent" *ngIf="draft.lastSentAt">
-        {{ (draft.lastSentCount === 1 ? 'social.sentLineOne' : 'social.sentLine') | t:{ date: (draft.lastSentAt | date: 'mediumDate':undefined:translate.locale()) ?? '', count: draft.lastSentCount ?? 0 } }}
-      </p>
-      <p class="small text-warning-emphasis mb-2 social-partial" *ngIf="partial[draft.id] as p">
-        {{ 'social.partialLine' | t:{ failed: p.failed, total: p.total } }}
-      </p>
-      <div class="d-flex align-items-center gap-2 flex-wrap">
-        <button type="button" class="btn btn-sm btn-primary" (click)="copy(draft)">
-          {{ 'social.copyButton' | t }}
-        </button>
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-primary"
-          [disabled]="savingId === draft.id || !isDirty(draft)"
-          (click)="save(draft)"
-        >
-          {{ (savingId === draft.id ? 'common.saving' : 'social.saveButton') | t }}
-        </button>
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-primary"
-          [disabled]="publishingId === draft.id"
-          (click)="publish(draft)"
-        >
-          {{ (publishingId === draft.id ? 'social.publishing' : 'social.publishButton') | t }}
-        </button>
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-danger"
-          [disabled]="deletingId === draft.id"
-          (click)="remove(draft)"
-        >
-          {{ (deletingId === draft.id ? 'social.deleting' : 'social.deleteButton') | t }}
-        </button>
-        <span class="small text-body-secondary ms-auto">
-          {{ draft.updatedAt | date: 'medium':undefined:translate.locale() }}
-        </span>
+    @if (drafts === null && !loadFailed) {
+      <div class="text-body-secondary small">{{ 'common.loading' | t }}</div>
+    }
+    @if (loadFailed) {
+      <div role="alert" class="d-flex flex-wrap align-items-center gap-2 social-load-error">
+        <span class="text-danger">{{ 'social.errors.loadDrafts' | t }}</span>
+        <button type="button" class="btn btn-sm btn-outline-primary" (click)="loadDrafts()">{{ 'social.errors.retryLoad' | t }}</button>
       </div>
-    </div>
+    }
+    @if (drafts && drafts.length === 0) {
+      <div class="text-body-secondary small">
+        {{ 'social.noDraftsYet' | t }}
+      </div>
+    }
+
+    @for (draft of drafts; track draft) {
+      <div class="border rounded p-3 mb-3">
+        <p class="small text-body-secondary mb-2">
+          <span class="fw-semibold">{{ 'social.briefPrefix' | t }}</span> {{ draft.prompt }}
+        </p>
+        <textarea
+          class="form-control mb-2"
+          [id]="'draft-' + draft.id"
+          [attr.aria-label]="'social.draftEditorLabel' | t:{ brief: draft.prompt }"
+          rows="4"
+          [ngModel]="edits[draft.id]"
+          (ngModelChange)="edits[draft.id] = $event"
+          [ngModelOptions]="{ standalone: true }"
+        ></textarea>
+        @if (draft.lastSentAt) {
+          <p class="small text-body-secondary mb-2 social-sent">
+            {{ (draft.lastSentCount === 1 ? 'social.sentLineOne' : 'social.sentLine') | t:{ date: (draft.lastSentAt | date: 'mediumDate':undefined:translate.locale()) ?? '', count: draft.lastSentCount ?? 0 } }}
+          </p>
+        }
+        @if (partial[draft.id]; as p) {
+          <p class="small text-warning-emphasis mb-2 social-partial">
+            {{ 'social.partialLine' | t:{ failed: p.failed, total: p.total } }}
+          </p>
+        }
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <button type="button" class="btn btn-sm btn-primary" (click)="copy(draft)">
+            {{ 'social.copyButton' | t }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-primary"
+            [disabled]="savingId === draft.id || !isDirty(draft)"
+            (click)="save(draft)"
+            >
+            {{ (savingId === draft.id ? 'common.saving' : 'social.saveButton') | t }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-primary"
+            [disabled]="publishingId === draft.id"
+            (click)="publish(draft)"
+            >
+            {{ (publishingId === draft.id ? 'social.publishing' : 'social.publishButton') | t }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-danger"
+            [disabled]="deletingId === draft.id"
+            (click)="remove(draft)"
+            >
+            {{ (deletingId === draft.id ? 'social.deleting' : 'social.deleteButton') | t }}
+          </button>
+          <span class="small text-body-secondary ms-auto">
+            {{ draft.updatedAt | date: 'medium':undefined:translate.locale() }}
+          </span>
+        </div>
+      </div>
+    }
   </app-panel>
 
   <app-subscribers />

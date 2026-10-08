@@ -84,11 +84,10 @@ function groupServicesByCategory(services: ServiceStatus[]): ServiceGroup[] {
  * one-page `DashboardComponent` is gone entirely as of §145.
  */
 @Component({
-  selector: 'app-apps',
-  standalone: true,
-  imports: [CommonModule, AsyncPipe, FormsModule, ServiceCardComponent, PanelComponent, TranslatePipe],
-  templateUrl: './apps.component.html',
-  styleUrl: './apps.component.css',
+    selector: 'app-apps',
+    imports: [CommonModule, AsyncPipe, FormsModule, ServiceCardComponent, PanelComponent, TranslatePipe],
+    templateUrl: './apps.component.html',
+    styleUrl: './apps.component.css'
 })
 export class AppsComponent implements OnInit, OnDestroy {
   protected readonly serviceState = inject(ServiceStateService);

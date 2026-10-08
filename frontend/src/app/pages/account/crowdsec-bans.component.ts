@@ -15,10 +15,9 @@ import { TranslateService } from '../../i18n/translate.service';
  * behind it requires.
  */
 @Component({
-  selector: 'app-crowdsec-bans',
-  standalone: true,
-  imports: [CommonModule, PanelComponent, TranslatePipe],
-  templateUrl: './crowdsec-bans.component.html',
+    selector: 'app-crowdsec-bans',
+    imports: [CommonModule, PanelComponent, TranslatePipe],
+    templateUrl: './crowdsec-bans.component.html'
 })
 export class CrowdsecBansComponent implements OnInit {
   private readonly settingsService = inject(SettingsService);

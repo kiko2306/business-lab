@@ -46,11 +46,10 @@ const KOPIA_STATUS_POLL_MS = 1000;
  * rather than another panel on an already-long dashboard.
  */
 @Component({
-  selector: 'app-backups',
-  standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, PanelComponent, TranslatePipe, ModalFocusDirective],
-  templateUrl: './backups.component.html',
-  styleUrl: './backups.component.css',
+    selector: 'app-backups',
+    imports: [CommonModule, FormsModule, ReactiveFormsModule, PanelComponent, TranslatePipe, ModalFocusDirective],
+    templateUrl: './backups.component.html',
+    styleUrl: './backups.component.css'
 })
 export class BackupsComponent implements OnInit, OnDestroy {
   private readonly operations = inject(OperationsService);

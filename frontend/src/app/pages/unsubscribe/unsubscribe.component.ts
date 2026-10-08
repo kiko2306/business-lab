@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { AuthShellComponent } from '../../components/auth-shell/auth-shell.component';
@@ -18,11 +18,10 @@ const REQUEST_TIMEOUT_MS = 15000;
  * scanner unsubscribe a customer who never tapped anything).
  */
 @Component({
-  selector: 'app-unsubscribe',
-  standalone: true,
-  imports: [CommonModule, AuthShellComponent, TranslatePipe],
-  templateUrl: './unsubscribe.component.html',
-  styleUrl: './unsubscribe.component.css',
+    selector: 'app-unsubscribe',
+    imports: [AuthShellComponent, TranslatePipe],
+    templateUrl: './unsubscribe.component.html',
+    styleUrl: './unsubscribe.component.css'
 })
 export class UnsubscribeComponent implements OnInit {
   private readonly operations = inject(OperationsService);

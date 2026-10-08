@@ -1,14 +1,16 @@
 <app-auth-shell [kicker]="'recovery.kicker' | t" [title]="'recovery.title' | t" size="wide">
   <span auth-subtitle>{{ 'recovery.subtitle' | t }}</span>
 
-  <div *ngIf="available === false" class="recovery-unavailable alert alert-info" role="status">
-    <strong class="d-block">{{ 'recovery.unavailable.title' | t }}</strong>
-    <p class="mb-2">{{ 'recovery.unavailable.text' | t }}</p>
-    <ul class="mb-0 list-unstyled">
-      <li><code class="user-select-all">./start.sh recover reset-password</code> — {{ 'recovery.unavailable.resetPassword' | t }}</li>
-      <li><code class="user-select-all">./start.sh recover disable-2fa</code> — {{ 'recovery.unavailable.disable2fa' | t }}</li>
-    </ul>
-  </div>
+  @if (available === false) {
+    <div class="recovery-unavailable alert alert-info" role="status">
+      <strong class="d-block">{{ 'recovery.unavailable.title' | t }}</strong>
+      <p class="mb-2">{{ 'recovery.unavailable.text' | t }}</p>
+      <ul class="mb-0 list-unstyled">
+        <li><code class="user-select-all">./start.sh recover reset-password</code> — {{ 'recovery.unavailable.resetPassword' | t }}</li>
+        <li><code class="user-select-all">./start.sh recover disable-2fa</code> — {{ 'recovery.unavailable.disable2fa' | t }}</li>
+      </ul>
+    </div>
+  }
 
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
     <div>

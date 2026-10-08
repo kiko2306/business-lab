@@ -1,4 +1,4 @@
-import { AsyncPipe, NgFor, NgIf } from '@angular/common';
+import { AsyncPipe } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { HealthSummaryComponent } from '../../components/health-summary/health-summary.component';
@@ -39,11 +39,10 @@ interface MenuTile {
  * of the app's areas, each its own route (plan.md §781).
  */
 @Component({
-  selector: 'app-home',
-  standalone: true,
-  imports: [AsyncPipe, HealthSummaryComponent, NgFor, NgIf, RouterLink, TranslatePipe],
-  templateUrl: './home.component.html',
-  styleUrl: './home.component.css',
+    selector: 'app-home',
+    imports: [AsyncPipe, HealthSummaryComponent, RouterLink, TranslatePipe],
+    templateUrl: './home.component.html',
+    styleUrl: './home.component.css'
 })
 export class HomeComponent implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);

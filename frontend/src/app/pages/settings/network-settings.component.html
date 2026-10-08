@@ -3,21 +3,24 @@
   anchor="cloudflare"
   [title]="'networkSettings.cloudflare.title' | t"
   [subtitle]="'networkSettings.cloudflare.subtitle' | t"
->
+  >
   <span panel-actions class="badge" [ngClass]="configuredSettings?.configured ? 'text-bg-success' : 'text-bg-secondary'">
     {{ (configuredSettings?.configured ? 'networkSettings.configuredBadge' : 'networkSettings.notConfiguredBadge') | t }}
   </span>
 
-  <div *ngIf="loading" class="d-flex align-items-center gap-2 text-body-secondary">
-    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-    {{ 'networkSettings.loadingSettings' | t }}
-  </div>
-
-  <ng-container *ngIf="!loading">
-    <div *ngIf="feedback" class="alert" [ngClass]="'alert-' + feedback.type">
-      {{ feedback.message }}
+  @if (loading) {
+    <div class="d-flex align-items-center gap-2 text-body-secondary">
+      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+      {{ 'networkSettings.loadingSettings' | t }}
     </div>
+  }
 
+  @if (!loading) {
+    @if (feedback) {
+      <div class="alert" [ngClass]="'alert-' + feedback.type">
+        {{ feedback.message }}
+      </div>
+    }
     <div class="mb-3">
       <label class="form-label fw-semibold" for="cloudflareToken">{{ 'networkSettings.apiTokenLabel' | t }}</label>
       <div class="input-group">
@@ -30,7 +33,7 @@
           autocomplete="off"
           maxlength="4096"
           (paste)="sanitizeTokenPaste($event)"
-        />
+          />
         <button type="button" class="btn btn-outline-secondary" (click)="showToken = !showToken">
           {{ (showToken ? 'networkSettings.hideButton' : 'networkSettings.showButton') | t }}
         </button>
@@ -38,28 +41,32 @@
       <div class="form-text">
         {{ configuredSettings?.permissionExplanation }}
       </div>
-      <div *ngIf="validationMessage() && (form.controls.token.touched || form.controls.token.dirty)" class="text-danger small mt-2" appFieldError="cloudflareToken">
-        {{ validationMessage() }}
+      @if (validationMessage() && (form.controls.token.touched || form.controls.token.dirty)) {
+        <div class="text-danger small mt-2" appFieldError="cloudflareToken">
+          {{ validationMessage() }}
+        </div>
+      }
+    </div>
+    @if (configuredSettings?.configured) {
+      <div class="current-token">
+        {{ 'networkSettings.currentSavedToken' | t }} <span>{{ configuredSettings?.tokenMasked }}</span>
       </div>
-    </div>
-
-    <div class="current-token" *ngIf="configuredSettings?.configured">
-      {{ 'networkSettings.currentSavedToken' | t }} <span>{{ configuredSettings?.tokenMasked }}</span>
-    </div>
-
+    }
     <div class="d-flex flex-wrap gap-2 mt-3">
       <button type="button" class="btn btn-primary" [disabled]="saving || form.invalid" (click)="save()">
-        <span *ngIf="saving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        @if (saving) {
+          <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        }
         {{ 'networkSettings.saveTokenButton' | t }}
       </button>
       <button type="button" class="btn btn-outline-primary" [disabled]="testing" (click)="testConnection()">
-        <span *ngIf="testing" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        @if (testing) {
+          <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        }
         {{ 'networkSettings.testConnectionButton' | t }}
       </button>
     </div>
-
     <hr class="my-4" />
-
     <label class="form-label fw-semibold" for="cfAccountModel">{{ 'networkSettings.accountModelLabel' | t }}</label>
     <select
       id="cfAccountModel"
@@ -67,7 +74,7 @@
       [disabled]="savingAccountModel"
       [ngModel]="configuredSettings?.accountModel"
       (ngModelChange)="saveAccountModel($event)"
-    >
+      >
       <option [ngValue]="null" disabled>{{ 'networkSettings.accountModel.choose' | t }}</option>
       <option value="self-controlled">{{ 'networkSettings.accountModel.selfControlled' | t }}</option>
       <option value="contracted">{{ 'networkSettings.accountModel.contracted' | t }}</option>
@@ -75,43 +82,50 @@
     <div class="form-text">
       {{ 'networkSettings.accountModelHint' | t }}
     </div>
-  </ng-container>
+  }
 </app-panel>
 
 <app-panel
   key="settings:exposure"
   [title]="'networkSettings.exposure.title' | t"
   [subtitle]="'networkSettings.exposure.subtitle' | t"
->
+  >
   <span panel-actions class="badge" [ngClass]="exposureSettings?.configured ? 'text-bg-success' : 'text-bg-secondary'">
     {{ (exposureSettings?.configured ? 'networkSettings.configuredBadge' : 'networkSettings.notConfiguredBadge') | t }}
   </span>
 
-  <div *ngIf="exposureLoading" class="d-flex align-items-center gap-2 text-body-secondary">
-    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-    {{ 'networkSettings.loadingSettings' | t }}
-  </div>
-
-  <ng-container *ngIf="!exposureLoading">
-    <div *ngIf="exposureFeedback" class="alert" [ngClass]="'alert-' + exposureFeedback.type">
-      {{ exposureFeedback.message }}
+  @if (exposureLoading) {
+    <div class="d-flex align-items-center gap-2 text-body-secondary">
+      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+      {{ 'networkSettings.loadingSettings' | t }}
     </div>
+  }
 
+  @if (!exposureLoading) {
+    @if (exposureFeedback) {
+      <div class="alert" [ngClass]="'alert-' + exposureFeedback.type">
+        {{ exposureFeedback.message }}
+      </div>
+    }
     <form [formGroup]="exposureForm" (ngSubmit)="saveExposure()">
       <div class="row g-3">
         <div class="col-12 col-md-6">
           <label class="form-label fw-semibold" for="exposureBaseDomain">{{ 'networkSettings.field.baseDomain' | t }}</label>
           <input id="exposureBaseDomain" class="form-control" placeholder="example.com" formControlName="baseDomain" />
-          <div *ngIf="exposureValidationMessage('baseDomain', 'networkSettings.field.baseDomain' | t)" class="text-danger small mt-2" appFieldError="exposureBaseDomain">
-            {{ exposureValidationMessage('baseDomain', 'networkSettings.field.baseDomain' | t) }}
-          </div>
+          @if (exposureValidationMessage('baseDomain', 'networkSettings.field.baseDomain' | t)) {
+            <div class="text-danger small mt-2" appFieldError="exposureBaseDomain">
+              {{ exposureValidationMessage('baseDomain', 'networkSettings.field.baseDomain' | t) }}
+            </div>
+          }
         </div>
         <div class="col-12 col-md-6">
           <label class="form-label fw-semibold" for="exposureCloudflareTunnelId">{{ 'networkSettings.field.cloudflareTunnelId' | t }}</label>
           <input id="exposureCloudflareTunnelId" class="form-control" formControlName="cloudflareTunnelId" />
-          <div *ngIf="exposureValidationMessage('cloudflareTunnelId', 'networkSettings.field.cloudflareTunnelId' | t)" class="text-danger small mt-2" appFieldError="exposureCloudflareTunnelId">
-            {{ exposureValidationMessage('cloudflareTunnelId', 'networkSettings.field.cloudflareTunnelId' | t) }}
-          </div>
+          @if (exposureValidationMessage('cloudflareTunnelId', 'networkSettings.field.cloudflareTunnelId' | t)) {
+            <div class="text-danger small mt-2" appFieldError="exposureCloudflareTunnelId">
+              {{ exposureValidationMessage('cloudflareTunnelId', 'networkSettings.field.cloudflareTunnelId' | t) }}
+            </div>
+          }
         </div>
         <div class="col-12 col-md-6">
           <label class="form-label fw-semibold" for="exposureNpmApiUrl">{{ 'networkSettings.field.npmApiUrl' | t }}</label>
@@ -121,9 +135,11 @@
         <div class="col-12 col-md-6">
           <label class="form-label fw-semibold" for="exposureNpmEmail">{{ 'networkSettings.field.npmEmail' | t }}</label>
           <input id="exposureNpmEmail" class="form-control" type="email" formControlName="npmEmail" />
-          <div *ngIf="exposureValidationMessage('npmEmail', 'networkSettings.field.npmEmail' | t)" class="text-danger small mt-2" appFieldError="exposureNpmEmail">
-            {{ exposureValidationMessage('npmEmail', 'networkSettings.field.npmEmail' | t) }}
-          </div>
+          @if (exposureValidationMessage('npmEmail', 'networkSettings.field.npmEmail' | t)) {
+            <div class="text-danger small mt-2" appFieldError="exposureNpmEmail">
+              {{ exposureValidationMessage('npmEmail', 'networkSettings.field.npmEmail' | t) }}
+            </div>
+          }
         </div>
         <div class="col-12 col-md-6">
           <label class="form-label fw-semibold" for="exposureNpmPassword">{{ 'networkSettings.field.npmPassword' | t }}</label>
@@ -134,16 +150,19 @@
             autocomplete="off"
             [placeholder]="exposureSettings?.npmPasswordConfigured ? ('networkSettings.npmPasswordPlaceholder' | t) : ''"
             formControlName="npmPassword"
-          />
-          <div *ngIf="exposureValidationMessage('npmPassword', 'networkSettings.field.npmPassword' | t)" class="text-danger small mt-2" appFieldError="exposureNpmPassword">
-            {{ exposureValidationMessage('npmPassword', 'networkSettings.field.npmPassword' | t) }}
-          </div>
+            />
+          @if (exposureValidationMessage('npmPassword', 'networkSettings.field.npmPassword' | t)) {
+            <div class="text-danger small mt-2" appFieldError="exposureNpmPassword">
+              {{ exposureValidationMessage('npmPassword', 'networkSettings.field.npmPassword' | t) }}
+            </div>
+          }
         </div>
       </div>
-
       <div class="d-flex flex-wrap gap-2 mt-3">
         <button type="submit" class="btn btn-primary" [disabled]="savingExposure">
-          <span *ngIf="savingExposure" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+          @if (savingExposure) {
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+          }
           {{ 'networkSettings.saveExposureButton' | t }}
         </button>
         <button
@@ -152,18 +171,22 @@
           [disabled]="testingExposure || !exposureSettings?.configured"
           [title]="!exposureSettings?.configured ? ('networkSettings.testExposureTitleDisabled' | t) : ''"
           (click)="testExposureConnection()"
-        >
-          <span *ngIf="testingExposure" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+          >
+          @if (testingExposure) {
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+          }
           {{ 'networkSettings.testConnectionButton' | t }}
         </button>
         <!-- The account and zone follow from the token and the domain, so the backend looks
-             them up on save (plan.md §785); typing here only overrides that. -->
+        them up on save (plan.md §785); typing here only overrides that. -->
         <details class="exposure-advanced col-12">
           <summary>{{ 'networkSettings.advanced.summary' | t }}</summary>
           <p class="form-text mb-2">{{ 'networkSettings.advanced.hint' | t }}</p>
-          <p *ngIf="exposureSettings?.cloudflareAccountId || exposureSettings?.cloudflareZoneId" class="small text-body-secondary mb-2">
-            {{ 'networkSettings.advanced.found' | t:{ account: exposureSettings?.cloudflareAccountId ?? '—', zone: exposureSettings?.cloudflareZoneId ?? '—' } }}
-          </p>
+          @if (exposureSettings?.cloudflareAccountId || exposureSettings?.cloudflareZoneId) {
+            <p class="small text-body-secondary mb-2">
+              {{ 'networkSettings.advanced.found' | t:{ account: exposureSettings?.cloudflareAccountId ?? '—', zone: exposureSettings?.cloudflareZoneId ?? '—' } }}
+            </p>
+          }
           <div class="row g-3">
             <div class="col-12 col-md-6">
               <label class="form-label" for="exposureCloudflareAccountId">{{ 'networkSettings.field.cloudflareAccountId' | t }}</label>
@@ -177,18 +200,18 @@
         </details>
       </div>
     </form>
-
-    <div *ngIf="exposureTestResult" class="mt-3">
-      <div class="alert mb-2" [ngClass]="exposureTestResult.npm.success ? 'alert-success' : 'alert-danger'">
-        <strong>{{ 'networkSettings.npmResultLabel' | t }}</strong> {{ exposureTestResult.npm.message }}
+    @if (exposureTestResult) {
+      <div class="mt-3">
+        <div class="alert mb-2" [ngClass]="exposureTestResult.npm.success ? 'alert-success' : 'alert-danger'">
+          <strong>{{ 'networkSettings.npmResultLabel' | t }}</strong> {{ exposureTestResult.npm.message }}
+        </div>
+        <div class="alert mb-0" [ngClass]="exposureTestResult.cloudflare.success ? 'alert-success' : 'alert-danger'">
+          <strong>{{ 'networkSettings.cloudflareResultLabel' | t }}</strong> {{ exposureTestResult.cloudflare.message }}
+        </div>
       </div>
-      <div class="alert mb-0" [ngClass]="exposureTestResult.cloudflare.success ? 'alert-success' : 'alert-danger'">
-        <strong>{{ 'networkSettings.cloudflareResultLabel' | t }}</strong> {{ exposureTestResult.cloudflare.message }}
-      </div>
-    </div>
-
+    }
     <p class="form-text mt-3 mb-0">
       {{ 'networkSettings.exposureFooterNote' | t }}
     </p>
-  </ng-container>
+  }
 </app-panel>

@@ -1,18 +1,19 @@
-import { NgIf } from '@angular/common';
+
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ModalFocusDirective } from './modal-focus.directive';
 
 @Component({
-  standalone: true,
-  imports: [NgIf, ModalFocusDirective],
-  template: `
+    imports: [ModalFocusDirective],
+    template: `
     <button id="opener" type="button">open</button>
-    <div *ngIf="open" id="dialog" appModalFocus [dismissible]="dismissible" (dismiss)="dismissed = dismissed + 1">
-      <button id="first" type="button">first</button>
-      <button id="last" type="button">last</button>
-    </div>
-  `,
+    @if (open) {
+      <div id="dialog" appModalFocus [dismissible]="dismissible" (dismiss)="dismissed = dismissed + 1">
+        <button id="first" type="button">first</button>
+        <button id="last" type="button">last</button>
+      </div>
+    }
+    `
 })
 class HostComponent {
   open = false;

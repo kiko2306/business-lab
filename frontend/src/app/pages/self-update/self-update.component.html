@@ -12,54 +12,70 @@
     [defaultOpen]="true"
     [title]="'selfUpdate.panel.title' | t"
     [subtitle]="'selfUpdate.panel.subtitle' | t"
-  >
-    <div class="card mb-3" *ngIf="status as s">
-      <div class="card-body p-4">
-        <!-- One line to lead with, read from the latest run as well as the check (plan.md §839). -->
-        <p id="update-status" tabindex="-1" class="h5 mb-3" *ngIf="overallStatus as st">
-          <span class="badge status-badge" [ngClass]="'text-bg-' + st.kind">{{ st.key | t:st.params }}</span>
-        </p>
-        <dl class="row mb-0 small">
-          <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.runningVersion' | t }}</dt>
-          <dd class="col-sm-8 font-monospace">v{{ s.appVersion }}</dd>
-
-          <ng-container *ngIf="s.check as check">
-            <!-- The raw commit hashes this used to show here were never
-                 meaningful to a non-technical reader — removed rather than
-                 translated (found during an audit, plan.md §791, §794). -->
-            <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.lastChecked' | t }}</dt>
-            <dd class="col-sm-8">
-              {{ check.checkedAt | date: 'medium':undefined:translate.locale() }}
-              <span *ngIf="checkIsStale" class="badge status-badge text-bg-warning ms-1">{{ 'selfUpdate.stale' | t }}</span>
-            </dd>
-          </ng-container>
-        </dl>
-
-        <div class="alert alert-warning small mt-3 mb-0" *ngIf="s.lastCheckError as err">
-          {{ 'selfUpdate.lastCheckFailed' | t:{ time: (err.at | date: 'medium':undefined:translate.locale()) ?? '' } }}
-          <details class="mt-1">
-            <summary>{{ 'selfUpdate.failed.details' | t }}</summary>
-            <pre class="failure-details font-monospace small mt-2 mb-0">{{ err.message }}</pre>
-          </details>
-        </div>
-        <div id="update-progress" class="alert alert-info small mt-3 mb-0" role="status" tabindex="-1" *ngIf="runInProgress && s.latestRun as run">
-          <strong *ngIf="stepOf(run.state) as step" class="me-1">{{ 'selfUpdate.step' | t:{ step: step, total: totalSteps } }}.</strong>
-          {{ ('selfUpdate.progress.' + run.state) | t }}<span *ngIf="run.detail">: {{ detailText(run.detail) }}</span>
-          <span class="d-block mt-1">{{ 'selfUpdate.keepOpen' | t }}</span>
-        </div>
-        <div id="update-failed" tabindex="-1" class="alert alert-danger small mt-3 mb-0" role="alert" *ngIf="!runInProgress && s.latestRun?.state === 'error'">
-          <strong class="d-block">{{ failureHeadlineKey(s.latestRun!) | t }}</strong>
-          <details class="mt-2" *ngIf="s.latestRun?.errorMessage">
-            <summary>{{ 'selfUpdate.failed.details' | t }}</summary>
-            <pre class="failure-details font-monospace small mt-2 mb-0">{{ s.latestRun?.errorMessage }}</pre>
-          </details>
-        </div>
-        <ng-container *ngIf="appsFailedOf(s.latestRun) as failedApps">
-          <div id="update-apps-failed" tabindex="-1" class="alert alert-warning apps-failed small mt-3 mb-0" role="alert" *ngIf="failedApps.length">
-            {{ (failedApps.length === 1 ? 'selfUpdate.appsFailed.one' : 'selfUpdate.appsFailed.other') | t:{ count: failedApps.length, apps: failedApps.join(', ') } }}
+    >
+    @if (status; as s) {
+      <div class="card mb-3">
+        <div class="card-body p-4">
+          <!-- One line to lead with, read from the latest run as well as the check (plan.md §839). -->
+          @if (overallStatus; as st) {
+            <p id="update-status" tabindex="-1" class="h5 mb-3">
+              <span class="badge status-badge" [ngClass]="'text-bg-' + st.kind">{{ st.key | t:st.params }}</span>
+            </p>
+          }
+          <dl class="row mb-0 small">
+            <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.runningVersion' | t }}</dt>
+            <dd class="col-sm-8 font-monospace">v{{ s.appVersion }}</dd>
+            @if (s.check; as check) {
+              <!-- The raw commit hashes this used to show here were never
+              meaningful to a non-technical reader — removed rather than
+              translated (found during an audit, plan.md §791, §794). -->
+              <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.lastChecked' | t }}</dt>
+              <dd class="col-sm-8">
+                {{ check.checkedAt | date: 'medium':undefined:translate.locale() }}
+                @if (checkIsStale) {
+                  <span class="badge status-badge text-bg-warning ms-1">{{ 'selfUpdate.stale' | t }}</span>
+                }
+              </dd>
+            }
+          </dl>
+          @if (s.lastCheckError; as err) {
+            <div class="alert alert-warning small mt-3 mb-0">
+              {{ 'selfUpdate.lastCheckFailed' | t:{ time: (err.at | date: 'medium':undefined:translate.locale()) ?? '' } }}
+              <details class="mt-1">
+                <summary>{{ 'selfUpdate.failed.details' | t }}</summary>
+                <pre class="failure-details font-monospace small mt-2 mb-0">{{ err.message }}</pre>
+              </details>
+            </div>
+          }
+          @if (runInProgress && s.latestRun; as run) {
+            <div id="update-progress" class="alert alert-info small mt-3 mb-0" role="status" tabindex="-1">
+              @if (stepOf(run.state); as step) {
+                <strong class="me-1">{{ 'selfUpdate.step' | t:{ step: step, total: totalSteps } }}.</strong>
+              }
+              {{ ('selfUpdate.progress.' + run.state) | t }}@if (run.detail) {
+              <span>: {{ detailText(run.detail) }}</span>
+            }
+            <span class="d-block mt-1">{{ 'selfUpdate.keepOpen' | t }}</span>
           </div>
-        </ng-container>
-
+        }
+        @if (!runInProgress && s.latestRun?.state === 'error') {
+          <div id="update-failed" tabindex="-1" class="alert alert-danger small mt-3 mb-0" role="alert">
+            <strong class="d-block">{{ failureHeadlineKey(s.latestRun!) | t }}</strong>
+            @if (s.latestRun?.errorMessage) {
+              <details class="mt-2">
+                <summary>{{ 'selfUpdate.failed.details' | t }}</summary>
+                <pre class="failure-details font-monospace small mt-2 mb-0">{{ s.latestRun?.errorMessage }}</pre>
+              </details>
+            }
+          </div>
+        }
+        @if (appsFailedOf(s.latestRun); as failedApps) {
+          @if (failedApps.length) {
+            <div id="update-apps-failed" tabindex="-1" class="alert alert-warning apps-failed small mt-3 mb-0" role="alert">
+              {{ (failedApps.length === 1 ? 'selfUpdate.appsFailed.one' : 'selfUpdate.appsFailed.other') | t:{ count: failedApps.length, apps: failedApps.join(', ') } }}
+            </div>
+          }
+        }
         <div class="d-flex gap-2 mt-3">
           <button
             id="check-now"
@@ -68,7 +84,7 @@
             [attr.aria-describedby]="runInProgress ? 'update-progress' : null"
             [disabled]="checking || runInProgress"
             (click)="checkNow()"
-          >
+            >
             {{ (checking ? 'selfUpdate.checking' : 'selfUpdate.checkNowButton') | t }}
           </button>
           <button
@@ -78,11 +94,12 @@
             [attr.aria-describedby]="runInProgress ? 'update-progress' : null"
             [disabled]="checking || triggering || runInProgress"
             (click)="updateNow()"
-          >
+            >
             {{ (triggering || runInProgress ? 'selfUpdate.updating' : checking ? 'selfUpdate.checking' : 'selfUpdate.updateNowButton') | t }}
           </button>
         </div>
       </div>
     </div>
-  </app-panel>
+  }
+</app-panel>
 </main>

@@ -36,11 +36,10 @@ import { FieldErrorDirective } from '../../components/field-error.directive';
  * pushes and the shared mailbox.
  */
 @Component({
-  selector: 'app-settings',
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink, PanelComponent, NetworkSettingsComponent, NetworkScanComponent, TranslatePipe, FieldErrorDirective],
-  templateUrl: './settings.component.html',
-  styleUrl: './settings.component.css'
+    selector: 'app-settings',
+    imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink, PanelComponent, NetworkSettingsComponent, NetworkScanComponent, TranslatePipe, FieldErrorDirective],
+    templateUrl: './settings.component.html',
+    styleUrl: './settings.component.css'
 })
 export class SettingsComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);

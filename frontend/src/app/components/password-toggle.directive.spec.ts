@@ -5,11 +5,10 @@ import { PasswordToggleDirective } from './password-toggle.directive';
 // plan.md §827 fix 4: a 16-character password typed blind on a phone, with no
 // way to see it, is the commonest reason for a second attempt.
 @Component({
-  standalone: true,
-  imports: [PasswordToggleDirective],
-  template: `
+    imports: [PasswordToggleDirective],
+    template: `
     <input id="pw" type="password" />
-    <button type="button" appPasswordToggle="pw" #toggle="appPasswordToggle">{{ toggle.shown ? 'Hide' : 'Show' }}</button>`,
+    <button type="button" appPasswordToggle="pw" #toggle="appPasswordToggle">{{ toggle.shown ? 'Hide' : 'Show' }}</button>`
 })
 class HostComponent {}
 

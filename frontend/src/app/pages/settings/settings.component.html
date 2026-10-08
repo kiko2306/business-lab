@@ -6,208 +6,248 @@
     </p>
   </div>
 
-<!-- P9a (§357): read-only provisioning checklist — what a new client box still needs set. -->
-<app-panel
-  key="settings:deployment"
-  [title]="'settings.deployment.title' | t"
+  <!-- P9a (§357): read-only provisioning checklist — what a new client box still needs set. -->
+  <app-panel
+    key="settings:deployment"
+    [title]="'settings.deployment.title' | t"
   [subtitle]="deployment
     ? (deploymentSubtitleKey(deployment.outstanding) | t:{ count: deployment.outstanding })
     : ('settings.deployment.subtitleDefault' | t)"
->
-  <p *ngIf="deploymentLoading" class="text-body-secondary mb-0">{{ 'common.loading' | t }}</p>
-  <p *ngIf="!deploymentLoading && !deployment" class="text-body-secondary mb-0">
-    {{ 'settings.deployment.unableToLoad' | t }}
-  </p>
-  <ul *ngIf="deployment" class="list-group list-group-flush">
-    <li *ngFor="let c of deployment.checks" class="list-group-item d-flex gap-3 px-0">
-      <span class="badge align-self-start" [class.text-bg-success]="c.done" [class.text-bg-warning]="!c.done">
-        {{ (c.done ? 'settings.deployment.setBadge' : 'settings.deployment.todoBadge') | t }}
-      </span>
-      <span class="flex-grow-1">
-        <span class="fw-medium">{{ deploymentLabelKey(c.id) | t }}</span>
-        <br />
-        <span class="text-body-secondary small">{{ deploymentDetailKey(c) | t:c.params }}</span>
-        <span *ngIf="!c.done" class="text-body-secondary small"> · {{ 'settings.deployment.fixInPrefix' | t }} <ng-container *ngIf="fixTarget(c.fixIn) as target; else plainFix">
-            <a *ngIf="target.route" class="link-primary" [routerLink]="target.route">{{ target.labelKey | t }}</a>
-            <button *ngIf="!target.route" type="button" class="btn btn-link btn-sm p-0 align-baseline" (click)="goToPanel(target)">{{ target.labelKey | t }}</button>
-          </ng-container>
-          <ng-template #plainFix><em>{{ c.fixIn }}</em></ng-template>
-        </span>
-      </span>
-    </li>
-  </ul>
+    >
+    @if (deploymentLoading) {
+      <p class="text-body-secondary mb-0">{{ 'common.loading' | t }}</p>
+    }
+    @if (!deploymentLoading && !deployment) {
+      <p class="text-body-secondary mb-0">
+        {{ 'settings.deployment.unableToLoad' | t }}
+      </p>
+    }
+    @if (deployment) {
+      <ul class="list-group list-group-flush">
+        @for (c of deployment.checks; track c) {
+          <li class="list-group-item d-flex gap-3 px-0">
+            <span class="badge align-self-start" [class.text-bg-success]="c.done" [class.text-bg-warning]="!c.done">
+              {{ (c.done ? 'settings.deployment.setBadge' : 'settings.deployment.todoBadge') | t }}
+            </span>
+            <span class="flex-grow-1">
+              <span class="fw-medium">{{ deploymentLabelKey(c.id) | t }}</span>
+              <br />
+              <span class="text-body-secondary small">{{ deploymentDetailKey(c) | t:c.params }}</span>
+              @if (!c.done) {
+                <span class="text-body-secondary small"> · {{ 'settings.deployment.fixInPrefix' | t }} @if (fixTarget(c.fixIn); as target) {
+                  @if (target.route) {
+                    <a class="link-primary" [routerLink]="target.route">{{ target.labelKey | t }}</a>
+                  }
+                  @if (!target.route) {
+                    <button type="button" class="btn btn-link btn-sm p-0 align-baseline" (click)="goToPanel(target)">{{ target.labelKey | t }}</button>
+                  }
+                } @else {
+                  <em>{{ c.fixIn }}</em>
+                }
+              </span>
+            }
+          </span>
+        </li>
+      }
+    </ul>
+  }
 </app-panel>
 
-<app-network-settings *ngIf="canManageNetworking" />
+@if (canManageNetworking) {
+  <app-network-settings />
+}
 
-<app-network-scan *ngIf="canScanNetwork" />
+@if (canScanNetwork) {
+  <app-network-scan />
+}
 
 <app-panel
   key="settings:general"
   [title]="'settings.general.title' | t"
   [subtitle]="'settings.general.subtitle' | t"
->
+  >
   <p class="text-body-secondary mb-3">
     {{ 'settings.general.description' | t }}
   </p>
 
-  <div *ngIf="generalLoading" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
+  @if (generalLoading) {
+    <div class="text-body-secondary small">{{ 'common.loading' | t }}</div>
+  }
 
-  <form *ngIf="!generalLoading && generalSettings" [formGroup]="generalForm" (ngSubmit)="saveGeneral()" class="row g-3">
-    <div class="col-12 col-md-8">
-      <label class="form-label fw-semibold" for="timezone">{{ 'settings.general.timezoneLabel' | t }}</label>
-      <select id="timezone" class="form-select" formControlName="timezone">
-        <option *ngFor="let tz of generalSettings.timezones" [value]="tz">{{ tz }}</option>
-      </select>
-      <p class="form-text mb-0">{{ 'settings.general.defaultPrefix' | t:{ value: generalSettings.defaultTimezone } }}</p>
-    </div>
-    <div class="col-12 col-md-8">
-      <label class="form-label fw-semibold" for="dashboardUrl">{{ 'settings.general.dashboardUrlLabel' | t }}</label>
-      <input
-        id="dashboardUrl"
-        type="url"
-        class="form-control"
-        formControlName="dashboardUrl"
-        placeholder="https://dashboard.example.com"
-      />
-      <p class="form-text mb-0">
-        {{ 'settings.general.dashboardUrlHintUsed' | t }}
-        <ng-container *ngIf="generalSettings.dashboardUrlEffective">
-          {{ 'settings.general.dashboardUrlCurrently' | t:{ url: generalSettings.dashboardUrlEffective } }}
-        </ng-container>
-        {{ 'settings.general.dashboardUrlBlank' | t }}
-      </p>
-      <div class="form-text text-danger" *ngIf="generalForm.controls.dashboardUrl.touched && generalForm.controls.dashboardUrl.invalid" appFieldError="dashboardUrl">
-        {{ 'settings.general.dashboardUrlError' | t }}
+  @if (!generalLoading && generalSettings) {
+    <form [formGroup]="generalForm" (ngSubmit)="saveGeneral()" class="row g-3">
+      <div class="col-12 col-md-8">
+        <label class="form-label fw-semibold" for="timezone">{{ 'settings.general.timezoneLabel' | t }}</label>
+        <select id="timezone" class="form-select" formControlName="timezone">
+          @for (tz of generalSettings.timezones; track tz) {
+            <option [value]="tz">{{ tz }}</option>
+          }
+        </select>
+        <p class="form-text mb-0">{{ 'settings.general.defaultPrefix' | t:{ value: generalSettings.defaultTimezone } }}</p>
       </div>
-    </div>
-    <div class="col-12 col-md-8">
-      <label class="form-label fw-semibold" for="updateBranch">{{ 'settings.general.updateBranchLabel' | t }}</label>
-      <input
-        id="updateBranch"
-        type="text"
-        class="form-control font-monospace"
-        formControlName="updateBranch"
-        placeholder="main"
-      />
-      <p class="form-text mb-0">
-        {{ 'settings.general.updateBranchHint' | t:{ branch: generalSettings.defaultUpdateBranch ?? '' } }}
-      </p>
-      <div class="form-text text-danger" *ngIf="generalForm.controls.updateBranch.touched && generalForm.controls.updateBranch.invalid" appFieldError="updateBranch">
-        {{ 'settings.general.updateBranchError' | t }}
+      <div class="col-12 col-md-8">
+        <label class="form-label fw-semibold" for="dashboardUrl">{{ 'settings.general.dashboardUrlLabel' | t }}</label>
+        <input
+          id="dashboardUrl"
+          type="url"
+          class="form-control"
+          formControlName="dashboardUrl"
+          placeholder="https://dashboard.example.com"
+          />
+        <p class="form-text mb-0">
+          {{ 'settings.general.dashboardUrlHintUsed' | t }}
+          @if (generalSettings.dashboardUrlEffective) {
+            {{ 'settings.general.dashboardUrlCurrently' | t:{ url: generalSettings.dashboardUrlEffective } }}
+          }
+          {{ 'settings.general.dashboardUrlBlank' | t }}
+        </p>
+        @if (generalForm.controls.dashboardUrl.touched && generalForm.controls.dashboardUrl.invalid) {
+          <div class="form-text text-danger" appFieldError="dashboardUrl">
+            {{ 'settings.general.dashboardUrlError' | t }}
+          </div>
+        }
       </div>
-    </div>
-    <div class="col-12 d-flex align-items-center gap-2">
-      <button type="submit" class="btn btn-primary" [disabled]="savingGeneral || generalForm.invalid">
-        {{ (savingGeneral ? 'common.saving' : 'settings.general.saveButton') | t }}
-      </button>
-      <span
-        *ngIf="generalFeedback"
-        class="small"
+      <div class="col-12 col-md-8">
+        <label class="form-label fw-semibold" for="updateBranch">{{ 'settings.general.updateBranchLabel' | t }}</label>
+        <input
+          id="updateBranch"
+          type="text"
+          class="form-control font-monospace"
+          formControlName="updateBranch"
+          placeholder="main"
+          />
+        <p class="form-text mb-0">
+          {{ 'settings.general.updateBranchHint' | t:{ branch: generalSettings.defaultUpdateBranch ?? '' } }}
+        </p>
+        @if (generalForm.controls.updateBranch.touched && generalForm.controls.updateBranch.invalid) {
+          <div class="form-text text-danger" appFieldError="updateBranch">
+            {{ 'settings.general.updateBranchError' | t }}
+          </div>
+        }
+      </div>
+      <div class="col-12 d-flex align-items-center gap-2">
+        <button type="submit" class="btn btn-primary" [disabled]="savingGeneral || generalForm.invalid">
+          {{ (savingGeneral ? 'common.saving' : 'settings.general.saveButton') | t }}
+        </button>
+        @if (generalFeedback) {
+          <span
+            class="small"
         [ngClass]="{
           'text-success': generalFeedback.type === 'success',
           'text-danger': generalFeedback.type === 'danger',
           'text-body-secondary': generalFeedback.type === 'info'
         }"
-      >
-        {{ generalFeedback.message }}
-      </span>
-    </div>
-  </form>
+            >
+            {{ generalFeedback.message }}
+          </span>
+        }
+      </div>
+    </form>
+  }
 </app-panel>
 
 <app-panel
   key="settings:ntfy"
   [title]="'settings.ntfy.title' | t"
   [subtitle]="'settings.ntfy.subtitle' | t"
->
+  >
   <p class="text-body-secondary mb-3">
     {{ 'settings.ntfy.description' | t }}
   </p>
 
-  <div *ngIf="alertsLoading" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
+  @if (alertsLoading) {
+    <div class="text-body-secondary small">{{ 'common.loading' | t }}</div>
+  }
 
-  <div *ngIf="!alertsLoading && alertSettings" class="row g-3">
-    <div class="col-12" *ngFor="let category of alertCategories">
-      <div class="d-flex align-items-start gap-3">
-        <div class="form-check form-switch flex-shrink-0 pt-1">
-          <input
-            class="form-check-input"
-            type="checkbox"
-            role="switch"
-            [id]="'categoryEnabled-' + category.key"
-            [attr.aria-labelledby]="'categoryLabel-' + category.key"
-            [checked]="alertSettings.enabled[category.key]"
-            [disabled]="savingAlerts"
-            (change)="toggleCategoryEnabled(category.key, $any($event.target).checked)"
-          />
-        </div>
-        <div class="flex-grow-1">
-          <label
-            class="form-label fw-semibold mb-1"
-            [id]="'categoryLabel-' + category.key"
-            [for]="'categoryTopic-' + category.key"
-          >
-            {{ ('settings.alertCategory.' + category.key) | t }}
-          </label>
-          <div class="input-group input-group-sm">
-            <input
-              [id]="'categoryTopic-' + category.key"
-              class="form-control font-monospace"
-              [(ngModel)]="categoryTopicDrafts[category.key]"
-              [ngModelOptions]="{ standalone: true }"
-              maxlength="64"
-              placeholder="homelab-alerts"
-            />
-            <button
-              type="button"
-              class="btn btn-outline-secondary"
-              [disabled]="!alertSettings.enabled[category.key] || testingAlertSource === category.key"
-              (click)="testAlertSource(category.key)"
-            >
-              <span
-                *ngIf="testingAlertSource === category.key"
-                class="spinner-border spinner-border-sm"
-                aria-hidden="true"
-              ></span>
-              <ng-container *ngIf="testingAlertSource !== category.key">{{ 'settings.ntfy.testButton' | t }}</ng-container>
-            </button>
+  @if (!alertsLoading && alertSettings) {
+    <div class="row g-3">
+      @for (category of alertCategories; track category) {
+        <div class="col-12">
+          <div class="d-flex align-items-start gap-3">
+            <div class="form-check form-switch flex-shrink-0 pt-1">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                role="switch"
+                [id]="'categoryEnabled-' + category.key"
+                [attr.aria-labelledby]="'categoryLabel-' + category.key"
+                [checked]="alertSettings.enabled[category.key]"
+                [disabled]="savingAlerts"
+                (change)="toggleCategoryEnabled(category.key, $any($event.target).checked)"
+                />
+            </div>
+            <div class="flex-grow-1">
+              <label
+                class="form-label fw-semibold mb-1"
+                [id]="'categoryLabel-' + category.key"
+                [for]="'categoryTopic-' + category.key"
+                >
+                {{ ('settings.alertCategory.' + category.key) | t }}
+              </label>
+              <div class="input-group input-group-sm">
+                <input
+                  [id]="'categoryTopic-' + category.key"
+                  class="form-control font-monospace"
+                  [(ngModel)]="categoryTopicDrafts[category.key]"
+                  [ngModelOptions]="{ standalone: true }"
+                  maxlength="64"
+                  placeholder="homelab-alerts"
+                  />
+                <button
+                  type="button"
+                  class="btn btn-outline-secondary"
+                  [disabled]="!alertSettings.enabled[category.key] || testingAlertSource === category.key"
+                  (click)="testAlertSource(category.key)"
+                  >
+                  @if (testingAlertSource === category.key) {
+                    <span
+                      class="spinner-border spinner-border-sm"
+                      aria-hidden="true"
+                    ></span>
+                  }
+                  @if (testingAlertSource !== category.key) {
+                    {{ 'settings.ntfy.testButton' | t }}
+                  }
+                </button>
+              </div>
+              <p class="form-text mb-0" [class.text-danger]="!categoryTopicValid(category.key)">
+                @if (!categoryTopicValid(category.key)) {
+                  {{ 'settings.ntfy.topicInvalidHint' | t }}
+                } @else {
+                  {{ 'settings.ntfy.topicHint' | t }}
+                }
+              </p>
+            </div>
           </div>
-          <p class="form-text mb-0" [class.text-danger]="!categoryTopicValid(category.key)">
-            <ng-container *ngIf="!categoryTopicValid(category.key); else categoryHint">
-              {{ 'settings.ntfy.topicInvalidHint' | t }}
-            </ng-container>
-            <ng-template #categoryHint>{{ 'settings.ntfy.topicHint' | t }}</ng-template>
-          </p>
         </div>
+      }
+      <div class="col-12">
+        <button
+          type="button"
+          class="btn btn-outline-primary btn-sm"
+          [disabled]="savingAlerts || !categoryTopicsDirty || !categoryTopicsAllValid"
+          (click)="saveCategoryTopics()"
+          >
+          {{ 'settings.ntfy.saveChannelsButton' | t }}
+        </button>
       </div>
-    </div>
-
-    <div class="col-12">
-      <button
-        type="button"
-        class="btn btn-outline-primary btn-sm"
-        [disabled]="savingAlerts || !categoryTopicsDirty || !categoryTopicsAllValid"
-        (click)="saveCategoryTopics()"
-      >
-        {{ 'settings.ntfy.saveChannelsButton' | t }}
-      </button>
-    </div>
-
-    <div class="col-12" *ngIf="alertsFeedback">
-      <span
-        class="small"
+      @if (alertsFeedback) {
+        <div class="col-12">
+          <span
+            class="small"
         [ngClass]="{
           'text-success': alertsFeedback.type === 'success',
           'text-danger': alertsFeedback.type === 'danger',
           'text-warning-emphasis': alertsFeedback.type === 'warning',
           'text-body-secondary': alertsFeedback.type === 'info'
         }"
-      >
-        {{ alertsFeedback.message }}
-      </span>
+            >
+            {{ alertsFeedback.message }}
+          </span>
+        </div>
+      }
     </div>
-  </div>
+  }
 </app-panel>
 
 <app-panel
@@ -215,226 +255,239 @@
   anchor="email"
   [title]="'settings.email.title' | t"
   [subtitle]="'settings.email.subtitle' | t"
->
+  >
   <p class="text-body-secondary small mb-3">
     {{ 'settings.email.description' | t }}
   </p>
 
-  <div *ngIf="mailLoading" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
+  @if (mailLoading) {
+    <div class="text-body-secondary small">{{ 'common.loading' | t }}</div>
+  }
 
-  <form *ngIf="!mailLoading" [formGroup]="mailForm" (ngSubmit)="saveMail()" class="row g-3">
-    <div class="col-12">
-      <h3 class="h6 mb-0">{{ 'settings.email.sendingHeading' | t }}</h3>
-    </div>
-
-    <div class="col-md-6">
-      <label class="form-label fw-semibold" for="smtpHost">{{ 'settings.email.smtpServerLabel' | t }}</label>
-      <input id="smtpHost" type="text" class="form-control" formControlName="smtpHost"
-             placeholder="smtp.example.com" autocomplete="off" />
-    </div>
-    <div class="col-md-3">
-      <label class="form-label fw-semibold" for="smtpEncryption">{{ 'settings.email.encryptionLabel' | t }}</label>
-      <select id="smtpEncryption" class="form-select" formControlName="smtpEncryption"
-              (change)="onMailEncryptionChange('smtp')">
-        <option value="tls">{{ 'settings.email.encryption.starttls' | t }}</option>
-        <option value="ssl">{{ 'settings.email.encryption.ssl' | t }}</option>
-        <option value="none">{{ 'settings.email.encryption.none' | t }}</option>
-      </select>
-    </div>
-    <div class="col-md-3">
-      <label class="form-label fw-semibold" for="smtpPort">{{ 'settings.email.portLabel' | t }}</label>
-      <input id="smtpPort" type="number" inputmode="numeric" class="form-control" formControlName="smtpPort" />
-    </div>
-
-    <div class="col-md-6">
-      <label class="form-label fw-semibold" for="smtpUser">{{ 'settings.email.usernameLabel' | t }}</label>
-      <input id="smtpUser" type="text" class="form-control" formControlName="smtpUser"
-             placeholder="you@example.com" autocomplete="off" />
-    </div>
-    <div class="col-md-6">
-      <label class="form-label fw-semibold" for="smtpPassword">{{ 'settings.email.passwordLabel' | t }}</label>
-      <input id="smtpPassword" type="password" class="form-control" formControlName="smtpPassword"
-             [placeholder]="mailSettings?.smtpPasswordConfigured ? ('settings.email.passwordConfigured' | t) : ('settings.email.passwordNotSet' | t)"
-             autocomplete="new-password" />
-    </div>
-
-    <div class="col-md-6">
-      <label class="form-label fw-semibold" for="fromAddress">{{ 'settings.email.fromAddressLabel' | t }}</label>
-      <input id="fromAddress" type="email" class="form-control" formControlName="fromAddress"
-             placeholder="homelab@example.com" autocomplete="off" />
-    </div>
-    <div class="col-md-6">
-      <label class="form-label fw-semibold" for="fromName">{{ 'settings.email.fromNameLabel' | t }} <span class="fw-normal text-body-secondary">{{ 'common.optional' | t }}</span></label>
-      <input id="fromName" type="text" class="form-control" formControlName="fromName" placeholder="Homelab" />
-    </div>
-
-    <div class="col-12 mt-4">
-      <h3 class="h6 mb-1">{{ 'settings.email.receivingHeading' | t }} <span class="fw-normal text-body-secondary small">{{ 'common.optional' | t }}</span></h3>
-      <p class="form-text mt-0">
-        {{ 'settings.email.receivingDescription' | t }}
-      </p>
-    </div>
-
-    <div class="col-md-6">
-      <label class="form-label fw-semibold" for="imapHost">{{ 'settings.email.imapServerLabel' | t }}</label>
-      <input id="imapHost" type="text" class="form-control" formControlName="imapHost"
-             placeholder="imap.example.com" autocomplete="off" />
-    </div>
-    <div class="col-md-3">
-      <label class="form-label fw-semibold" for="imapEncryption">{{ 'settings.email.encryptionLabel' | t }}</label>
-      <select id="imapEncryption" class="form-select" formControlName="imapEncryption"
-              (change)="onMailEncryptionChange('imap')">
-        <option value="ssl">{{ 'settings.email.encryption.ssl' | t }}</option>
-        <option value="tls">{{ 'settings.email.encryption.starttls' | t }}</option>
-        <option value="none">{{ 'settings.email.encryption.none' | t }}</option>
-      </select>
-    </div>
-    <div class="col-md-3">
-      <label class="form-label fw-semibold" for="imapPort">{{ 'settings.email.portLabel' | t }}</label>
-      <input id="imapPort" type="number" inputmode="numeric" class="form-control" formControlName="imapPort" />
-    </div>
-
-    <div class="col-md-6">
-      <label class="form-label fw-semibold" for="imapUser">{{ 'settings.email.usernameLabel' | t }}</label>
-      <input id="imapUser" type="text" class="form-control" formControlName="imapUser" autocomplete="off" />
-    </div>
-    <div class="col-md-6">
-      <label class="form-label fw-semibold" for="imapPassword">{{ 'settings.email.passwordLabel' | t }}</label>
-      <input id="imapPassword" type="password" class="form-control" formControlName="imapPassword"
-             [placeholder]="mailSettings?.imapPasswordConfigured ? ('settings.email.passwordConfigured' | t) : ('settings.email.passwordNotSet' | t)"
-             autocomplete="new-password" />
-    </div>
-
-    <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
-      <button type="submit" class="btn btn-primary" [disabled]="savingMail">
-        {{ (savingMail ? 'common.saving' : 'settings.email.saveButton') | t }}
-      </button>
-      <button type="button" class="btn btn-outline-secondary"
-              [disabled]="testingMail || !mailSettings?.configured" (click)="testMail()">
-        {{ (testingMail ? 'common.testing' : 'settings.email.testButton') | t }}
-      </button>
-      <span
-        *ngIf="mailFeedback"
-        class="small"
+  @if (!mailLoading) {
+    <form [formGroup]="mailForm" (ngSubmit)="saveMail()" class="row g-3">
+      <div class="col-12">
+        <h3 class="h6 mb-0">{{ 'settings.email.sendingHeading' | t }}</h3>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="smtpHost">{{ 'settings.email.smtpServerLabel' | t }}</label>
+        <input id="smtpHost" type="text" class="form-control" formControlName="smtpHost"
+          placeholder="smtp.example.com" autocomplete="off" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold" for="smtpEncryption">{{ 'settings.email.encryptionLabel' | t }}</label>
+        <select id="smtpEncryption" class="form-select" formControlName="smtpEncryption"
+          (change)="onMailEncryptionChange('smtp')">
+          <option value="tls">{{ 'settings.email.encryption.starttls' | t }}</option>
+          <option value="ssl">{{ 'settings.email.encryption.ssl' | t }}</option>
+          <option value="none">{{ 'settings.email.encryption.none' | t }}</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold" for="smtpPort">{{ 'settings.email.portLabel' | t }}</label>
+        <input id="smtpPort" type="number" inputmode="numeric" class="form-control" formControlName="smtpPort" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="smtpUser">{{ 'settings.email.usernameLabel' | t }}</label>
+        <input id="smtpUser" type="text" class="form-control" formControlName="smtpUser"
+          placeholder="you@example.com" autocomplete="off" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="smtpPassword">{{ 'settings.email.passwordLabel' | t }}</label>
+        <input id="smtpPassword" type="password" class="form-control" formControlName="smtpPassword"
+          [placeholder]="mailSettings?.smtpPasswordConfigured ? ('settings.email.passwordConfigured' | t) : ('settings.email.passwordNotSet' | t)"
+          autocomplete="new-password" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="fromAddress">{{ 'settings.email.fromAddressLabel' | t }}</label>
+        <input id="fromAddress" type="email" class="form-control" formControlName="fromAddress"
+          placeholder="homelab@example.com" autocomplete="off" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="fromName">{{ 'settings.email.fromNameLabel' | t }} <span class="fw-normal text-body-secondary">{{ 'common.optional' | t }}</span></label>
+        <input id="fromName" type="text" class="form-control" formControlName="fromName" placeholder="Homelab" />
+      </div>
+      <div class="col-12 mt-4">
+        <h3 class="h6 mb-1">{{ 'settings.email.receivingHeading' | t }} <span class="fw-normal text-body-secondary small">{{ 'common.optional' | t }}</span></h3>
+        <p class="form-text mt-0">
+          {{ 'settings.email.receivingDescription' | t }}
+        </p>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="imapHost">{{ 'settings.email.imapServerLabel' | t }}</label>
+        <input id="imapHost" type="text" class="form-control" formControlName="imapHost"
+          placeholder="imap.example.com" autocomplete="off" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold" for="imapEncryption">{{ 'settings.email.encryptionLabel' | t }}</label>
+        <select id="imapEncryption" class="form-select" formControlName="imapEncryption"
+          (change)="onMailEncryptionChange('imap')">
+          <option value="ssl">{{ 'settings.email.encryption.ssl' | t }}</option>
+          <option value="tls">{{ 'settings.email.encryption.starttls' | t }}</option>
+          <option value="none">{{ 'settings.email.encryption.none' | t }}</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold" for="imapPort">{{ 'settings.email.portLabel' | t }}</label>
+        <input id="imapPort" type="number" inputmode="numeric" class="form-control" formControlName="imapPort" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="imapUser">{{ 'settings.email.usernameLabel' | t }}</label>
+        <input id="imapUser" type="text" class="form-control" formControlName="imapUser" autocomplete="off" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="imapPassword">{{ 'settings.email.passwordLabel' | t }}</label>
+        <input id="imapPassword" type="password" class="form-control" formControlName="imapPassword"
+          [placeholder]="mailSettings?.imapPasswordConfigured ? ('settings.email.passwordConfigured' | t) : ('settings.email.passwordNotSet' | t)"
+          autocomplete="new-password" />
+      </div>
+      <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
+        <button type="submit" class="btn btn-primary" [disabled]="savingMail">
+          {{ (savingMail ? 'common.saving' : 'settings.email.saveButton') | t }}
+        </button>
+        <button type="button" class="btn btn-outline-secondary"
+          [disabled]="testingMail || !mailSettings?.configured" (click)="testMail()">
+          {{ (testingMail ? 'common.testing' : 'settings.email.testButton') | t }}
+        </button>
+        @if (mailFeedback) {
+          <span
+            class="small"
         [ngClass]="{
           'text-success': mailFeedback.type === 'success',
           'text-danger': mailFeedback.type === 'danger',
           'text-body-secondary': mailFeedback.type === 'info'
         }"
-      >
-        {{ mailFeedback.message }}
-      </span>
-    </div>
-
-    <!-- Per-protocol results: a working SMTP shouldn't be hidden by a
-         broken IMAP, and the detail is what makes a failure actionable. -->
-    <div *ngIf="mailTestResult" class="col-12">
-      <ul class="list-unstyled small mb-0">
-        <li [ngClass]="mailTestResult.smtp.ok ? 'text-success' : 'text-danger'">
-          <strong>{{ 'settings.email.sendingResultLabel' | t }}</strong> {{ mailTestResult.smtp.detail }}
-        </li>
-        <li *ngIf="mailTestResult.imap" [ngClass]="mailTestResult.imap.ok ? 'text-success' : 'text-danger'">
-          <strong>{{ 'settings.email.receivingResultLabel' | t }}</strong> {{ mailTestResult.imap.detail }}
-        </li>
-      </ul>
-    </div>
-  </form>
+            >
+            {{ mailFeedback.message }}
+          </span>
+        }
+      </div>
+      <!-- Per-protocol results: a working SMTP shouldn't be hidden by a
+      broken IMAP, and the detail is what makes a failure actionable. -->
+      @if (mailTestResult) {
+        <div class="col-12">
+          <ul class="list-unstyled small mb-0">
+            <li [ngClass]="mailTestResult.smtp.ok ? 'text-success' : 'text-danger'">
+              <strong>{{ 'settings.email.sendingResultLabel' | t }}</strong> {{ mailTestResult.smtp.detail }}
+            </li>
+            @if (mailTestResult.imap) {
+              <li [ngClass]="mailTestResult.imap.ok ? 'text-success' : 'text-danger'">
+                <strong>{{ 'settings.email.receivingResultLabel' | t }}</strong> {{ mailTestResult.imap.detail }}
+              </li>
+            }
+          </ul>
+        </div>
+      }
+    </form>
+  }
 </app-panel>
 
 <app-panel
   key="settings:ai-keys"
   [title]="'settings.aiKeys.title' | t"
   [subtitle]="'settings.aiKeys.subtitle' | t"
->
+  >
   <p class="text-body-secondary small mb-3">
     {{ 'settings.aiKeys.description' | t }}
   </p>
 
-  <div *ngIf="aiKeysLoading" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
+  @if (aiKeysLoading) {
+    <div class="text-body-secondary small">{{ 'common.loading' | t }}</div>
+  }
 
-  <div *ngIf="!aiKeysLoading && aiKeys" class="row g-3">
-    <div class="col-12" *ngFor="let providerState of aiKeys.providers">
-      <label class="form-label fw-semibold mb-1" [for]="'aiKey-' + providerState.provider">
-        {{ ('settings.aiKeys.provider.' + providerState.provider) | t }}
-      </label>
-      <div class="input-group">
-        <input
-          [id]="'aiKey-' + providerState.provider"
-          type="password"
-          class="form-control"
-          autocomplete="off"
-          [ngModel]="aiKeyDrafts[providerState.provider] ?? ''"
-          (ngModelChange)="aiKeyDrafts[providerState.provider] = $event"
-          [ngModelOptions]="{ standalone: true }"
-          [placeholder]="providerState.configured ? (providerState.keyMasked ?? ('settings.aiKeys.placeholderConfigured' | t)) : ''"
-        />
-        <button
-          type="button"
-          class="btn btn-primary"
-          [disabled]="savingAiKeyProvider === providerState.provider || !(aiKeyDrafts[providerState.provider] ?? '').trim()"
-          (click)="saveAiKey(providerState.provider)"
-        >
-          {{ (savingAiKeyProvider === providerState.provider ? 'common.saving' : 'settings.aiKeys.saveButton') | t }}
-        </button>
-        <button
-          type="button"
-          class="btn btn-outline-secondary"
-          [disabled]="testingAiKeyProvider === providerState.provider || (!(aiKeyDrafts[providerState.provider] ?? '').trim() && !providerState.configured)"
-          (click)="testAiKey(providerState.provider)"
-        >
-          {{ (testingAiKeyProvider === providerState.provider ? 'common.testing' : 'settings.aiKeys.testButton') | t }}
-        </button>
-      </div>
-      <p class="form-text mb-0" *ngIf="aiKeyRowFeedback[providerState.provider] as feedback">
-        <span
-          class="small"
+  @if (!aiKeysLoading && aiKeys) {
+    <div class="row g-3">
+      @for (providerState of aiKeys.providers; track providerState) {
+        <div class="col-12">
+          <label class="form-label fw-semibold mb-1" [for]="'aiKey-' + providerState.provider">
+            {{ ('settings.aiKeys.provider.' + providerState.provider) | t }}
+          </label>
+          <div class="input-group">
+            <input
+              [id]="'aiKey-' + providerState.provider"
+              type="password"
+              class="form-control"
+              autocomplete="off"
+              [ngModel]="aiKeyDrafts[providerState.provider] ?? ''"
+              (ngModelChange)="aiKeyDrafts[providerState.provider] = $event"
+              [ngModelOptions]="{ standalone: true }"
+              [placeholder]="providerState.configured ? (providerState.keyMasked ?? ('settings.aiKeys.placeholderConfigured' | t)) : ''"
+              />
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="savingAiKeyProvider === providerState.provider || !(aiKeyDrafts[providerState.provider] ?? '').trim()"
+              (click)="saveAiKey(providerState.provider)"
+              >
+              {{ (savingAiKeyProvider === providerState.provider ? 'common.saving' : 'settings.aiKeys.saveButton') | t }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline-secondary"
+              [disabled]="testingAiKeyProvider === providerState.provider || (!(aiKeyDrafts[providerState.provider] ?? '').trim() && !providerState.configured)"
+              (click)="testAiKey(providerState.provider)"
+              >
+              {{ (testingAiKeyProvider === providerState.provider ? 'common.testing' : 'settings.aiKeys.testButton') | t }}
+            </button>
+          </div>
+          @if (aiKeyRowFeedback[providerState.provider]; as feedback) {
+            <p class="form-text mb-0">
+              <span
+                class="small"
           [ngClass]="{
             'text-success': feedback.type === 'success',
             'text-danger': feedback.type === 'danger',
             'text-body-secondary': feedback.type === 'info'
           }"
-        >
-          {{ feedback.message }}
-        </span>
-      </p>
-    </div>
-
-    <div class="col-12 mt-4">
-      <h3 class="h6 mb-2">{{ 'settings.aiKeys.featuresHeading' | t }}</h3>
-      <div class="row g-2">
-        <div class="col-12 col-md-6" *ngFor="let feature of aiFeatures">
-          <label class="form-label small mb-1" [for]="'aiFeature-' + feature.key">
-            {{ ('settings.aiKeys.feature.' + feature.key) | t }}
-          </label>
-          <select
-            [id]="'aiFeature-' + feature.key"
-            class="form-select form-select-sm"
-            [disabled]="savingFeatureProvider === feature.key"
-            [ngModel]="aiKeys.features[feature.key]"
-            (ngModelChange)="saveFeatureProvider(feature.key, $event)"
-            [ngModelOptions]="{ standalone: true }"
-          >
-            <option *ngFor="let providerState of aiKeys.providers" [value]="providerState.provider">
-              {{ ('settings.aiKeys.provider.' + providerState.provider) | t }}
-            </option>
-          </select>
+                >
+                {{ feedback.message }}
+              </span>
+            </p>
+          }
+        </div>
+      }
+      <div class="col-12 mt-4">
+        <h3 class="h6 mb-2">{{ 'settings.aiKeys.featuresHeading' | t }}</h3>
+        <div class="row g-2">
+          @for (feature of aiFeatures; track feature) {
+            <div class="col-12 col-md-6">
+              <label class="form-label small mb-1" [for]="'aiFeature-' + feature.key">
+                {{ ('settings.aiKeys.feature.' + feature.key) | t }}
+              </label>
+              <select
+                [id]="'aiFeature-' + feature.key"
+                class="form-select form-select-sm"
+                [disabled]="savingFeatureProvider === feature.key"
+                [ngModel]="aiKeys.features[feature.key]"
+                (ngModelChange)="saveFeatureProvider(feature.key, $event)"
+                [ngModelOptions]="{ standalone: true }"
+                >
+                @for (providerState of aiKeys.providers; track providerState) {
+                  <option [value]="providerState.provider">
+                    {{ ('settings.aiKeys.provider.' + providerState.provider) | t }}
+                  </option>
+                }
+              </select>
+            </div>
+          }
         </div>
       </div>
-    </div>
-
-    <div class="col-12" *ngIf="aiKeysFeedback">
-      <span
-        class="small"
+      @if (aiKeysFeedback) {
+        <div class="col-12">
+          <span
+            class="small"
         [ngClass]="{
           'text-success': aiKeysFeedback.type === 'success',
           'text-danger': aiKeysFeedback.type === 'danger',
           'text-body-secondary': aiKeysFeedback.type === 'info'
         }"
-      >
-        {{ aiKeysFeedback.message }}
-      </span>
+            >
+            {{ aiKeysFeedback.message }}
+          </span>
+        </div>
+      }
     </div>
-  </div>
+  }
 </app-panel>
 
 </main>

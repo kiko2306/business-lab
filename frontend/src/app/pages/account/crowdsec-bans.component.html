@@ -2,55 +2,68 @@
   key="account:crowdsec-bans"
   [title]="'account.crowdsecBans.title' | t"
   [subtitle]="'account.crowdsecBans.subtitle' | t"
->
+  >
   <div class="d-flex align-items-center gap-2 mb-2">
     <button type="button" class="btn btn-sm btn-outline-secondary" [disabled]="loading" (click)="load()">
-      <span *ngIf="loading" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+      @if (loading) {
+        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+      }
       {{ 'account.crowdsecBans.refreshButton' | t }}
     </button>
   </div>
   <p class="text-body-secondary small mb-2">
     {{ 'account.crowdsecBans.description' | t }}
   </p>
-  <p *ngIf="bans && !bans.length" class="small text-body-secondary mb-0">{{ 'account.crowdsecBans.empty' | t }}</p>
-  <div *ngIf="bans?.length" class="table-responsive">
-    <table class="table table-sm align-middle small mb-0">
-      <thead>
-        <tr>
-          <th scope="col">{{ 'account.crowdsecBans.table.ip' | t }}</th>
-          <th scope="col">{{ 'account.crowdsecBans.table.why' | t }}</th>
-          <th scope="col">{{ 'account.crowdsecBans.table.network' | t }}</th>
-          <th scope="col">{{ 'account.crowdsecBans.table.expiresIn' | t }}</th>
-          <th scope="col"></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let ban of bans">
-          <td class="font-monospace text-break">{{ ban.ip }}</td>
-          <td>
-            <div *ngFor="let scenario of ban.scenarios">{{ scenario.replace('crowdsecurity/', '') }}</div>
-          </td>
-          <td>{{ ban.country || '' }} {{ ban.asName || '' }}</td>
-          <td class="text-nowrap">{{ remaining(ban.expiresInSeconds) }}</td>
-          <td class="text-end">
-            <button
-              type="button"
-              class="btn btn-sm btn-outline-danger"
-              [disabled]="unbanningIp !== null"
-              (click)="unban(ban.ip)"
-              [attr.aria-label]="'account.crowdsecBans.unbanAriaLabel' | t:{ ip: ban.ip }"
-            >
-              <span *ngIf="unbanningIp === ban.ip" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-              {{ 'account.crowdsecBans.unbanButton' | t }}
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-  <span
-    *ngIf="feedback"
-    class="d-block small mt-2"
-    [ngClass]="feedback.type === 'success' ? 'text-success' : 'text-danger'"
-  >{{ feedback.message }}</span>
+  @if (bans && !bans.length) {
+    <p class="small text-body-secondary mb-0">{{ 'account.crowdsecBans.empty' | t }}</p>
+  }
+  @if (bans?.length) {
+    <div class="table-responsive">
+      <table class="table table-sm align-middle small mb-0">
+        <thead>
+          <tr>
+            <th scope="col">{{ 'account.crowdsecBans.table.ip' | t }}</th>
+            <th scope="col">{{ 'account.crowdsecBans.table.why' | t }}</th>
+            <th scope="col">{{ 'account.crowdsecBans.table.network' | t }}</th>
+            <th scope="col">{{ 'account.crowdsecBans.table.expiresIn' | t }}</th>
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (ban of bans; track ban) {
+            <tr>
+              <td class="font-monospace text-break">{{ ban.ip }}</td>
+              <td>
+                @for (scenario of ban.scenarios; track scenario) {
+                  <div>{{ scenario.replace('crowdsecurity/', '') }}</div>
+                }
+              </td>
+              <td>{{ ban.country || '' }} {{ ban.asName || '' }}</td>
+              <td class="text-nowrap">{{ remaining(ban.expiresInSeconds) }}</td>
+              <td class="text-end">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-danger"
+                  [disabled]="unbanningIp !== null"
+                  (click)="unban(ban.ip)"
+                  [attr.aria-label]="'account.crowdsecBans.unbanAriaLabel' | t:{ ip: ban.ip }"
+                  >
+                  @if (unbanningIp === ban.ip) {
+                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                  }
+                  {{ 'account.crowdsecBans.unbanButton' | t }}
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+  @if (feedback) {
+    <span
+      class="d-block small mt-2"
+      [ngClass]="feedback.type === 'success' ? 'text-success' : 'text-danger'"
+    >{{ feedback.message }}</span>
+  }
 </app-panel>

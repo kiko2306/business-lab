@@ -1,4 +1,4 @@
-import { NgFor, NgIf } from '@angular/common';
+
 import { Component, inject } from '@angular/core';
 import { PanelComponent } from '../panel/panel.component';
 import { DiscoveredHost } from '../../core/models';
@@ -14,10 +14,9 @@ type ScanState = 'idle' | 'scanning' | 'done' | 'failed';
  * traffic to every device on the network, so it runs only when asked for.
  */
 @Component({
-  selector: 'app-network-scan',
-  standalone: true,
-  imports: [NgFor, NgIf, PanelComponent, TranslatePipe],
-  templateUrl: './network-scan.component.html',
+    selector: 'app-network-scan',
+    imports: [PanelComponent, TranslatePipe],
+    templateUrl: './network-scan.component.html'
 })
 export class NetworkScanComponent {
   private readonly operations = inject(OperationsService);

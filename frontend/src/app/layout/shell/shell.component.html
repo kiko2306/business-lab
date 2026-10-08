@@ -1,7 +1,7 @@
 <div class="app-shell">
   <!-- The header repeats 11 nav links plus language, theme and logout on every
-       route; without this, reaching the page by keyboard means tabbing through
-       all of them after every navigation (WCAG 2.4.1). -->
+  route; without this, reaching the page by keyboard means tabbing through
+  all of them after every navigation (WCAG 2.4.1). -->
   <a class="skip-link" href="#main-content">{{ 'shell.skipToContent' | t }}</a>
   <header class="app-header border-bottom sticky-top">
     <div class="container-fluid py-2">
@@ -11,48 +11,70 @@
             <img src="favicon.svg" alt="" width="26" height="26" />
             Business Lab
           </div>
-          <div class="small text-body-secondary text-truncate" *ngIf="user$ | async as user">
-            {{ 'shell.signedInAs' | t:{ username: user.username } }}
-          </div>
+          @if (user$ | async; as user) {
+            <div class="small text-body-secondary text-truncate">
+              {{ 'shell.signedInAs' | t:{ username: user.username } }}
+            </div>
+          }
         </a>
         <app-resource-strip class="app-header__resources"></app-resource-strip>
-        <nav class="app-header__actions" *ngIf="caps$ | async as caps">
-          <a class="app-nav__link" routerLink="/apps" routerLinkActive="active"
-             *ngIf="caps.has('apps:control')">{{ 'shell.nav.apps' | t }}</a>
-          <a class="app-nav__link" routerLink="/backups" routerLinkActive="active"
-             *ngIf="caps.has('backups:manage')">{{ 'shell.nav.backups' | t }}</a>
-          <a class="app-nav__link" routerLink="/settings" routerLinkActive="active"
-             *ngIf="caps.has('settings:manage') || caps.has('exposure:settings')">{{ 'shell.nav.settings' | t }}</a>
-          <a class="app-nav__link" routerLink="/content" routerLinkActive="active"
-             *ngIf="caps.has('settings:manage')">{{ 'shell.nav.content' | t }}</a>
-          <a class="app-nav__link" routerLink="/users" routerLinkActive="active"
-             *ngIf="caps.has('users:manage')">{{ 'shell.nav.users' | t }}</a>
-          <a class="app-nav__link" routerLink="/audit-logs" routerLinkActive="active"
-             *ngIf="caps.has('audit:view')">{{ 'shell.nav.auditLogs' | t }}</a>
-          <a class="app-nav__link" routerLink="/updates" routerLinkActive="active"
-             *ngIf="caps.has('system:update')">{{ 'shell.nav.updates' | t }}</a>
-          <a class="app-nav__link" routerLink="/account" routerLinkActive="active">{{ 'shell.nav.security' | t }}</a>
-          <a class="app-nav__link app-nav__link--warning" routerLink="/recovery">{{ 'shell.nav.recovery' | t }}</a>
-        </nav>
+        @if (caps$ | async; as caps) {
+          <nav class="app-header__actions">
+            @if (caps.has('apps:control')) {
+              <a class="app-nav__link" routerLink="/apps" routerLinkActive="active"
+              >{{ 'shell.nav.apps' | t }}</a>
+            }
+            @if (caps.has('backups:manage')) {
+              <a class="app-nav__link" routerLink="/backups" routerLinkActive="active"
+              >{{ 'shell.nav.backups' | t }}</a>
+            }
+            @if (caps.has('settings:manage') || caps.has('exposure:settings')) {
+              <a class="app-nav__link" routerLink="/settings" routerLinkActive="active"
+              >{{ 'shell.nav.settings' | t }}</a>
+            }
+            @if (caps.has('settings:manage')) {
+              <a class="app-nav__link" routerLink="/content" routerLinkActive="active"
+              >{{ 'shell.nav.content' | t }}</a>
+            }
+            @if (caps.has('users:manage')) {
+              <a class="app-nav__link" routerLink="/users" routerLinkActive="active"
+              >{{ 'shell.nav.users' | t }}</a>
+            }
+            @if (caps.has('audit:view')) {
+              <a class="app-nav__link" routerLink="/audit-logs" routerLinkActive="active"
+              >{{ 'shell.nav.auditLogs' | t }}</a>
+            }
+            @if (caps.has('system:update')) {
+              <a class="app-nav__link" routerLink="/updates" routerLinkActive="active"
+              >{{ 'shell.nav.updates' | t }}</a>
+            }
+            <a class="app-nav__link" routerLink="/account" routerLinkActive="active">{{ 'shell.nav.security' | t }}</a>
+            <a class="app-nav__link app-nav__link--warning" routerLink="/recovery">{{ 'shell.nav.recovery' | t }}</a>
+          </nav>
+        }
         <select class="form-select form-select-sm app-header__lang" [attr.aria-label]="'shell.languageLabel' | t"
-                [value]="translate.locale()" (change)="onLocaleChange($any($event.target).value)">
+          [value]="translate.locale()" (change)="onLocaleChange($any($event.target).value)">
           <option value="en">EN</option>
           <option value="pt-PT">PT</option>
         </select>
         <button type="button" class="btn btn-outline-secondary btn-sm app-header__theme" (click)="toggleTheme()"
-                [attr.aria-label]="'shell.themeLabel' | t" [title]="'shell.themeLabel' | t">
+          [attr.aria-label]="'shell.themeLabel' | t" [title]="'shell.themeLabel' | t">
           <!-- Inline SVG, not a Unicode symbol — a bare ☀/☾ doesn't render in every font
-               (found live during an audit, plan.md §791); matches panel.component's own
-               chevron convention (currentColor stroke, no font dependency). -->
-          <svg *ngIf="theme() === 'dark'" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5" />
-            <path d="M8 0.5v2M8 13.5v2M15.5 8h-2M2.5 8h-2M13.2 2.8l-1.4 1.4M4.2 11.8l-1.4 1.4M13.2 13.2l-1.4-1.4M4.2 4.2L2.8 2.8"
-                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-          </svg>
-          <svg *ngIf="theme() !== 'dark'" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M13.5 9.3A5.5 5.5 0 1 1 6.7 2.5a4.3 4.3 0 0 0 6.8 6.8z"
-                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
+          (found live during an audit, plan.md §791); matches panel.component's own
+          chevron convention (currentColor stroke, no font dependency). -->
+          @if (theme() === 'dark') {
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5" />
+              <path d="M8 0.5v2M8 13.5v2M15.5 8h-2M2.5 8h-2M13.2 2.8l-1.4 1.4M4.2 11.8l-1.4 1.4M13.2 13.2l-1.4-1.4M4.2 4.2L2.8 2.8"
+                stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+          }
+          @if (theme() !== 'dark') {
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M13.5 9.3A5.5 5.5 0 1 1 6.7 2.5a4.3 4.3 0 0 0 6.8 6.8z"
+                stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          }
         </button>
         <button type="button" class="btn btn-outline-danger btn-sm app-header__logout" (click)="logout()">{{ 'shell.logout' | t }}</button>
       </div>
@@ -60,14 +82,16 @@
   </header>
 
   <!-- The routed page renders as a sibling of the outlet, so this wrapper
-       contains it and gives the skip link something to focus. -->
+  contains it and gives the skip link something to focus. -->
   <div id="main-content" tabindex="-1" class="app-shell__content">
     <router-outlet></router-outlet>
   </div>
 
   <footer class="app-footer text-body-secondary">
     <div class="container-fluid py-3">
-      Business Lab<span *ngIf="appVersion"> v{{ appVersion }}</span>
-    </div>
-  </footer>
+      Business Lab@if (appVersion) {
+      <span> v{{ appVersion }}</span>
+    }
+  </div>
+</footer>
 </div>

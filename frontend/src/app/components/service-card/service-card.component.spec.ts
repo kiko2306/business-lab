@@ -1055,12 +1055,11 @@ describe('ServiceCardComponent under OnPush', () => {
 // translated binding per check, so its call count is the work done.
 describe('ServiceCardComponent idle cost (plan.md §808)', () => {
   @Component({
-    standalone: true,
     imports: [ServiceCardComponent],
     template: `@for (s of services; track s.name) {
       <app-service-card [service]="s" [allServices]="services"></app-service-card>
-    }`,
-  })
+    }`
+})
   class HostComponent {
     services = Array.from({ length: 50 }, (_, i) => service(`app-${i}`, 'running'));
   }

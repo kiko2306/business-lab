@@ -65,18 +65,17 @@ interface DependencyState {
 }
 
 @Component({
-  selector: 'app-service-card',
-  standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe],
-  templateUrl: './service-card.component.html',
-  styleUrls: ['./service-card.component.css', './startup-logs.css'],
-  // ~50 of these sit on the Apps page, and under the default strategy every
-  // card's bindings were re-checked on every event anywhere (plan.md §802/§808).
-  // The price is that state arriving from a subscription, a timer or an
-  // EventSource no longer redraws the card by itself: each such path calls
-  // markForCheck(), and service-card.component.spec.ts drives every one of them
-  // under this strategy, because a missed one is a card showing stale data.
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    selector: 'app-service-card',
+    imports: [CommonModule, FormsModule, TranslatePipe],
+    templateUrl: './service-card.component.html',
+    styleUrls: ['./service-card.component.css', './startup-logs.css'],
+    // ~50 of these sit on the Apps page, and under the default strategy every
+    // card's bindings were re-checked on every event anywhere (plan.md §802/§808).
+    // The price is that state arriving from a subscription, a timer or an
+    // EventSource no longer redraws the card by itself: each such path calls
+    // markForCheck(), and service-card.component.spec.ts drives every one of them
+    // under this strategy, because a missed one is a card showing stale data.
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   private readonly operations = inject(OperationsService);

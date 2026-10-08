@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -19,11 +19,10 @@ import { AuthShellComponent } from '../../components/auth-shell/auth-shell.compo
  * account is activated and signed in.
  */
 @Component({
-  selector: 'app-set-password',
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective, PasswordToggleDirective, AuthShellComponent],
-  templateUrl: './set-password.component.html',
-  styleUrl: './set-password.component.css',
+    selector: 'app-set-password',
+    imports: [ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective, PasswordToggleDirective, AuthShellComponent],
+    templateUrl: './set-password.component.html',
+    styleUrl: './set-password.component.css'
 })
 export class SetPasswordComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);

@@ -5,62 +5,79 @@
     <div class="service-row-heading">
       <span class="service-name" [title]="service.label">{{ service.label }}</span>
       <span class="badge text-bg-{{ stateBadge(service.state) }}">{{ 'serviceCard.state.' + service.state | t }}</span>
-      <span *ngIf="service.state === 'running' && !service.healthy" class="badge bg-body-tertiary border" [ngClass]="healthClass()">{{ healthLabel() }}</span>
-      <a
-        *ngIf="service.exposedHostname"
-        class="badge text-bg-secondary border text-decoration-none"
-        [href]="'https://' + service.exposedHostname + (service.webPath || '')"
-        target="_blank"
-        rel="noopener noreferrer"
-        [title]="'serviceCard.openPublicUrlTitle' | t"
-      >
-        {{ service.exposedHostname }}{{ service.webPath }}
-      </a>
-      <a
-        *ngIf="!service.exposedHostname && (service.lanOnly || service.overlayOnly || service.state === 'running') && lanAccessUrl()"
-        class="badge text-bg-secondary border text-decoration-none"
-        [href]="lanAccessUrl()"
-        target="_blank"
-        rel="noopener noreferrer"
-        [title]="'serviceCard.openUrlTitle' | t:{ url: lanAccessUrl() ?? '' }"
-      >
-        {{ (service.lanOnly ? 'serviceCard.access.lanOnly' : service.overlayOnly ? 'serviceCard.access.overlayOnly' : 'serviceCard.access.lan') | t }}
-      </a>
+      @if (service.state === 'running' && !service.healthy) {
+        <span class="badge bg-body-tertiary border" [ngClass]="healthClass()">{{ healthLabel() }}</span>
+      }
+      @if (service.exposedHostname) {
+        <a
+          class="badge text-bg-secondary border text-decoration-none"
+          [href]="'https://' + service.exposedHostname + (service.webPath || '')"
+          target="_blank"
+          rel="noopener noreferrer"
+          [title]="'serviceCard.openPublicUrlTitle' | t"
+          >
+          {{ service.exposedHostname }}{{ service.webPath }}
+        </a>
+      }
+      @if (!service.exposedHostname && (service.lanOnly || service.overlayOnly || service.state === 'running') && lanAccessUrl()) {
+        <a
+          class="badge text-bg-secondary border text-decoration-none"
+          [href]="lanAccessUrl()"
+          target="_blank"
+          rel="noopener noreferrer"
+          [title]="'serviceCard.openUrlTitle' | t:{ url: lanAccessUrl() ?? '' }"
+          >
+          {{ (service.lanOnly ? 'serviceCard.access.lanOnly' : service.overlayOnly ? 'serviceCard.access.overlayOnly' : 'serviceCard.access.lan') | t }}
+        </a>
+      }
     </div>
     <div class="service-row-sub">
       <span class="text-truncate">{{ service.description }}</span>
-      <span *ngIf="!dependenciesSatisfied()" class="text-warning-emphasis">
-        · {{ startBlockedTitle() }}
-        <button *ngIf="service.state !== 'running' && service.state !== 'starting'" type="button" class="btn btn-link btn-sm p-0 align-baseline" [disabled]="loadingAction !== null" (click)="startWithNeedsRequested.emit()">{{ 'serviceCard.startWithNeeds' | t }}</button>
-      </span>
-      <span *ngIf="dependenciesSatisfied() && degradedBy().length" class="text-warning-emphasis">
-        · {{ degradedTitle() }}
-      </span>
+      @if (!dependenciesSatisfied()) {
+        <span class="text-warning-emphasis">
+          · {{ startBlockedTitle() }}
+          @if (service.state !== 'running' && service.state !== 'starting') {
+            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" [disabled]="loadingAction !== null" (click)="startWithNeedsRequested.emit()">{{ 'serviceCard.startWithNeeds' | t }}</button>
+          }
+        </span>
+      }
+      @if (dependenciesSatisfied() && degradedBy().length) {
+        <span class="text-warning-emphasis">
+          · {{ degradedTitle() }}
+        </span>
+      }
     </div>
     <!-- Plain cause + one action; the raw error stays one click away. -->
-    <div *ngIf="service.state === 'error'" class="row-recovery small text-danger d-flex flex-wrap align-items-center gap-2">
-      <span>{{ 'serviceCard.recovery.cause' | t:{ label: service.label } }}</span>
-      <button type="button" class="btn btn-outline-danger btn-sm py-0" [disabled]="loadingAction !== null" (click)="requestAction('start')">{{ 'serviceCard.recovery.tryAgain' | t }}</button>
-      <details *ngIf="service.error">
-        <summary>{{ 'serviceCard.recovery.showDetails' | t }}</summary>
-        {{ service.error }}
-      </details>
-    </div>
+    @if (service.state === 'error') {
+      <div class="row-recovery small text-danger d-flex flex-wrap align-items-center gap-2">
+        <span>{{ 'serviceCard.recovery.cause' | t:{ label: service.label } }}</span>
+        <button type="button" class="btn btn-outline-danger btn-sm py-0" [disabled]="loadingAction !== null" (click)="requestAction('start')">{{ 'serviceCard.recovery.tryAgain' | t }}</button>
+        @if (service.error) {
+          <details>
+            <summary>{{ 'serviceCard.recovery.showDetails' | t }}</summary>
+            {{ service.error }}
+          </details>
+        }
+      </div>
+    }
 
     <!-- Always listed, not only when something is missing: knowing an app needs
-         Authelia is as useful when it is up as when it is down. -->
-    <div class="service-row-deps" *ngIf="dependencies().length">
-      <span class="deps-label">{{ 'serviceCard.needsLabel' | t }}</span>
-      <span
-        class="dep"
-        *ngFor="let dep of dependencies()"
-        [class.dep--down]="!dep.running"
-        [class.dep--optional]="!dep.blocking"
-        [title]="dependencyTitle(dep)"
-      >
-        <span class="dep-dot" aria-hidden="true"></span>{{ dep.label }}
-      </span>
-    </div>
+    Authelia is as useful when it is up as when it is down. -->
+    @if (dependencies().length) {
+      <div class="service-row-deps">
+        <span class="deps-label">{{ 'serviceCard.needsLabel' | t }}</span>
+        @for (dep of dependencies(); track dep) {
+          <span
+            class="dep"
+            [class.dep--down]="!dep.running"
+            [class.dep--optional]="!dep.blocking"
+            [title]="dependencyTitle(dep)"
+            >
+            <span class="dep-dot" aria-hidden="true"></span>{{ dep.label }}
+          </span>
+        }
+      </div>
+    }
   </div>
 
   <div class="service-row-actions">
@@ -70,26 +87,36 @@
       [disabled]="loadingAction !== null || service.state === 'running' || service.state === 'starting' || !dependenciesSatisfied()"
       [title]="dependenciesSatisfied() ? '' : startBlockedTitle()"
       (click)="requestAction('start')"
-    >
-      <span *ngIf="loadingAction === 'start'" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-      <span *ngIf="loadingAction !== 'start' && service.state === 'starting'"><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>{{ 'serviceCard.startingButton' | t }}</span>
-      <span *ngIf="loadingAction !== 'start' && service.state !== 'starting'">{{ 'serviceCard.startButton' | t }}</span>
+      >
+      @if (loadingAction === 'start') {
+        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+      }
+      @if (loadingAction !== 'start' && service.state === 'starting') {
+        <span><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>{{ 'serviceCard.startingButton' | t }}</span>
+      }
+      @if (loadingAction !== 'start' && service.state !== 'starting') {
+        <span>{{ 'serviceCard.startButton' | t }}</span>
+      }
     </button>
     <button
       type="button"
       class="btn btn-outline-danger btn-sm"
       [disabled]="loadingAction !== null || service.state !== 'running'"
       (click)="requestAction('stop')"
-    >
-      <span *ngIf="loadingAction === 'stop'" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-      <span *ngIf="loadingAction !== 'stop'">{{ 'serviceCard.stopButton' | t }}</span>
+      >
+      @if (loadingAction === 'stop') {
+        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+      }
+      @if (loadingAction !== 'stop') {
+        <span>{{ 'serviceCard.stopButton' | t }}</span>
+      }
     </button>
     <button
       type="button"
       class="btn btn-outline-secondary btn-sm"
       [title]="'serviceCard.settingsTitle' | t"
       (click)="openSettings()"
-    >
+      >
       {{ 'serviceCard.settingsButton' | t }}
     </button>
   </div>
@@ -97,298 +124,328 @@
 
 <!-- Configuration / exposure / admin-account modal -->
 <!-- No backdrop-click close here: it would silently drop unsaved edits. Escape and the X close. -->
-<div *ngIf="settingsModalOpen" class="settings-backdrop">
-  <div #settingsDialog tabindex="-1" (keydown)="trapTab($event)" class="settings-dialog" role="dialog" aria-modal="true" [attr.aria-labelledby]="'settings-title-' + service.name">
-    <div class="settings-head">
-      <span class="service-icon service-icon-sm" aria-hidden="true">{{ initials(service.label) }}</span>
-      <span class="fw-semibold" [id]="'settings-title-' + service.name">{{ 'serviceCard.settingsModalTitle' | t:{ label: service.label } }}</span>
-      <button type="button" class="btn-close ms-auto" [attr.aria-label]="'common.close' | t" (click)="closeSettings()"></button>
-    </div>
-
-    <div class="settings-body">
-      <!-- About: what used to crowd the row heading (plan.md §761) -->
-      <section class="settings-section settings-about small d-flex flex-wrap gap-2 align-items-center">
-        <span class="badge bg-body-tertiary border">{{ 'serviceCard.installedLabel' | t:{ version: installedVersion() } }}</span>
-        <span class="badge text-bg-secondary border" *ngFor="let port of service.ports" [title]="'serviceCard.portTitle' | t">{{ 'serviceCard.portLabel' | t:{ port: port.hostPort } }}</span>
-        <span *ngIf="service.mobileApps?.android" class="badge bg-body-tertiary border">{{ 'serviceCard.androidAppTitle' | t }}</span>
-        <span *ngIf="service.mobileApps?.ios" class="badge bg-body-tertiary border">{{ 'serviceCard.iosAppTitle' | t }}</span>
-        <a
-          *ngIf="service.exposedHostname && service.clientApiPath"
-          class="badge text-bg-secondary border text-decoration-none"
-          [href]="'https://' + service.exposedHostname + service.clientApiPath"
-          target="_blank"
-          rel="noopener noreferrer"
-          [title]="'serviceCard.clientApiUrlTitle' | t"
-        >
-          {{ 'serviceCard.clientApiUrlLabel' | t }}: {{ service.exposedHostname }}{{ service.clientApiPath }}
-        </a>
-        <a
-          *ngFor="let extra of service.additionalExposureUrls"
-          class="badge text-bg-secondary border text-decoration-none"
-          [href]="'https://' + extra.hostname"
-          target="_blank"
-          rel="noopener noreferrer"
-          [title]="'serviceCard.extraUrlTitle' | t:{ label: extra.label }"
-        >
-          {{ extra.label }}: {{ extra.hostname }}
-        </a>
-      </section>
-
-      <!-- Configuration -->
-      <section class="settings-section">
-        <h3 class="settings-section-title">{{ 'serviceCard.configuration.title' | t }}</h3>
-
-        <div *ngIf="envLoading" class="d-flex align-items-center gap-2 text-body-secondary small">
-          <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-          {{ 'common.loading' | t }}
-        </div>
-
-        <ng-container *ngIf="!envLoading && env">
-          <div *ngIf="!visibleEnvFields.length" class="small text-body-secondary mb-2">
-            {{ 'serviceCard.configuration.noSettings' | t }}
-          </div>
-
-          <div *ngIf="missingRequiredCount() > 0" class="alert alert-warning py-1 px-2 small mb-2">
-            {{ (missingRequiredCount() === 1 ? 'serviceCard.configuration.missingRequired.one' : 'serviceCard.configuration.missingRequired.other') | t:{ count: missingRequiredCount() } }}
-          </div>
-
-          <ng-container *ngFor="let field of visibleEnvFields">
-           <div class="mb-2">
-            <label class="form-label small mb-1" [for]="'env-' + service.name + '-' + field.key">
-              {{ envLabel(field.key) }}
-              <span *ngIf="field.required" class="text-danger">*</span>
-            </label>
-
-            <!-- Boolean toggle (editable) — e.g. Vaultwarden's SIGNUPS_ALLOWED -->
-            <div *ngIf="field.boolean && !field.managed" class="d-flex gap-3 pt-1">
-              <div class="form-check">
-                <input
-                  class="form-check-input"
-                  type="radio"
-                  [id]="'env-' + service.name + '-' + field.key + '-true'"
-                  [name]="'env-' + service.name + '-' + field.key"
-                  value="true"
-                  [(ngModel)]="envValues[field.key]"
-                />
-                <label class="form-check-label small" [for]="'env-' + service.name + '-' + field.key + '-true'">{{ 'serviceCard.boolean.true' | t }}</label>
-              </div>
-              <div class="form-check">
-                <input
-                  class="form-check-input"
-                  type="radio"
-                  [id]="'env-' + service.name + '-' + field.key + '-false'"
-                  [name]="'env-' + service.name + '-' + field.key"
-                  value="false"
-                  [(ngModel)]="envValues[field.key]"
-                />
-                <label class="form-check-label small" [for]="'env-' + service.name + '-' + field.key + '-false'">{{ 'serviceCard.boolean.false' | t }}</label>
-              </div>
+@if (settingsModalOpen) {
+  <div class="settings-backdrop">
+    <div #settingsDialog tabindex="-1" (keydown)="trapTab($event)" class="settings-dialog" role="dialog" aria-modal="true" [attr.aria-labelledby]="'settings-title-' + service.name">
+      <div class="settings-head">
+        <span class="service-icon service-icon-sm" aria-hidden="true">{{ initials(service.label) }}</span>
+        <span class="fw-semibold" [id]="'settings-title-' + service.name">{{ 'serviceCard.settingsModalTitle' | t:{ label: service.label } }}</span>
+        <button type="button" class="btn-close ms-auto" [attr.aria-label]="'common.close' | t" (click)="closeSettings()"></button>
+      </div>
+      <div class="settings-body">
+        <!-- About: what used to crowd the row heading (plan.md §761) -->
+        <section class="settings-section settings-about small d-flex flex-wrap gap-2 align-items-center">
+          <span class="badge bg-body-tertiary border">{{ 'serviceCard.installedLabel' | t:{ version: installedVersion() } }}</span>
+          @for (port of service.ports; track port) {
+            <span class="badge text-bg-secondary border" [title]="'serviceCard.portTitle' | t">{{ 'serviceCard.portLabel' | t:{ port: port.hostPort } }}</span>
+          }
+          @if (service.mobileApps?.android) {
+            <span class="badge bg-body-tertiary border">{{ 'serviceCard.androidAppTitle' | t }}</span>
+          }
+          @if (service.mobileApps?.ios) {
+            <span class="badge bg-body-tertiary border">{{ 'serviceCard.iosAppTitle' | t }}</span>
+          }
+          @if (service.exposedHostname && service.clientApiPath) {
+            <a
+              class="badge text-bg-secondary border text-decoration-none"
+              [href]="'https://' + service.exposedHostname + service.clientApiPath"
+              target="_blank"
+              rel="noopener noreferrer"
+              [title]="'serviceCard.clientApiUrlTitle' | t"
+              >
+              {{ 'serviceCard.clientApiUrlLabel' | t }}: {{ service.exposedHostname }}{{ service.clientApiPath }}
+            </a>
+          }
+          @for (extra of service.additionalExposureUrls; track extra) {
+            <a
+              class="badge text-bg-secondary border text-decoration-none"
+              [href]="'https://' + extra.hostname"
+              target="_blank"
+              rel="noopener noreferrer"
+              [title]="'serviceCard.extraUrlTitle' | t:{ label: extra.label }"
+              >
+              {{ extra.label }}: {{ extra.hostname }}
+            </a>
+          }
+        </section>
+        <!-- Configuration -->
+        <section class="settings-section">
+          <h3 class="settings-section-title">{{ 'serviceCard.configuration.title' | t }}</h3>
+          @if (envLoading) {
+            <div class="d-flex align-items-center gap-2 text-body-secondary small">
+              <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+              {{ 'common.loading' | t }}
             </div>
-
-            <!-- Boolean toggle pinned by exposure (e.g. ntfy NTFY_BEHIND_PROXY) —
-                 same radios, disabled, showing the enforced value. -->
-            <div *ngIf="field.boolean && field.managed" class="d-flex gap-3 pt-1">
-              <div class="form-check">
-                <input class="form-check-input" type="radio" disabled
-                  [checked]="managedFieldValue(field) === 'true'" />
-                <label class="form-check-label small">{{ 'serviceCard.boolean.true' | t }}</label>
+          }
+          @if (!envLoading && env) {
+            @if (!visibleEnvFields.length) {
+              <div class="small text-body-secondary mb-2">
+                {{ 'serviceCard.configuration.noSettings' | t }}
               </div>
-              <div class="form-check">
-                <input class="form-check-input" type="radio" disabled
-                  [checked]="managedFieldValue(field) !== 'true'" />
-                <label class="form-check-label small">{{ 'serviceCard.boolean.false' | t }}</label>
+            }
+            @if (missingRequiredCount() > 0) {
+              <div class="alert alert-warning py-1 px-2 small mb-2">
+                {{ (missingRequiredCount() === 1 ? 'serviceCard.configuration.missingRequired.one' : 'serviceCard.configuration.missingRequired.other') | t:{ count: missingRequiredCount() } }}
               </div>
-            </div>
-
-            <!-- Exposure-managed non-boolean (read-only) — Vaultwarden DOMAIN,
-                 n8n N8N_HOST, ntfy NTFY_BASE_URL, … -->
-            <input
-              *ngIf="field.managed && !field.boolean"
-              type="text"
-              class="form-control form-control-sm"
-              [id]="'env-' + service.name + '-' + field.key"
-              [value]="managedFieldValue(field)"
-              readonly
-            />
-
-            <div *ngIf="field.managed" class="form-text small">
-              {{ (field.managedValue
-                ? 'serviceCard.configuration.managedFromExposure'
-                : 'serviceCard.configuration.managedFollowsUrl') | t }}
-            </div>
-
-            <input
-              *ngIf="!field.managed && !field.boolean && !field.secret"
-              type="text"
-              class="form-control form-control-sm"
-              [id]="'env-' + service.name + '-' + field.key"
-              [(ngModel)]="envValues[field.key]"
-              [placeholder]="field.defaultValue ?? ''"
-            />
-            <input
-              *ngIf="!field.managed && !field.boolean && field.secret"
-              type="password"
-              class="form-control form-control-sm"
-              [id]="'env-' + service.name + '-' + field.key"
-              [(ngModel)]="envValues[field.key]"
-              [placeholder]="field.isSet ? ('serviceCard.configuration.passwordConfigured' | t) : ('serviceCard.configuration.passwordNotSet' | t)"
-              autocomplete="new-password"
-            />
-            <div *ngIf="!field.managed && !field.boolean && field.secret && field.suggestedValue" class="form-text small">
-              {{ 'serviceCard.configuration.autoGenerated' | t }}
-            </div>
-           </div>
-          </ng-container>
-
+            }
+            @for (field of visibleEnvFields; track field) {
+              <div class="mb-2">
+                <label class="form-label small mb-1" [for]="'env-' + service.name + '-' + field.key">
+                  {{ envLabel(field.key) }}
+                  @if (field.required) {
+                    <span class="text-danger">*</span>
+                  }
+                </label>
+                <!-- Boolean toggle (editable) — e.g. Vaultwarden's SIGNUPS_ALLOWED -->
+                @if (field.boolean && !field.managed) {
+                  <div class="d-flex gap-3 pt-1">
+                    <div class="form-check">
+                      <input
+                        class="form-check-input"
+                        type="radio"
+                        [id]="'env-' + service.name + '-' + field.key + '-true'"
+                        [name]="'env-' + service.name + '-' + field.key"
+                        value="true"
+                        [(ngModel)]="envValues[field.key]"
+                        />
+                      <label class="form-check-label small" [for]="'env-' + service.name + '-' + field.key + '-true'">{{ 'serviceCard.boolean.true' | t }}</label>
+                    </div>
+                    <div class="form-check">
+                      <input
+                        class="form-check-input"
+                        type="radio"
+                        [id]="'env-' + service.name + '-' + field.key + '-false'"
+                        [name]="'env-' + service.name + '-' + field.key"
+                        value="false"
+                        [(ngModel)]="envValues[field.key]"
+                        />
+                      <label class="form-check-label small" [for]="'env-' + service.name + '-' + field.key + '-false'">{{ 'serviceCard.boolean.false' | t }}</label>
+                    </div>
+                  </div>
+                }
+                <!-- Boolean toggle pinned by exposure (e.g. ntfy NTFY_BEHIND_PROXY) —
+                same radios, disabled, showing the enforced value. -->
+                @if (field.boolean && field.managed) {
+                  <div class="d-flex gap-3 pt-1">
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" disabled
+                        [checked]="managedFieldValue(field) === 'true'" />
+                      <label class="form-check-label small">{{ 'serviceCard.boolean.true' | t }}</label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" disabled
+                        [checked]="managedFieldValue(field) !== 'true'" />
+                      <label class="form-check-label small">{{ 'serviceCard.boolean.false' | t }}</label>
+                    </div>
+                  </div>
+                }
+                <!-- Exposure-managed non-boolean (read-only) — Vaultwarden DOMAIN,
+                n8n N8N_HOST, ntfy NTFY_BASE_URL, … -->
+                @if (field.managed && !field.boolean) {
+                  <input
+                    type="text"
+                    class="form-control form-control-sm"
+                    [id]="'env-' + service.name + '-' + field.key"
+                    [value]="managedFieldValue(field)"
+                    readonly
+                    />
+                }
+                @if (field.managed) {
+                  <div class="form-text small">
+                    {{ (field.managedValue
+                    ? 'serviceCard.configuration.managedFromExposure'
+                    : 'serviceCard.configuration.managedFollowsUrl') | t }}
+                  </div>
+                }
+                @if (!field.managed && !field.boolean && !field.secret) {
+                  <input
+                    type="text"
+                    class="form-control form-control-sm"
+                    [id]="'env-' + service.name + '-' + field.key"
+                    [(ngModel)]="envValues[field.key]"
+                    [placeholder]="field.defaultValue ?? ''"
+                    />
+                }
+                @if (!field.managed && !field.boolean && field.secret) {
+                  <input
+                    type="password"
+                    class="form-control form-control-sm"
+                    [id]="'env-' + service.name + '-' + field.key"
+                    [(ngModel)]="envValues[field.key]"
+                    [placeholder]="field.isSet ? ('serviceCard.configuration.passwordConfigured' | t) : ('serviceCard.configuration.passwordNotSet' | t)"
+                    autocomplete="new-password"
+                    />
+                }
+                @if (!field.managed && !field.boolean && field.secret && field.suggestedValue) {
+                  <div class="form-text small">
+                    {{ 'serviceCard.configuration.autoGenerated' | t }}
+                  </div>
+                }
+              </div>
+            }
+            <button
+              type="button"
+              class="btn btn-outline-primary btn-sm mt-1"
+              [disabled]="envSaving || !visibleEnvFields.length"
+              (click)="saveEnv()"
+              >
+              @if (envSaving) {
+                <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+              }
+              {{ 'serviceCard.configuration.saveButton' | t }}
+            </button>
+          }
+        </section>
+        <!-- Backups -->
+        <section class="settings-section">
+          <h3 class="settings-section-title">{{ 'serviceCard.backups.title' | t }}</h3>
+          <p class="small text-body-secondary mb-2">
+            {{ 'serviceCard.backups.description' | t }}
+          </p>
           <button
             type="button"
-            class="btn btn-outline-primary btn-sm mt-1"
-            [disabled]="envSaving || !visibleEnvFields.length"
-            (click)="saveEnv()"
-          >
-            <span *ngIf="envSaving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-            {{ 'serviceCard.configuration.saveButton' | t }}
+            class="btn btn-outline-primary btn-sm mb-2"
+            [disabled]="backupsCreating || backupBusyFile !== null"
+            (click)="createAppBackup()"
+            >
+            @if (backupsCreating) {
+              <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            }
+            {{ 'serviceCard.backups.backUpNowButton' | t }}
           </button>
-        </ng-container>
-      </section>
+          @if (backupsLoading) {
+            <div class="d-flex align-items-center gap-2 text-body-secondary small">
+              <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+              {{ 'common.loading' | t }}
+            </div>
+          }
+          @if (!backupsLoading) {
+            @if (!appBackups.length) {
+              <div class="small text-body-secondary">{{ 'serviceCard.backups.noSnapshots' | t }}</div>
+            }
+            @if (appBackups.length) {
+              <ul class="list-unstyled d-flex flex-column gap-2 mb-0">
+                @for (b of appBackups; track b) {
+                  <li
+                    class="d-flex flex-wrap align-items-center gap-2 p-2 border rounded bg-body-tertiary"
+                    >
+                    <div class="app-backup-meta d-flex flex-column">
+                      <span class="fw-semibold small">{{ b.createdAt | date: 'medium':undefined:translate.locale() }}</span>
+                      <span class="small text-body-secondary">{{ appBackupDetail(b) }}</span>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-1 ms-auto">
+                      @if (backupBusyFile === b.file) {
+                        <span
+                          class="spinner-border spinner-border-sm text-body-secondary"
+                          aria-hidden="true"
+                        ></span>
+                      }
+                      <button
+                        type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        [disabled]="backupBusyFile !== null"
+                        (click)="downloadAppBackup(b)"
+                        >
+                        {{ 'serviceCard.backups.downloadButton' | t }}
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-primary btn-sm"
+                        [disabled]="backupBusyFile !== null || backupsCreating"
+                        (click)="restoreAppBackup(b)"
+                        >
+                        {{ 'serviceCard.backups.restoreButton' | t }}
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-danger btn-sm"
+                        [disabled]="backupBusyFile !== null"
+                        (click)="deleteAppBackup(b)"
+                        >
+                        {{ 'serviceCard.backups.deleteButton' | t }}
+                      </button>
+                    </div>
+                  </li>
+                }
+              </ul>
+            }
+          }
+        </section>
+        <!-- Admin account -->
+        @if (service.adminUserManagementSupported) {
+          <section class="settings-section">
+            <h3 class="settings-section-title">{{ 'serviceCard.adminAccount.title' | t }}</h3>
+            @if (adminUserLoading) {
+              <div class="d-flex align-items-center gap-2 text-body-secondary small">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                {{ 'common.loading' | t }}
+              </div>
+            }
+            @if (!adminUserLoading && adminUser) {
+              <div class="mb-2">
+                <label class="form-label small mb-1" [for]="'admin-username-' + service.name">{{ 'serviceCard.adminAccount.usernameLabel' | t }}</label>
+                <input class="form-control form-control-sm" [id]="'admin-username-' + service.name" [(ngModel)]="adminUserForm.username" />
+              </div>
+              <div class="mb-2">
+                <label class="form-label small mb-1" [for]="'admin-displayname-' + service.name">{{ 'serviceCard.adminAccount.displayNameLabel' | t }}</label>
+                <input class="form-control form-control-sm" [id]="'admin-displayname-' + service.name" [(ngModel)]="adminUserForm.displayName" />
+              </div>
+              <div class="mb-2">
+                <label class="form-label small mb-1" [for]="'admin-email-' + service.name">{{ 'serviceCard.adminAccount.emailLabel' | t }}</label>
+                <input type="email" class="form-control form-control-sm" [id]="'admin-email-' + service.name" [(ngModel)]="adminUserForm.email" />
+              </div>
+              <div class="mb-2">
+                <label class="form-label small mb-1" [for]="'admin-password-' + service.name">{{ 'serviceCard.adminAccount.newPasswordLabel' | t }}</label>
+                <input
+                  type="password"
+                  class="form-control form-control-sm"
+                  [id]="'admin-password-' + service.name"
+                  [(ngModel)]="adminUserForm.password"
+                  [placeholder]="'serviceCard.adminAccount.passwordPlaceholder' | t"
+                  autocomplete="new-password"
+                  />
+              </div>
+              <div class="small text-body-secondary mb-2">
+                {{ 'serviceCard.adminAccount.savingRestartsNote' | t:{ label: service.label } }}
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm" [disabled]="adminUserSaving" (click)="saveAdminUser()">
+                @if (adminUserSaving) {
+                  <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                }
+                {{ 'serviceCard.adminAccount.saveButton' | t }}
+              </button>
+            }
+          </section>
+        }
+      </div>
+    </div>
+  </div>
+}
 
-      <!-- Backups -->
-      <section class="settings-section">
-        <h3 class="settings-section-title">{{ 'serviceCard.backups.title' | t }}</h3>
-        <p class="small text-body-secondary mb-2">
-          {{ 'serviceCard.backups.description' | t }}
-        </p>
-
+@if (startupLogsOpen) {
+  <div class="startup-logs-backdrop" (click)="closeStartupLogs()">
+    <div #startupDialog tabindex="-1" (keydown)="trapTab($event)" class="startup-logs-dialog" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" [attr.aria-labelledby]="'startup-title-' + service.name">
+      <div class="startup-logs-head">
+        @if (startupPhase === 'streaming') {
+          <span
+            class="spinner-border spinner-border-sm text-light"
+            aria-hidden="true"
+          ></span>
+        }
+        <span class="fw-semibold" [id]="'startup-title-' + service.name">{{ 'serviceCard.startupLogs.startingHeading' | t:{ label: service.label } }}</span>
+        <span class="badge" [ngClass]="startupPhaseBadgeClass()">{{ startupPhaseLabel() }}</span>
         <button
           type="button"
-          class="btn btn-outline-primary btn-sm mb-2"
-          [disabled]="backupsCreating || backupBusyFile !== null"
-          (click)="createAppBackup()"
-        >
-          <span *ngIf="backupsCreating" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-          {{ 'serviceCard.backups.backUpNowButton' | t }}
-        </button>
-
-        <div *ngIf="backupsLoading" class="d-flex align-items-center gap-2 text-body-secondary small">
-          <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-          {{ 'common.loading' | t }}
-        </div>
-
-        <ng-container *ngIf="!backupsLoading">
-          <div *ngIf="!appBackups.length" class="small text-body-secondary">{{ 'serviceCard.backups.noSnapshots' | t }}</div>
-
-          <ul *ngIf="appBackups.length" class="list-unstyled d-flex flex-column gap-2 mb-0">
-            <li
-              *ngFor="let b of appBackups"
-              class="d-flex flex-wrap align-items-center gap-2 p-2 border rounded bg-body-tertiary"
-            >
-              <div class="app-backup-meta d-flex flex-column">
-                <span class="fw-semibold small">{{ b.createdAt | date: 'medium':undefined:translate.locale() }}</span>
-                <span class="small text-body-secondary">{{ appBackupDetail(b) }}</span>
-              </div>
-              <div class="d-flex flex-wrap align-items-center gap-1 ms-auto">
-                <span
-                  *ngIf="backupBusyFile === b.file"
-                  class="spinner-border spinner-border-sm text-body-secondary"
-                  aria-hidden="true"
-                ></span>
-                <button
-                  type="button"
-                  class="btn btn-outline-secondary btn-sm"
-                  [disabled]="backupBusyFile !== null"
-                  (click)="downloadAppBackup(b)"
-                >
-                  {{ 'serviceCard.backups.downloadButton' | t }}
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-outline-primary btn-sm"
-                  [disabled]="backupBusyFile !== null || backupsCreating"
-                  (click)="restoreAppBackup(b)"
-                >
-                  {{ 'serviceCard.backups.restoreButton' | t }}
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-outline-danger btn-sm"
-                  [disabled]="backupBusyFile !== null"
-                  (click)="deleteAppBackup(b)"
-                >
-                  {{ 'serviceCard.backups.deleteButton' | t }}
-                </button>
-              </div>
-            </li>
-          </ul>
-        </ng-container>
-      </section>
-
-      <!-- Admin account -->
-      <section class="settings-section" *ngIf="service.adminUserManagementSupported">
-        <h3 class="settings-section-title">{{ 'serviceCard.adminAccount.title' | t }}</h3>
-
-        <div *ngIf="adminUserLoading" class="d-flex align-items-center gap-2 text-body-secondary small">
-          <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-          {{ 'common.loading' | t }}
-        </div>
-
-        <ng-container *ngIf="!adminUserLoading && adminUser">
-          <div class="mb-2">
-            <label class="form-label small mb-1" [for]="'admin-username-' + service.name">{{ 'serviceCard.adminAccount.usernameLabel' | t }}</label>
-            <input class="form-control form-control-sm" [id]="'admin-username-' + service.name" [(ngModel)]="adminUserForm.username" />
-          </div>
-          <div class="mb-2">
-            <label class="form-label small mb-1" [for]="'admin-displayname-' + service.name">{{ 'serviceCard.adminAccount.displayNameLabel' | t }}</label>
-            <input class="form-control form-control-sm" [id]="'admin-displayname-' + service.name" [(ngModel)]="adminUserForm.displayName" />
-          </div>
-          <div class="mb-2">
-            <label class="form-label small mb-1" [for]="'admin-email-' + service.name">{{ 'serviceCard.adminAccount.emailLabel' | t }}</label>
-            <input type="email" class="form-control form-control-sm" [id]="'admin-email-' + service.name" [(ngModel)]="adminUserForm.email" />
-          </div>
-          <div class="mb-2">
-            <label class="form-label small mb-1" [for]="'admin-password-' + service.name">{{ 'serviceCard.adminAccount.newPasswordLabel' | t }}</label>
-            <input
-              type="password"
-              class="form-control form-control-sm"
-              [id]="'admin-password-' + service.name"
-              [(ngModel)]="adminUserForm.password"
-              [placeholder]="'serviceCard.adminAccount.passwordPlaceholder' | t"
-              autocomplete="new-password"
-            />
-          </div>
-          <div class="small text-body-secondary mb-2">
-            {{ 'serviceCard.adminAccount.savingRestartsNote' | t:{ label: service.label } }}
-          </div>
-          <button type="button" class="btn btn-outline-primary btn-sm" [disabled]="adminUserSaving" (click)="saveAdminUser()">
-            <span *ngIf="adminUserSaving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-            {{ 'serviceCard.adminAccount.saveButton' | t }}
-          </button>
-        </ng-container>
-      </section>
+          class="btn-close btn-close-white ms-auto"
+          [attr.aria-label]="'serviceCard.startupLogs.closeAriaLabel' | t"
+          (click)="closeStartupLogs()"
+        ></button>
+      </div>
+      <pre #startupLogBody class="startup-logs-body">{{ startupLogText() }}</pre>
+      <div class="startup-logs-foot">
+        <span class="small">{{ startupFootNote() }}</span>
+        <button type="button" class="btn btn-sm btn-secondary ms-auto" (click)="closeStartupLogs()">{{ 'common.close' | t }}</button>
+      </div>
     </div>
   </div>
-</div>
-
-<div *ngIf="startupLogsOpen" class="startup-logs-backdrop" (click)="closeStartupLogs()">
-  <div #startupDialog tabindex="-1" (keydown)="trapTab($event)" class="startup-logs-dialog" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" [attr.aria-labelledby]="'startup-title-' + service.name">
-    <div class="startup-logs-head">
-      <span
-        *ngIf="startupPhase === 'streaming'"
-        class="spinner-border spinner-border-sm text-light"
-        aria-hidden="true"
-      ></span>
-      <span class="fw-semibold" [id]="'startup-title-' + service.name">{{ 'serviceCard.startupLogs.startingHeading' | t:{ label: service.label } }}</span>
-      <span class="badge" [ngClass]="startupPhaseBadgeClass()">{{ startupPhaseLabel() }}</span>
-      <button
-        type="button"
-        class="btn-close btn-close-white ms-auto"
-        [attr.aria-label]="'serviceCard.startupLogs.closeAriaLabel' | t"
-        (click)="closeStartupLogs()"
-      ></button>
-    </div>
-    <pre #startupLogBody class="startup-logs-body">{{ startupLogText() }}</pre>
-    <div class="startup-logs-foot">
-      <span class="small">{{ startupFootNote() }}</span>
-      <button type="button" class="btn btn-sm btn-secondary ms-auto" (click)="closeStartupLogs()">{{ 'common.close' | t }}</button>
-    </div>
-  </div>
-</div>
+}

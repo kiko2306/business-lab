@@ -42,11 +42,10 @@ function worstDisk(disks: DiskUsage[]): DiskUsage | null {
  * numbers up, and nothing renders until the first success.
  */
 @Component({
-  selector: 'app-resource-strip',
-  standalone: true,
-  imports: [NgFor, NgIf, NgSwitch, NgSwitchCase],
-  templateUrl: './resource-strip.component.html',
-  styleUrl: './resource-strip.component.css',
+    selector: 'app-resource-strip',
+    imports: [NgFor, NgIf, NgSwitch, NgSwitchCase],
+    templateUrl: './resource-strip.component.html',
+    styleUrl: './resource-strip.component.css'
 })
 export class ResourceStripComponent implements OnInit {
   private readonly operations = inject(OperationsService);

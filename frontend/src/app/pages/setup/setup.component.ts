@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -14,11 +14,10 @@ import { PasswordToggleDirective } from '../../components/password-toggle.direct
 import { AuthShellComponent } from '../../components/auth-shell/auth-shell.component';
 
 @Component({
-  selector: 'app-setup',
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective, PasswordToggleDirective, AuthShellComponent],
-  templateUrl: './setup.component.html',
-  styleUrl: './setup.component.css'
+    selector: 'app-setup',
+    imports: [ReactiveFormsModule, RouterLink, TranslatePipe, FieldErrorDirective, PasswordToggleDirective, AuthShellComponent],
+    templateUrl: './setup.component.html',
+    styleUrl: './setup.component.css'
 })
 export class SetupComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
