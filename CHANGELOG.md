@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.167.0] — 2026-10-08
+
+### Fixed
+
+- The API now finishes its schema migrations before it listens, so a request in the first moments of a boot cannot hit a missing table; an oversized body answers 413 and a malformed one 400, instead of both reporting an internal error (plan.md §887).
+
 ## [0.166.9] — 2026-10-08
 
 ### Fixed

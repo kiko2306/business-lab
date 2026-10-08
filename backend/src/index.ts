@@ -1,5 +1,5 @@
 import './loadEnv';
-import express, { NextFunction, Request, Response } from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -20,21 +20,9 @@ import subscriberAdminRouter from './routes/subscriberAdmin';
 import accessRequestsRouter from './routes/accessRequests';
 import subscribersRouter from './routes/subscribers';
 import { getAppVersion } from './version';
-import {
-  ensureUserRolesTable,
-  ensureRoleModelReshape,
-  ensureUserAppAccessSchema,
-  ensureUserEmailUnique,
-  ensureUserInvitationsSchema,
-  ensureServiceExposureTable,
-  dropServiceExposureAutheliaColumn,
-  dropServiceImageUpdatesTable,
-  ensureTotpSchema,
-  ensureAuditLogsIndex,
-} from './utils/database';
-import { ensureAlertCategoryTopics } from './utils/alertNotify';
-import { ensureAiApiKeyMigration } from './utils/aiSettings';
+import { ensureSchema } from './startup';
 import authMiddleware from './middleware/auth';
+import { errorHandler } from './middleware/errorHandler';
 import setupModeMiddleware from './middleware/setupMode';
 import { requireCapability } from './middleware/requireCapability';
 import { initWebSocket, sseHandler } from './services/realtime';
@@ -49,11 +37,9 @@ import { startExposureReconciler } from './services/exposureReconciler';
 import { startDocusealSignedCopySweeper } from './services/docusealSignedCopy';
 import { startCriticalServiceHealthMonitor } from './services/criticalServiceHealth';
 import { regenerateHomepageServices } from './services/homepageConfig';
-import { ensureCoreSidecars, ensureSelfUpdateTable, reconcileDanglingSelfUpdateRun, startSelfUpdateCheckSweeper } from './services/selfUpdate';
+import { ensureCoreSidecars, startSelfUpdateCheckSweeper } from './services/selfUpdate';
 import { startAuditLogPurgeSweeper } from './utils/audit';
 import { startHostLanIpRefresh } from './services/networkScan';
-import { ensureSocialDraftsTable } from './services/socialDrafts';
-import { ensureAdvertSubscribersTable } from './services/advertSubscribers';
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -225,108 +211,73 @@ for (const prefix of ROUTE_PREFIXES) {
   app.use(`${prefix}/health`, healthLimiter, setupModeMiddleware(false), authMiddleware, healthRouter);
 }
 
-// Global error handler
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  if (err?.message === 'Origin not allowed by CORS policy') {
-    return res.status(403).json({ error: 'CORS origin denied' });
-  }
-  console.error('Unhandled error:', err.message);
-  return res.status(500).json({ error: 'Internal server error' });
-});
+// Global error handler — see middleware/errorHandler.ts.
+app.use(errorHandler);
 
-ensureUserRolesTable()
-  // Chained, not concurrent: the reshape (§152) renames rows the table
-  // migration may have just backfilled.
-  .then(() => ensureRoleModelReshape())
-  .catch((err: Error) => {
-    console.error('Unable to ensure the role model:', err.message);
+/**
+ * Everything that is not the schema: Docker-touching boot work, the reconcilers
+ * and the sweepers. Runs *after* `listen`, deliberately — an exposure reconcile
+ * talks to Cloudflare and `ensureCoreSidecars` runs compose, so holding
+ * readiness on them would trade a startup race for a minutes-long dark window.
+ */
+function startBackgroundWork(): void {
+  // Also on boot, not just after an update: a host that already pulled the commit
+  // adding a core sidecar (and only ever ran the Update page) has none yet.
+  ensureCoreSidecars().catch((err: Error) => {
+    console.error('Unable to ensure core sidecars:', err.message);
   });
-ensureUserAppAccessSchema()
-  .then(() => ensureUserInvitationsSchema())
-  // Chained after the two above: it normalises and then indexes `users.email`,
-  // which only exists once ensureUserAppAccessSchema has added the column.
-  .then(() => ensureUserEmailUnique())
-  .catch((err: Error) => {
-    console.error('Unable to ensure the user app-access / invitations schema:', err.message);
+  startBackupScheduler();
+  startKopiaRcloneKeepalive();
+  // An app dropped from the registry keeps its NPM proxy host and Cloudflare
+  // hostname otherwise, with no page left in the dashboard to switch them off.
+  reconcileRemovedServices().catch((err: Error) => {
+    console.error('Unable to reconcile exposure for removed services:', err.message);
   });
-ensureServiceExposureTable()
-  .then(() => dropServiceExposureAutheliaColumn())
-  .catch((err: Error) => {
-    console.error('Unable to ensure service_exposure table:', err.message);
+  // Auto-exposure (§331) can create a service_exposure row on a start that
+  // didn't itself regenerate Authelia's rules (or the rules were hand-edited).
+  // Re-assert them once on boot so every enabled hostname has its access_control
+  // rule + OIDC client before the first request — idempotent, restarts Authelia
+  // only if the block moved.
+  syncAutheliaAccessControlSafe('boot', null).catch(() => {});
+  syncAutheliaOidcClientsSafe('boot', null).catch(() => {});
+  // Exposure is only half of it: a removed app's containers keep running as an
+  // unmanaged Compose project and its gitignored apps/<name>/data + .env stay on
+  // disk. Tear both down once on boot.
+  reconcileRemovedAppProjects().catch((err: Error) => {
+    console.error('Unable to clean up removed app projects:', err.message);
   });
-ensureTotpSchema().catch((err: Error) => {
-  console.error('Unable to ensure TOTP schema:', err.message);
-});
-dropServiceImageUpdatesTable().catch((err: Error) => {
-  console.error('Unable to drop service_image_updates:', err.message);
-});
-ensureAuditLogsIndex().catch((err: Error) => {
-  console.error('Unable to ensure audit_logs index:', err.message);
-});
-ensureAlertCategoryTopics().catch((err: Error) => {
-  console.error('Unable to ensure alert category topics:', err.message);
-});
-ensureAiApiKeyMigration().catch((err: Error) => {
-  console.error('Unable to ensure AI API key migration:', err.message);
-});
-ensureSocialDraftsTable().catch((err: Error) => {
-  console.error('Unable to ensure social_drafts table:', err.message);
-});
-ensureAdvertSubscribersTable().catch((err: Error) => {
-  console.error('Unable to ensure advert_subscribers table:', err.message);
-});
-ensureSelfUpdateTable()
-  .then(() => reconcileDanglingSelfUpdateRun())
-  .catch((err: Error) => {
-    console.error('Unable to ensure self-update schema:', err.message);
-  });
-// Also on boot, not just after an update: a host that already pulled the commit
-// adding a core sidecar (and only ever ran the Update page) has none yet.
-ensureCoreSidecars().catch((err: Error) => {
-  console.error('Unable to ensure core sidecars:', err.message);
-});
-startBackupScheduler();
-startKopiaRcloneKeepalive();
-// An app dropped from the registry keeps its NPM proxy host and Cloudflare
-// hostname otherwise, with no page left in the dashboard to switch them off.
-reconcileRemovedServices().catch((err: Error) => {
-  console.error('Unable to reconcile exposure for removed services:', err.message);
-});
-// Auto-exposure (§331) can create a service_exposure row on a start that
-// didn't itself regenerate Authelia's rules (or the rules were hand-edited).
-// Re-assert them once on boot so every enabled hostname has its access_control
-// rule + OIDC client before the first request — idempotent, restarts Authelia
-// only if the block moved.
-syncAutheliaAccessControlSafe('boot', null).catch(() => {});
-syncAutheliaOidcClientsSafe('boot', null).catch(() => {});
-// Exposure is only half of it: a removed app's containers keep running as an
-// unmanaged Compose project and its gitignored apps/<name>/data + .env stay on
-// disk. Tear both down once on boot.
-reconcileRemovedAppProjects().catch((err: Error) => {
-  console.error('Unable to clean up removed app projects:', err.message);
-});
-// Then, on a slow cadence, re-assert every still-exposed service against the
-// live NPM/Cloudflare state so hand-edits or a rotated token that broke
-// provisioning get caught and fixed instead of sitting silently broken.
-startExposureReconciler();
-// DocuSeal signed PDFs → shared signed/ folder, hourly while running (§872).
-startDocusealSignedCopySweeper();
-// Tailscale/NetBird: auto-restart after repeated external-reachability
-// failures — the fast-cadence counterpart to the exposure reconciler above,
-// independent of Uptime Kuma's own monitors so the recovery path doesn't go
-// dark if Uptime Kuma itself is down (§443).
-startCriticalServiceHealthMonitor();
-// The Home Page's services.yaml is otherwise only rewritten on a start/stop or
-// an exposure toggle — so a backend restart after app state changed (or a
-// fresh deploy) would leave it stale. Reconcile it once on boot. Best-effort
-// inside the helper (§114).
-regenerateHomepageServices();
-startSelfUpdateCheckSweeper();
-startAuditLogPurgeSweeper();
-startHostLanIpRefresh();
+  // Then, on a slow cadence, re-assert every still-exposed service against the
+  // live NPM/Cloudflare state so hand-edits or a rotated token that broke
+  // provisioning get caught and fixed instead of sitting silently broken.
+  startExposureReconciler();
+  // DocuSeal signed PDFs → shared signed/ folder, hourly while running (§872).
+  startDocusealSignedCopySweeper();
+  // Tailscale/NetBird: auto-restart after repeated external-reachability
+  // failures — the fast-cadence counterpart to the exposure reconciler above,
+  // independent of Uptime Kuma's own monitors so the recovery path doesn't go
+  // dark if Uptime Kuma itself is down (§443).
+  startCriticalServiceHealthMonitor();
+  // The Home Page's services.yaml is otherwise only rewritten on a start/stop or
+  // an exposure toggle — so a backend restart after app state changed (or a
+  // fresh deploy) would leave it stale. Reconcile it once on boot. Best-effort
+  // inside the helper (§114).
+  regenerateHomepageServices();
+  startSelfUpdateCheckSweeper();
+  startAuditLogPurgeSweeper();
+  startHostLanIpRefresh();
+}
 
-const server = app.listen(PORT, () => {
-  console.log(`Homelab backend listening on port ${PORT}`);
+// The schema first, then the port. These used to be a dozen unawaited
+// `ensure*().catch(log)` calls with `app.listen` on the next line, so a request
+// arriving in the first moments of a boot — or of the boot after an upgrade that
+// adds a table — could hit a table that wasn't there yet (plan.md §884 item 3).
+// `ensureSchema` never rejects: a broken migration logs which one it was and the
+// API still comes up, because an operator needs the Update panel reachable to
+// fix it.
+void ensureSchema().then(() => {
+  const server = app.listen(PORT, () => {
+    console.log(`Homelab backend listening on port ${PORT}`);
+  });
+  initWebSocket(server);
+  startBackgroundWork();
 });
-
-initWebSocket(server);
