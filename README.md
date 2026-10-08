@@ -207,6 +207,32 @@ two — the guarantees are.
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
 
+### Review batch 2, 2026-10-08 (plan.md §879)
+
+The security remainder of the same review, four items, each its own commit and version bump.
+
+- [ ] **Beta-test the access-token purpose claim (plan.md §879 item 1)** — on `beta`, after the
+      update: you are signed out once (every access token issued before the change is now
+      rejected, and the page should take you to the sign-in screen rather than hang). Then sign
+      in again, leave a tab open for over an hour and confirm it keeps working without a
+      re-login (that is the silent refresh), sign in once with 2FA, and use **Sign out** and
+      confirm the next page load asks for a password.
+- [ ] **Beta-test the live-status stream after the ticket change (plan.md §879 item 2)** — on
+      `beta`, open the Apps page: the cards flip to Running within ~15 s of a start without a
+      manual refresh (that is the WebSocket, or the SSE fallback, authenticating with a ticket).
+      Start an app and watch its startup log stream to the end. Both in two tabs at once.
+- [ ] **Beta-test the one-account-per-email rule (plan.md §879 item 3)** — on `beta`: create a
+      user, then try to create a second with the same address, and with the same address in a
+      different case (`Ana@…` vs `ana@…`) — both refused with a clear message, not a 500. Then
+      open **Edit access** on an existing account and try to change its email to one another
+      account already holds: also refused. Check the backend log on startup names no problem
+      with the email index; if it says it could not create it, there are already duplicates on
+      that box and they need merging by hand.
+- [ ] **Beta-test that recovery mode still works (plan.md §879 item 4)** — on `beta`, on the
+      host: `./start.sh recover` still resets a locked-out admin (that path never used HTTP).
+      Then open `/recovery` in a browser over the public hostname and confirm it still says
+      recovery is not available from there rather than offering the form.
+
 ### Review batch, 2026-10-08 (plan.md §873)
 
 Four items from a whole-repo review, run in this order, each its own commit and version bump.
