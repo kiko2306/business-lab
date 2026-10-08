@@ -213,8 +213,6 @@ Sessions burn the usage limit fast: the SessionStart hook alone injects ~77 KB (
 every start and every `/clear`, and it is re-read on every later turn. Take these in order, top
 first; this block comes before everything below. Delete each item when it lands.
 
-- [ ] **Prune memory** — delete `session-state-2026-09-10.md` and `session-state-2026-09-12.md`
-      (~12 KB stale logs; git and `plan.md` hold the record) and drop their `MEMORY.md` lines.
 - [ ] **Work habits** — one task per session, `/compact` or continue instead of `/clear`, run big
       test/build output through `tail` or a subagent. Note in `docs/` or `CLAUDE.md`.
 - [ ] **Review always-on style plugins** — caveman and ponytail add rules to every turn; decide
