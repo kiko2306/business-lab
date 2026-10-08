@@ -38,6 +38,7 @@
  * raw extra `kopia repository create webdav` flags.
  */
 
+import { openSettingValue } from './settingsStore';
 import { query } from './database';
 
 export const BACKUP_TARGET_KEYS = {
@@ -96,7 +97,7 @@ export async function getBackupTarget(): Promise<BackupTarget | null> {
   const result = await query<{ key: string; value: string }>('SELECT key, value FROM settings WHERE key = ANY($1)', [
     Object.values(BACKUP_TARGET_KEYS),
   ]);
-  const values = Object.fromEntries(result.rows.map((row) => [row.key, row.value]));
+  const values = Object.fromEntries(result.rows.map((row) => [row.key, openSettingValue(row.key, row.value)]));
 
   const kind = values[BACKUP_TARGET_KEYS.kind] as BackupTargetKind;
   if (!BACKUP_TARGET_KINDS.includes(kind)) {

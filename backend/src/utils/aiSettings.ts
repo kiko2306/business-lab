@@ -17,7 +17,7 @@
  */
 
 import { query } from './database';
-import { setSetting } from './settingsStore';
+import { openSettingValue, setSetting } from './settingsStore';
 
 export type AiProviderId = 'anthropic' | 'google' | 'groq';
 
@@ -81,7 +81,8 @@ const LEGACY_ANTHROPIC_KEY_SETTING = 'claude_api_key';
 /** The stored key for one provider, or `null` if it has never been set. */
 export async function getAiApiKey(provider: AiProviderId): Promise<string | null> {
   const result = await query<{ value: string }>('SELECT value FROM settings WHERE key = $1', [keySettingKey(provider)]);
-  return result.rows[0]?.value?.trim() || null;
+  const stored = result.rows[0]?.value;
+  return (stored && openSettingValue(keySettingKey(provider), stored).trim()) || null;
 }
 
 export async function setAiApiKey(provider: AiProviderId, key: string): Promise<void> {
@@ -106,7 +107,7 @@ export async function ensureAiApiKeyMigration(): Promise<void> {
   const alreadyMigrated = await getAiApiKey('anthropic');
   if (alreadyMigrated) return;
   const legacy = await query<{ value: string }>('SELECT value FROM settings WHERE key = $1', [LEGACY_ANTHROPIC_KEY_SETTING]);
-  const legacyKey = legacy.rows[0]?.value?.trim();
+  const legacyKey = openSettingValue(LEGACY_ANTHROPIC_KEY_SETTING, legacy.rows[0]?.value ?? '').trim();
   if (legacyKey) {
     await setAiApiKey('anthropic', legacyKey);
   }

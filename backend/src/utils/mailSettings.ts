@@ -13,6 +13,7 @@
  * receiving is optional, and most installs will only ever set sending.
  */
 
+import { openSettingValue } from './settingsStore';
 import { query } from './database';
 
 export const MAIL_SETTINGS_KEYS = {
@@ -79,7 +80,7 @@ export async function getMailConfig(): Promise<MailConfig | null> {
   const result = await query<{ key: string; value: string }>('SELECT key, value FROM settings WHERE key = ANY($1)', [
     Object.values(MAIL_SETTINGS_KEYS),
   ]);
-  const values = Object.fromEntries(result.rows.map((row) => [row.key, row.value]));
+  const values = Object.fromEntries(result.rows.map((row) => [row.key, openSettingValue(row.key, row.value)]));
 
   const smtpHost = values[MAIL_SETTINGS_KEYS.smtpHost] ?? '';
   const smtpUser = values[MAIL_SETTINGS_KEYS.smtpUser] ?? '';

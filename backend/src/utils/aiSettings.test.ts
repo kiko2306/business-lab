@@ -10,6 +10,7 @@ import {
   setAiApiKey,
 } from './aiSettings';
 import { query } from './database';
+import { openSettingValue } from './settingsStore';
 
 vi.mock('./database', () => ({ query: vi.fn() }));
 const mockedQuery = vi.mocked(query);
@@ -100,7 +101,9 @@ describe('ensureAiApiKeyMigration', () => {
       .mockResolvedValueOnce({ rows: [{ value: 'sk-ant-legacy' }] } as never) // legacy row
       .mockResolvedValueOnce({ rows: [] } as never); // the INSERT via setAiApiKey
     await ensureAiApiKeyMigration();
-    expect(mockedQuery).toHaveBeenLastCalledWith(expect.any(String), [['ai_api_key_anthropic'], ['sk-ant-legacy']]);
+    const [, params] = mockedQuery.mock.lastCall as [string, [string[], string[]]];
+    expect(params[0]).toEqual(['ai_api_key_anthropic']);
+    expect(openSettingValue('ai_api_key_anthropic', params[1][0])).toBe('sk-ant-legacy');
   });
 
   it('is a no-op once ai_api_key_anthropic already exists', async () => {
@@ -122,6 +125,9 @@ describe('setAiApiKey', () => {
   it('upserts under the provider-specific settings key', async () => {
     mockedQuery.mockResolvedValue({ rows: [] } as never);
     await setAiApiKey('google', 'AIza-test');
-    expect(mockedQuery).toHaveBeenCalledWith(expect.any(String), [['ai_api_key_google'], ['AIza-test']]);
+    const [, params] = mockedQuery.mock.lastCall as [string, [string[], string[]]];
+    expect(params[0]).toEqual(['ai_api_key_google']);
+    expect(params[1][0]).not.toContain('AIza-test'); // sealed at rest, §893
+    expect(openSettingValue('ai_api_key_google', params[1][0])).toBe('AIza-test');
   });
 });

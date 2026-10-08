@@ -27,6 +27,7 @@ import {
 } from './utils/database';
 import { ensureAlertCategoryTopics } from './utils/alertNotify';
 import { ensureAiApiKeyMigration } from './utils/aiSettings';
+import { sealStoredSecrets } from './utils/settingsStore';
 import { ensureSocialDraftsTable } from './services/socialDrafts';
 import { ensureAdvertSubscribersTable } from './services/advertSubscribers';
 import { ensureSelfUpdateTable, reconcileDanglingSelfUpdateRun } from './services/selfUpdate';
@@ -59,6 +60,7 @@ const SCHEMA_STEPS: SchemaStep[] = [
   { label: 'ensure the audit_logs index', run: ensureAuditLogsIndex },
   { label: 'ensure the alert category topics', run: ensureAlertCategoryTopics },
   { label: 'ensure the AI API key migration', run: ensureAiApiKeyMigration },
+  { label: 'seal stored third-party secrets', run: sealStoredSecrets },
   { label: 'ensure the social_drafts table', run: ensureSocialDraftsTable },
   { label: 'ensure the advert_subscribers table', run: ensureAdvertSubscribersTable },
   {

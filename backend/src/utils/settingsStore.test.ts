@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { query } from './database';
 
 vi.mock('./database', () => ({ query: vi.fn() }));
 const mockedQuery = vi.mocked(query);
 
-import { setSetting, setSettings } from './settingsStore';
+import { isSecretSettingKey, openSettingValue, sealStoredSecrets, setSetting, setSettings } from './settingsStore';
+import { sealSecret } from './totpSecret';
 
 beforeEach(() => {
   mockedQuery.mockReset();
@@ -51,5 +52,78 @@ describe('setSetting', () => {
     setSetting('app_timezone', 'Europe/Lisbon');
     const [, params] = mockedQuery.mock.calls[0];
     expect(params).toEqual([['app_timezone'], ['Europe/Lisbon']]);
+  });
+});
+
+describe('secret settings at rest (plan.md §893)', () => {
+  const ORIGINAL = process.env.JWT_SECRET;
+  beforeEach(() => {
+    process.env.JWT_SECRET = `master-${'x'.repeat(24)}`;
+  });
+  afterEach(() => {
+    process.env.JWT_SECRET = ORIGINAL;
+  });
+
+  it('seals a secret key on write and leaves other keys alone', () => {
+    setSettings({ cloudflare_tunnel_token: 'tok-secret-123', cloudflare_zone_id: 'zone' });
+    const [, params] = mockedQuery.mock.calls[0];
+    const [, values] = params as [string[], string[]];
+    expect(values[0]).not.toContain('tok-secret-123');
+    expect(openSettingValue('cloudflare_tunnel_token', values[0])).toBe('tok-secret-123');
+    expect(values[1]).toBe('zone');
+  });
+
+  it('seals every kind of secret key, including per-provider AI keys', () => {
+    for (const key of [
+      'cloudflare_tunnel_token',
+      'exposure_npm_password',
+      'mail_smtp_password',
+      'mail_imap_password',
+      'backup_target_password',
+      'ai_api_key_openai',
+    ]) {
+      expect(isSecretSettingKey(key)).toBe(true);
+    }
+    expect(isSecretSettingKey('ai_provider_social_generate')).toBe(false);
+    expect(isSecretSettingKey('mail_smtp_host')).toBe(false);
+  });
+
+  it('does not seal an empty or null secret', () => {
+    setSettings({ mail_smtp_password: '' });
+    expect(mockedQuery.mock.calls[0][1]).toEqual([['mail_smtp_password'], ['']]);
+  });
+
+  it('reads a legacy plaintext row as-is during rollover', () => {
+    expect(openSettingValue('cloudflare_tunnel_token', 'plain-token-value')).toBe('plain-token-value');
+  });
+
+  it('reads a value sealed under another JWT_SECRET as empty rather than throwing', () => {
+    const sealed = sealSecret('abc');
+    process.env.JWT_SECRET = `other-${'y'.repeat(24)}`;
+    expect(openSettingValue('mail_smtp_password', sealed)).toBe('');
+  });
+
+  it('never opens a non-secret key', () => {
+    expect(openSettingValue('app_timezone', 'v1:a:b:c')).toBe('v1:a:b:c');
+  });
+
+  it('re-wraps plaintext secrets, guarded on the old value, and skips sealed ones', async () => {
+    const already = sealSecret('keep');
+    mockedQuery.mockResolvedValueOnce({
+      rows: [
+        { key: 'cloudflare_tunnel_token', value: 'plain-1' },
+        { key: 'mail_smtp_password', value: already },
+        { key: 'exposure_npm_password', value: '' },
+      ],
+    } as never);
+    await sealStoredSecrets();
+    expect(mockedQuery).toHaveBeenCalledTimes(2);
+    const [sql, params] = mockedQuery.mock.calls[1];
+    expect(sql).toContain('UPDATE settings');
+    expect(sql).toContain('AND value = $3');
+    const [key, sealed, old] = params as string[];
+    expect(key).toBe('cloudflare_tunnel_token');
+    expect(old).toBe('plain-1');
+    expect(openSettingValue(key, sealed)).toBe('plain-1');
   });
 });

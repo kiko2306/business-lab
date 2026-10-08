@@ -1,3 +1,4 @@
+import { openSettingValue } from './settingsStore';
 import path from 'path';
 import fs from 'fs';
 import { query } from './database';
@@ -53,7 +54,7 @@ export async function getExposureConfig(): Promise<ExposureGlobalConfig | null> 
   const result = await query<{ key: string; value: string }>('SELECT key, value FROM settings WHERE key = ANY($1)', [
     [...Object.values(EXPOSURE_SETTINGS_KEYS), CLOUDFLARE_TOKEN_KEY],
   ]);
-  const values = Object.fromEntries(result.rows.map((row) => [row.key, row.value]));
+  const values = Object.fromEntries(result.rows.map((row) => [row.key, openSettingValue(row.key, row.value)]));
 
   const config: ExposureGlobalConfig = {
     baseDomain: values[EXPOSURE_SETTINGS_KEYS.baseDomain] ?? '',

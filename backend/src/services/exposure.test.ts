@@ -8,6 +8,7 @@ import { ensureIngressRoute, removeIngressRoute } from './cloudflareTunnelClient
 import { writeAuditLog } from '../utils/audit';
 import { deprovisionServiceExposure, ensureAutoExposure, getExposability, getNpmOriginUrl, provisionServiceIfEnabled } from './exposure';
 import { ServiceExposureRow, ExposureGlobalConfig } from '../types';
+import { openSettingValue } from '../utils/settingsStore';
 
 vi.mock('../utils/database', () => ({ query: vi.fn() }));
 vi.mock('../utils/exposureSettings', async (importOriginal) => ({
@@ -149,13 +150,11 @@ describe('provisionServiceIfEnabled', () => {
 
     const result = await provisionServiceIfEnabled('paperless', 1);
 
-    expect(mockedQuery).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO settings'),
-      [
-        ['exposure_npm_email', 'exposure_npm_password'],
-        ['admin@example.com', 'rotated-secret'],
-      ]
-    );
+    const write = mockedQuery.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO settings'));
+    const [keys, values] = write?.[1] as [string[], string[]];
+    expect(keys).toEqual(['exposure_npm_email', 'exposure_npm_password']);
+    expect(values[0]).toBe('admin@example.com');
+    expect(openSettingValue('exposure_npm_password', values[1])).toBe('rotated-secret'); // sealed at rest, §893
     expect(result.attempted).toBe(true);
     expect(mockedEnsureProxyHost).toHaveBeenCalled();
   });

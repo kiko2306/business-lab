@@ -51,7 +51,7 @@ import { CrowdsecUnavailableError, listCrowdsecBans, unbanCrowdsecIp } from '../
 import { runAlertTest } from '../services/alertTest';
 import { testNpmConnection } from '../services/npmClient';
 import { testCloudflareTunnelAccess, countTokenZones } from '../services/cloudflareTunnelClient';
-import { setSetting, setSettings } from '../utils/settingsStore';
+import { openSettingValue, setSetting, setSettings } from '../utils/settingsStore';
 import {
   AI_FEATURES,
   AI_PROVIDERS,
@@ -111,7 +111,8 @@ function isValidToken(token: unknown): token is string {
 
 async function getStoredToken(): Promise<string | null> {
   const result = await query<{ value: string }>('SELECT value FROM settings WHERE key = $1', [CLOUDFLARE_TOKEN_KEY]);
-  return result.rows[0]?.value ?? null;
+  const stored = result.rows[0]?.value;
+  return stored ? openSettingValue(CLOUDFLARE_TOKEN_KEY, stored) : null;
 }
 
 interface CloudflareVerifyResult {

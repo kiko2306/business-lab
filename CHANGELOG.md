@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.167.5] — 2026-10-08
+
+### Changed
+
+- Cloudflare token, NPM, mail, backup and AI-provider secrets are now encrypted at rest in the database
+
 ## [0.167.4] — 2026-10-08
 
 ### Changed

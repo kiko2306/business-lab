@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.167.4** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.167.5** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -214,14 +214,11 @@ owner. Listed most-severe first, which is the order to take them in. Each was re
 against the tree at `0.167.1`. Test first, own commit and version bump each; delete an item when
 its fix lands (a fix still needing a `beta` look leaves its own beta item behind).
 
-- [ ] **🔴 Seal the third-party secrets at rest (plan.md §889 item 1)** — the Cloudflare tunnel
-      token, NPM password, SMTP password and every AI provider key sit in the `settings` table as
-      plaintext, while TOTP secrets are AES-GCM sealed under a `JWT_SECRET`-derived key
-      (`utils/totpSecret.ts`). One database dump hands over all of them. Use the same
-      `sealSecret`/`openSecret`; the read path has to accept both shapes during rollover, and a
-      migration re-wraps what is already stored. On `beta` afterwards: test the Cloudflare token,
-      send a test email, run an AI-backed action, and save the exposure settings — each has to
-      still authenticate, and the Settings page must still show the masked value, not ciphertext.
+- [ ] **Beta-test sealed third-party secrets (plan.md §893)** — on `beta`, after the update: test the
+      Cloudflare token, send a test email, run an AI-backed action, test the NPM connection and save
+      the exposure settings, and run a backup to a password-protected target. Each has to still
+      authenticate, and the Settings page must still show the masked value, not ciphertext. Backend logs must
+      show no "Unable to seal stored third-party secrets" line at boot.
 - [ ] **Beta-test nodemailer 10 (plan.md §892)** — on `beta`, after the update rebuilds the backend:
       send a test email from Settings, invite a user and confirm the set-password link arrives,
       and check the backup/alert mails still send.
