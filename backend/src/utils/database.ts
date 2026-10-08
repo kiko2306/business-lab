@@ -38,12 +38,7 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
   params?: unknown[]
 ): Promise<QueryResult<T>> {
-  const client = await getPool().connect();
-  try {
-    return await client.query<T>(text, params);
-  } finally {
-    client.release();
-  }
+  return getPool().query<T>(text, params);
 }
 
 /**

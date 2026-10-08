@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.167.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.167.3** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -281,10 +281,6 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
       stack. The bare prefix exists for a deployment pointing a dedicated API hostname at this
       server. Check whether anything actually uses it (the frontend's nginx proxies `/api/`), and
       drop it or record why it stays.
-- [ ] **🔴 Simplify `query()` to `pool.query()` (plan.md §889 item 14)** —
-      `utils/database.ts:41` does `connect()`, query, `release()` in a `finally`, which is exactly
-      what `pool.query` does. One-line change, covered by the whole suite.
-
 ### Review batch 3, 2026-10-08 (plan.md §884)
 
 Infrastructure robustness, five items. Three touch Docker or nginx, so they need a real look.

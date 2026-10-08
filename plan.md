@@ -38381,3 +38381,7 @@ Ordered most-severe first, which is the order to work them in. Each was re-verif
 ## 890. Branch name cannot start with a dash
 
 [x] done. §889 item 6. `isValidBranchName` regex now anchors first char to `[A-Za-z0-9]`; `-x` would reach `git fetch origin <branch>` as flag. One test added. Length cap kept at 120.
+
+## 891. query() uses pool.query
+
+[x] done. §889 item 14. `utils/database.ts` `query()` was connect/query/release-in-finally, which is what `pool.query` does. Now one line. No new test: whole suite covers it.
