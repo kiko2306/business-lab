@@ -24,6 +24,7 @@ import {
   ensureUserRolesTable,
   ensureRoleModelReshape,
   ensureUserAppAccessSchema,
+  ensureUserEmailUnique,
   ensureUserInvitationsSchema,
   ensureServiceExposureTable,
   dropServiceExposureAutheliaColumn,
@@ -242,6 +243,9 @@ ensureUserRolesTable()
   });
 ensureUserAppAccessSchema()
   .then(() => ensureUserInvitationsSchema())
+  // Chained after the two above: it normalises and then indexes `users.email`,
+  // which only exists once ensureUserAppAccessSchema has added the column.
+  .then(() => ensureUserEmailUnique())
   .catch((err: Error) => {
     console.error('Unable to ensure the user app-access / invitations schema:', err.message);
   });

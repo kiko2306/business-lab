@@ -6,7 +6,8 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { query } from '../utils/database';
+import { query, uniqueViolation } from '../utils/database';
+import { normaliseEmail } from '../utils/email';
 import { hashPassword } from '../utils/password';
 import { schemas, validateBody, validateParams } from '../middleware/validation';
 import { writeAuditLog } from '../utils/audit';
@@ -171,7 +172,7 @@ router.get('/', async (_req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.post('/', validateBody(schemas.userCreate), async (req: Request, res: Response) => {
   const { username } = req.body;
-  const email = (req.body.email as string).trim();
+  const email = normaliseEmail(req.body.email as string);
   const roles = req.body.roles as Role[];
   const capabilities = (req.body.capabilities ?? []) as Capability[];
   const appAccess = (req.body.appAccess ?? []) as string[];
@@ -236,11 +237,16 @@ router.post('/', validateBody(schemas.userCreate), async (req: Request, res: Res
       ...(warning ? { warning } : {}),
     });
   } catch (error) {
-    const err = error as { code?: string; message: string };
-    if (err.code === '23505') {
+    // Which column it was, not just "something was already taken": email is now
+    // unique too (§879 item 3), and this used to blame the username for both.
+    const clash = uniqueViolation(error);
+    if (clash === 'username') {
       return res.status(409).json({ error: 'Username already exists' });
     }
-    console.error('Create user error:', err.message);
+    if (clash === 'email') {
+      return res.status(409).json({ error: 'Another account already uses that email address.' });
+    }
+    console.error('Create user error:', (error as Error).message);
     return res.status(500).json({ error: 'Unable to create user.' });
   }
 });
@@ -363,7 +369,7 @@ router.put(
   validateBody(schemas.userAccessUpdate),
   async (req: Request, res: Response) => {
     const id = Number(req.params.id);
-    const { email } = req.body;
+    const email = normaliseEmail(req.body.email as string);
     const appAccess = req.body.appAccess as string[];
 
     try {
@@ -374,7 +380,7 @@ router.put(
 
       const target = await query<{ username: string; password_hash: string | null }>(
         'UPDATE users SET email = $2 WHERE id = $1 RETURNING username, password_hash',
-        [id, email.trim()]
+        [id, email]
       );
       if (!target.rows[0]) {
         return res.status(404).json({ error: 'User not found.' });
@@ -386,7 +392,7 @@ router.put(
       // Revoking a no-SSO app locks the account it created there — best
       // effort, never blocks this response (§493).
       if (removed.length) {
-        await deprovisionNoSsoCredentials(removed, email.trim());
+        await deprovisionNoSsoCredentials(removed, email);
       }
 
       await writeAuditLog({
@@ -401,11 +407,14 @@ router.put(
 
       return res.json({
         message: 'Access updated.',
-        email: email.trim(),
+        email,
         appAccess,
         ...(warning ? { warning } : {}),
       });
     } catch (error) {
+      if (uniqueViolation(error) === 'email') {
+        return res.status(409).json({ error: 'Another account already uses that email address.' });
+      }
       console.error('Update user access error:', (error as Error).message);
       return res.status(500).json({ error: 'Unable to update access.' });
     }

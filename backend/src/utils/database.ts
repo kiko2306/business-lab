@@ -68,6 +68,65 @@ export async function withTransaction<T>(
   }
 }
 
+/** The unique index on `lower(users.email)` — see `ensureUserEmailUnique`. */
+export const USERS_EMAIL_UNIQUE_INDEX = 'users_email_lower_unique_idx';
+
+/**
+ * Which column a Postgres unique violation was about, or null when the error is
+ * something else or names a constraint this does not know.
+ *
+ * `POST /users` mapped every `23505` to "Username already exists", which would
+ * report a duplicate address as a duplicate username the moment email gained a
+ * unique index of its own. A caller that cannot tell which column it was must
+ * fall through to its generic error rather than blame the wrong field.
+ */
+export function uniqueViolation(error: unknown): 'username' | 'email' | null {
+  const { code, constraint } = (error ?? {}) as { code?: string; constraint?: string };
+  if (code !== '23505') {
+    return null;
+  }
+  if (constraint === USERS_EMAIL_UNIQUE_INDEX) {
+    return 'email';
+  }
+  return constraint === 'users_username_key' ? 'username' : null;
+}
+
+/**
+ * One dashboard account per email address (plan.md §879 item 3). On
+ * `lower(email)` rather than the column, because the address is the identity
+ * key for a no-SSO app account and those are matched case-insensitively.
+ * `WHERE email IS NOT NULL` is belt and braces — Postgres already allows
+ * repeated NULLs in a unique index — and keeps accounts that predate the
+ * column out of it.
+ *
+ * Best-effort on purpose. A database that already holds duplicates cannot have
+ * this index created, and failing the boot migration forever over it would take
+ * the dashboard down rather than fix anything: the duplicates need a human to
+ * decide which account keeps the address. So it logs what it could not do and
+ * carries on, and the route-level checks still refuse to add new ones.
+ */
+export async function ensureUserEmailUnique(): Promise<void> {
+  await query('UPDATE users SET email = lower(trim(email)) WHERE email IS NOT NULL AND email <> lower(trim(email))');
+  try {
+    await query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS ${USERS_EMAIL_UNIQUE_INDEX}
+       ON users (lower(email)) WHERE email IS NOT NULL`
+    );
+  } catch (error) {
+    const duplicates = await query<{ email: string; n: number }>(
+      `SELECT lower(email) AS email, COUNT(*)::int AS n
+       FROM users WHERE email IS NOT NULL
+       GROUP BY lower(email) HAVING COUNT(*) > 1`
+    ).catch(() => ({ rows: [] as { email: string; n: number }[] }));
+    console.error(
+      'Unable to make users.email unique — these addresses are on more than one account, ' +
+        'and each shares one login in every no-SSO app: ' +
+        (duplicates.rows.map((row) => `${row.email} (${row.n})`).join(', ') || 'none found') +
+        `. Original error: ${(error as Error).message}`
+    );
+  }
+}
+
 /**
  * Bring the `user_roles` join table into being (plan.md §149) and make sure
  * every existing account has a role. Roles were removed once (`51387f0`) and

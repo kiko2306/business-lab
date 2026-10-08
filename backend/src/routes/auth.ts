@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { query, withTransaction } from '../utils/database';
 import { hashPassword, verifyPassword } from '../utils/password';
+import { normaliseEmail } from '../utils/email';
 import {
   signAccessToken,
   signRefreshToken,
@@ -224,7 +225,7 @@ router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schem
       `INSERT INTO users (username, email, password_hash, is_setup_complete)
        VALUES ($1, $2, $3, TRUE)
        RETURNING id, username`,
-      [username.trim(), email.trim().toLowerCase(), passwordHash]
+      [username.trim(), normaliseEmail(email), passwordHash]
     );
     const user = result.rows[0];
 

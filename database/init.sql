@@ -27,6 +27,14 @@ CREATE TABLE IF NOT EXISTS users (
     email             VARCHAR(255)
 );
 
+-- One account per address (plan.md §879 item 3). On lower(email) rather than
+-- the column, because email is the identity key for a no-SSO app account
+-- (noSsoCredentialFanout.ts matches on it) and those are case-insensitive —
+-- two accounts resolving to one address would share one app login. Matches
+-- what ensureUserEmailUnique() adds to an existing database.
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_unique_idx
+    ON users (lower(email)) WHERE email IS NOT NULL;
+
 -- Single-use TOTP recovery codes: only the SHA-256 hash is kept. Replaced
 -- wholesale on (re-)enrolment; a row's used_at is stamped when it is redeemed.
 CREATE TABLE IF NOT EXISTS totp_recovery_codes (

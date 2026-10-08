@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.166.6] — 2026-10-08
+
+### Security
+
+- One dashboard account per email address: a unique index on lower(email), lowercasing on every write, and a 409 instead of two accounts quietly sharing one login in every no-SSO app (plan.md §882).
+
 ## [0.166.5] — 2026-10-08
 
 ### Security
