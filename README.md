@@ -207,6 +207,27 @@ two — the guarantees are.
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
 
+### Review batch, 2026-10-08 (plan.md §873)
+
+Four items from a whole-repo review, run in this order, each its own commit and version bump.
+
+- [ ] **Stop an admin promoting itself to webmaster (plan.md §873 item 1)** — on `beta`, sign in
+      as an `admin` (not a webmaster) and try, over the API and in the UI: **Edit roles** on another
+      account offering Full admin, and **Reset password** on the webmaster's own row. Both must be
+      refused with a clear message, and the webmaster's own Edit roles / Reset password on that same
+      admin must still work. Then check an admin can still create, edit and delete ordinary accounts.
+- [ ] **Beta-test the dependency bumps (plan.md §873 item 2)** — `proxy-addr`, `joi` and `qs`.
+      On `beta`, after the update: sign in (2FA too, if enrolled), save Settings with a deliberately
+      bad value and confirm the 422 still names the field, and check the Audit Logs page shows your
+      real client IP for a LAN sign-in and for one over the public hostname (`proxy-addr` is what
+      resolves it).
+- [ ] **Beta-test the cached status and health polls (plan.md §873 item 3)** — on `beta`, open the
+      Apps page in two tabs for a few minutes: the cards still flip to Running within ~15 s of a
+      start and back on a stop, the header's CPU/disk/memory figures still move and agree between
+      tabs, and a disk alert still appears when a threshold is crossed. Change an app's port in its
+      config panel and confirm the Running panel shows the new port after a restart (that value is
+      the one now cached per cycle).
+
 ### Critique round 2 (plan.md §812)
 
 Surfaces never critiqued. Per item: `/impeccable critique` against a real render, log the
