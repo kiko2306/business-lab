@@ -36,4 +36,12 @@ describe('runArgv', () => {
     const result = await runArgv('sh', ['-c', 'trap "" TERM; sleep 5'], 200);
     expect(result.code).not.toBe(0);
   });
+
+  // A chatty `docker compose` must not grow the heap without bound; runShell already caps at 4 MB.
+  it('stops a child that floods output and says why', async () => {
+    const result = await runArgv('sh', ['-c', 'head -c 6000000 /dev/zero | tr "\\0" x; sleep 5']);
+    expect(result.code).toBe(-1);
+    expect(result.stderr).toContain('exceeded');
+    expect(result.stdout.length).toBeLessThanOrEqual(4 * 1024 * 1024 + 65536);
+  });
 });

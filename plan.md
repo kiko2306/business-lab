@@ -38413,3 +38413,7 @@ Memory pruned: deleted `session-state-2026-09-10` and `session-state-2026-09-12`
 Work-habits item landed as `docs/session-habits.md` (one task per session, `/compact` over `/clear`, trim output, narrow reads, subagent for sweeps, keep startup small) with a one-line pointer in CLAUDE.md. Rejected: putting the list in CLAUDE.md itself — it is loaded every turn, which is the cost being cut.
 
 Style-plugin item closed: owner decided to keep caveman and ponytail on by default. Terse replies cut output tokens; their per-turn rule text is small next to the startup cost already removed. Nothing changed. All §894 items done: hook 80 → 8 KB, CLAUDE.md -2 KB, stale memory deleted, habits in `docs/session-habits.md`; plan.md squash and README split were measured and dropped as no-saving.
+
+## 895. Output caps on runArgv and requestJson (§889 item 8)
+
+[x] done. `runArgv` (spawn, no limit) and `requestJson` (response body) now stop at 4 MB, matching `runShell`'s `maxBuffer`. `runArgv` keeps its never-reject contract: on overflow it SIGKILLs and resolves code -1 with stderr "Output exceeded N bytes; killed" plus what arrived. `requestJson` destroys the request and rejects with "exceeded". Tests first: a 6 MB flood and a 5 MB response both failed (the flood hung to the 5 s timeout), then passed. Rejected: a per-call `maxBytes` option — no caller needs a different ceiling, add when one does.

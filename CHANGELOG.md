@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.167.6] — 2026-10-08
+
+### Security
+
+- Cap child-process and HTTP response output at 4 MB
+
 ## [0.167.5] — 2026-10-08
 
 ### Changed

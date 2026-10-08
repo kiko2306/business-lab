@@ -2,6 +2,9 @@ import https from 'https';
 import http from 'http';
 import { URL } from 'url';
 
+/** Same ceiling runShell/runArgv use; a response body is hostile input. */
+const MAX_BODY_BYTES = 4 * 1024 * 1024;
+
 export interface JsonResponse<T = unknown> {
   statusCode: number;
   body: T | null;
@@ -55,6 +58,9 @@ export function requestJson<T = unknown>(
       let raw = '';
       response.on('data', (chunk) => {
         raw += chunk;
+        if (raw.length > MAX_BODY_BYTES) {
+          request.destroy(new Error(`Response from ${urlString} exceeded ${MAX_BODY_BYTES} bytes.`));
+        }
       });
       response.on('end', () => {
         const statusCode = response.statusCode ?? 0;

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.167.5** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.167.6** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -247,10 +247,6 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
       host root. That means any path-traversal or RCE in the backend reads every app's env file,
       every SSH key and `/etc/shadow`. Either narrow it to what `df` needs or write down why the
       whole-root mount is accepted, so it is a decision rather than a leftover.
-- [ ] **🔴 Cap the output `runArgv` and `requestJson` accumulate (plan.md §889 item 8)** —
-      `utils/run.ts:92` grows `stdout` with no limit while its sibling `runShell` caps at 4 MB, so
-      a chatty `docker compose` can grow the heap unbounded; `utils/httpJson.ts:57` does the same
-      with a response body, which is a hostile input. Cap both and fail loudly at the cap.
 - [ ] **🔴 Run only an app's own post-start reconcilers (plan.md §889 item 9)** —
       `POST_UP_RECONCILERS` in `services/executor.ts` runs all 27 entries on every app start and
       each no-ops on the service name. Derive the list from the registry so a start runs only what

@@ -75,7 +75,7 @@ export interface RunArgvResult {
  * holding those pipes left the caller waiting for the grandchild anyway. The
  * shapes here (`docker run`, `docker compose`) make that unlikely rather than
  * impossible, and a timeout that doesn't time out is worth two lines to
- * close. A timeout is reported as code -1 with whatever output arrived.
+ * close. A timeout, or output past MAX_BUFFER, is reported as code -1 with whatever output arrived.
  */
 export function runArgv(command: string, args: string[], timeoutMs = DEFAULT_TIMEOUT_MS): Promise<RunArgvResult> {
   return new Promise((resolve) => {
@@ -83,16 +83,29 @@ export function runArgv(command: string, args: string[], timeoutMs = DEFAULT_TIM
     let stdout = '';
     let stderr = '';
     let output = '';
+    let bytes = 0;
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
       resolve({ code: -1, stdout, stderr: stderr || `Timed out after ${timeoutMs}ms`, output });
     }, timeoutMs);
 
-    child.stdout.on('data', (d) => {
+    // Same cap runShell gets from exec's maxBuffer; spawn has none, so a chatty
+    // child would otherwise grow these strings until the heap gives out.
+    const overflow = (d: Buffer): boolean => {
+      bytes += d.length;
+      if (bytes <= MAX_BUFFER) return false;
+      clearTimeout(timer);
+      child.kill('SIGKILL');
+      resolve({ code: -1, stdout, stderr: `Output exceeded ${MAX_BUFFER} bytes; killed`, output });
+      return true;
+    };
+    child.stdout.on('data', (d: Buffer) => {
+      if (overflow(d)) return;
       stdout += d.toString();
       output += d.toString();
     });
-    child.stderr.on('data', (d) => {
+    child.stderr.on('data', (d: Buffer) => {
+      if (overflow(d)) return;
       stderr += d.toString();
       output += d.toString();
     });
