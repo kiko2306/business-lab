@@ -213,8 +213,6 @@ Sessions burn the usage limit fast: the SessionStart hook alone injects ~77 KB (
 every start and every `/clear`, and it is re-read on every later turn. Take these in order, top
 first; this block comes before everything below. Delete each item when it lands.
 
-- [ ] **Slim the README TODO** — keep a short open-items index; move the long "what to check and
-      how" text out of the always-read path so step 1 of the working loop stays cheap.
 - [ ] **Squash old `plan.md` sections** — file is 2.2 MB and `plan-index.md` 76 KB. Archive or
       squash finished sections (keep the tried-and-rejected record, drop iteration detail), then
       `./scripts/plan-index.sh`.
