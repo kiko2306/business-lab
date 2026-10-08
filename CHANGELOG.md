@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.169.1] — 2026-10-08
+
+### Security
+
+- Authenticate once per request on /services instead of twice
+
 ## [0.169.0] — 2026-10-08
 
 ### Security

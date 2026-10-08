@@ -38441,3 +38441,7 @@ Two things broke, both real:
 2. The suite became order-dependent: `TranslateService.setLocale` persists to localStorage, so a spec that switched to Portuguese left later specs in Portuguese ("Inicie primeiro authelia"). Random order hid it before. A top-level `beforeEach` in `src/app/test-isolation.spec.ts` clears it; five consecutive full runs pass.
 
 Initial bundle grew 720 → 766 kB (compressed 162 kB), past the 720 kB warning budget; raised the warning to 800 kB (error stays 1 MB). Left alone: `TypeError ... reading 'pipe'` printed in the test log from `service-card.component.ts` — a spec double returning undefined, passes, not caused by the upgrade. Rejected: running the optional `provide-initializer` / `router-current-navigation` migrations — not needed for the advisories. Browser E2E suite passes.
+
+## 899. One JWT check per request on /services (§889 item 12)
+
+[x] done. `index.ts` already mounts `/services` behind `protectedGate()` (limiter, setup mode, `authMiddleware`), and all 13 routes in `routes/services.ts` applied `auth` again: two JWT verifies and two recovery-mode lookups per call. Removed the inner ones; capability gates untouched. `/settings` never had the duplicate (the item said so for both; only `services.ts` did). Test first: `routes/services.auth.test.ts` walks the router stack and failed listing 13 routes; it also pins that `index.ts` still mounts the router behind the gate, which is what makes the removal safe. Browser E2E passes. Not merged to `beta`: no behaviour change a person can see.

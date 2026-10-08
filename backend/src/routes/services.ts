@@ -6,7 +6,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import fs from 'fs/promises';
 import rateLimit from 'express-rate-limit';
-import auth from '../middleware/auth';
 import { requireCapability } from '../middleware/requireCapability';
 import * as executor from '../services/executor';
 import * as status from '../services/status';
@@ -20,6 +19,8 @@ import * as appBackup from '../services/appBackup';
 import logger from '../utils/logger';
 import { HttpError } from '../types';
 
+// Authentication happens once, at the mount in index.ts (protectedGate). Routes here only
+// add capability gates; a per-route `auth` verified every JWT a second time (plan.md §899).
 const router = Router();
 
 const serviceLimiter = rateLimit({
@@ -48,7 +49,7 @@ function requireAdminUserSupport(req: Request, res: Response, next: NextFunction
  * GET /api/services/status
  * Get status of all services
  */
-router.get('/status', serviceLimiter, auth, async (req: Request, res: Response) => {
+router.get('/status', serviceLimiter, async (req: Request, res: Response) => {
   try {
     const serviceStatus = await status.getAllServiceStatus();
     res.json(serviceStatus);
@@ -64,7 +65,7 @@ router.get('/status', serviceLimiter, auth, async (req: Request, res: Response) 
   }
 });
 
-router.post('/stream-ticket', serviceLimiter, auth, (req: Request, res: Response) => {
+router.post('/stream-ticket', serviceLimiter, (req: Request, res: Response) => {
   const ticket = createStreamTicket(req.user!.id);
   res.json({ ticket, expiresInSeconds: 60 });
 });
@@ -76,7 +77,6 @@ router.post('/stream-ticket', serviceLimiter, auth, (req: Request, res: Response
 router.post(
   '/:name/start',
   serviceLimiter,
-  auth,
   requireCapability('apps:control'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
@@ -114,7 +114,6 @@ router.post(
 router.post(
   '/:name/stop',
   serviceLimiter,
-  auth,
   requireCapability('apps:control'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
@@ -159,7 +158,6 @@ router.post(
 router.post(
   '/:name/backup',
   serviceLimiter,
-  auth,
   requireCapability('backups:manage'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
@@ -219,7 +217,6 @@ router.post(
 router.post(
   '/:name/backup/restore',
   serviceLimiter,
-  auth,
   requireCapability('backups:manage'),
   validateParams(schemas.serviceNameParam),
   validateBody(schemas.serviceBackupRestore),
@@ -270,7 +267,6 @@ router.post(
 router.get(
   '/:name/backups',
   serviceLimiter,
-  auth,
   requireCapability('backups:manage'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
@@ -291,7 +287,6 @@ router.get(
 router.get(
   '/:name/backups/:file',
   serviceLimiter,
-  auth,
   requireCapability('backups:manage'),
   validateParams(schemas.serviceBackupFileParams),
   validateServiceAllowlist,
@@ -319,7 +314,6 @@ router.get(
 router.delete(
   '/:name/backups/:file',
   serviceLimiter,
-  auth,
   requireCapability('backups:manage'),
   validateParams(schemas.serviceBackupFileParams),
   validateServiceAllowlist,
@@ -357,7 +351,6 @@ router.delete(
  */
 router.get(
   '/:name/env',
-  auth,
   requireCapability('apps:config'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
@@ -378,7 +371,6 @@ router.get(
  */
 router.put(
   '/:name/env',
-  auth,
   requireCapability('apps:config'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
@@ -411,7 +403,6 @@ router.put(
  */
 router.get(
   '/:name/admin-user',
-  auth,
   requireCapability('apps:config'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
@@ -435,7 +426,6 @@ router.get(
  */
 router.put(
   '/:name/admin-user',
-  auth,
   requireCapability('apps:config'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.169.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.169.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -261,11 +261,6 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
 - [ ] **🔴 Split `routes/settings.ts` (plan.md §889 item 11)** — 979 lines covering Cloudflare, AI
       keys, exposure, mail, backup target, health thresholds and the update branch. One router per
       concern, mounted together, so the capability gates stay exactly where they are.
-- [ ] **🔴 Stop authenticating twice on `/services` and `/settings` (plan.md §889 item 12)** —
-      `index.ts` applies `authMiddleware` at the mount and then all 11 routes inside
-      `routes/services.ts` apply `auth` again: two JWT verifies per request. Drop the inner one,
-      keeping the per-route capability gates, and confirm with a `curl` that an unauthenticated
-      request still 401s on every one of them.
 - [ ] **🔴 Decide whether both route prefixes are still needed (plan.md §889 item 13)** — every
       router is mounted twice, at `''` and `/api` (`index.ts:172`), doubling the Express layer
       stack. The bare prefix exists for a deployment pointing a dedicated API hostname at this
