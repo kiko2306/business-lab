@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.165.19] — 2026-10-08
+
+### Added
+
+- Jellyfin, Navidrome and Immich read media, music and photos dropped into the Samba share
+
 ## [0.165.18] — 2026-10-08
 
 ### Fixed

@@ -50,10 +50,10 @@ services:
       - "homepage.description=Music streaming server (Subsonic-compatible)"
     volumes:
       - ./data:/data
-      # Point this at your actual music library on the host — defaults to a
-      # folder inside this app's own data dir if left unset. Read-only: Navidrome
-      # never writes to the library, only its own /data.
-      - ${NAVIDROME_MUSIC_DIR:-./data/music}:/music:ro
+      # `music/` in the shared tree Samba serves, so files dropped over SMB
+      # show up here. Created by sharedFolders.ts before every start.
+      # Read-only: Navidrome never writes to the library, only its own /data.
+      - ../nextcloud/data/shared/music:/music:ro
     healthcheck:
       # /ping is unauthenticated and returns a small JSON body.
       test: ["CMD-SHELL", "wget -q -O - http://localhost:4533/ping || exit 1"]

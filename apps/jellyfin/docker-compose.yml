@@ -29,9 +29,9 @@ services:
     volumes:
       - ./data/config:/config
       - ./data/cache:/cache
-      # Point this at your actual media library on the host — defaults to a
-      # folder inside this app's own data dir if left unset.
-      - ${JELLYFIN_MEDIA_DIR:-./data/media}:/media
+      # `media/` in the shared tree Samba serves, so files dropped over SMB
+      # show up here. Created by sharedFolders.ts before every start.
+      - ../nextcloud/data/shared/media:/media:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8096/health || exit 1"]
       interval: 30s

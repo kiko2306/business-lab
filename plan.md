@@ -38157,3 +38157,13 @@ Verified on the dev box 2026-10-07 (0.165.16, Tailscale stopped ~5 min): `probe-
 ## 869. Deleting a user locks their no-SSO app logins
 
 [x] done. `samba-test-admin` and `claude` outlived their deleted dashboard users on the dev box (`claude` still `[U]` enabled). Cause: only the access-edit route called `deprovisionNoSsoCredentials`; `DELETE /api/users/:id` never did, and the `user_app_access` cascade plus the gone `users` row (deprovisioners look the account up by email) left nothing to call it with afterwards. Affects every no-SSO app (Kimai, NocoDB, ITFlow, DocuSeal, Home Assistant, Jellyfin, Samba), not just Samba. Fix once: `deprovisionNoSsoAppsForUser(id)` (`userDeletionCleanup.ts`) runs before the DELETE. Disable-not-delete kept (§493). Not fixed by code: the two existing leftovers on the dev box (throwaway; a re-created user of the same name is re-enabled on grant). Test: `userDeletionCleanup.test.ts`; no route-level harness exists, so the route wiring itself is covered by the beta item.
+
+## 870. Jellyfin, Navidrome, Immich read the Samba share
+
+[x] done. Files dropped over SMB now reach the media apps. Shared tree = `apps/nextcloud/data/shared` (§310). New subfolders: `media/` → Jellyfin `/media:ro`, `music/` → Navidrome `/music:ro`, `photos/` → Immich `/mnt/photos:ro`. `sharedFolders.ts` makes them world-writable before `compose up` (same EPERM tolerance as `paperlessDropbox.ts`); called from `executor.ts`.
+
+Immich has no config-file knob for libraries. `immichEnsurePhotosLibrary` (`immichClient.ts`) logs in as the bootstrap admin, creates External Library "Shared photos" on `/mnt/photos` if none lists that path, then scans. Runs from `immichAdminBootstrap.ts` after every Immich start, so only while exposed (Immich is auto-exposed, §331).
+
+Removed `JELLYFIN_MEDIA_DIR` / `NAVIDROME_MUSIC_DIR` (§ earlier host-path override): the share is the library now. Rejected: mounting Immich's `data/upload` over SMB (Immich owns that layout + DB); Immich read-write (it only indexes in place).
+
+Not done, proposed earlier: Paperless archive export, Stirling-PDF pipeline folders, DocuSeal signed-PDF copy. Awaiting user go-ahead.

@@ -25,7 +25,7 @@ import { appBaseUrl } from '../utils/appUrl';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { getServiceExposureRow } from './exposure';
 import { readAppEnvValue } from './appEnv';
-import { immichAdminSignUp, immichPing } from './immichClient';
+import { immichAdminSignUp, immichEnsurePhotosLibrary, immichPing } from './immichClient';
 import { sleep } from '../utils/wait';
 
 export const IMMICH_SERVICE = 'immich';
@@ -98,6 +98,16 @@ export async function reconcileImmichFirstAdmin(serviceName: string): Promise<vo
         logger.info('Immich already has an admin account; nothing to bootstrap');
       } else {
         logger.error('Immich admin bootstrap: admin-sign-up call failed');
+        return;
+      }
+      // Whether the admin is new or old, point Immich at the shared photos
+      // folder. Best-effort: a failure here (e.g. password login switched
+      // off) only means the library is added by hand.
+      const library = await immichEnsurePhotosLibrary(baseUrl, email, password);
+      if (library === 'created') {
+        logger.info('Added Immich External Library for the shared photos folder');
+      } else if (library === 'failed') {
+        logger.warn('Immich shared photos library not added: API login or create failed');
       }
       return;
     }

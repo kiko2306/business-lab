@@ -40,6 +40,9 @@ services:
       # Managed by the dashboard: immich.json (Authelia OIDC) lands here while
       # Immich is exposed — see IMMICH_CONFIG_FILE above (§275).
       - ./data/config:/config
+      # `photos/` in the shared tree Samba serves, read-only: the External
+      # Library (immichLibrary.ts) indexes it in place, never moves files.
+      - ../nextcloud/data/shared/photos:/mnt/photos:ro
       - /etc/localtime:/etc/localtime:ro
     depends_on:
       immich-db:

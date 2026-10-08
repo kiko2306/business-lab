@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.165.18** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.165.19** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -540,6 +540,17 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       needs an app left in `error` while the page loads. Delete once seen.
 
 ### Exposure and platform
+
+- [ ] **Beta-test media apps reading the Samba share (plan.md §870)** — on `beta`, start
+      Jellyfin, Navidrome and Immich. Over SMB, drop a video in `media/`, a song in `music/`,
+      a photo in `photos/` of the share. Add the Jellyfin library `/media` and rescan: the
+      video shows. Navidrome shows the song after its scan. Immich → Administration →
+      External Libraries lists "Shared photos" and the photo appears. Check the three
+      folders exist and an SMB user can write them (no "access denied").
+- [ ] **Share more apps over Samba (plan.md §870)** — not built, awaiting go-ahead:
+      Paperless archive export to `archive/`, Stirling-PDF pipeline watch folders
+      `pdf-in/` → `pdf-out/`, DocuSeal signed-PDF copy to `signed/` (no native folder
+      export; needs a small job). Delete the item once decided or built.
 
 - [ ] **One-off: move the live ITFlow data onto the dev box (plan.md §865)** — planned,
       not run. **Blocked: owner must decide how the 3 live users merge with the 2 dev users
