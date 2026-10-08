@@ -28,6 +28,8 @@ It read **one section at time, never whole**. To read one, use `./scripts/plan-s
 
 ## Commands
 
+Usage-limit habits (one task per session, trim output, read narrowly): `docs/session-habits.md`.
+
 **No Node on this host** — everything run in container. Use `./scripts/check.sh <backend|frontend> <test|typecheck|build>`, e.g. `./scripts/check.sh backend test` or `./scripts/check.sh frontend test`. It find repo root itself, so work even if shell cwd drift into `backend/` or `frontend/` — mount `$PWD` direct break there, because some backend test resolve path up to repo root, not just own workspace. `frontend test` build `business-lab-frontend-test` image on first use if missing (Karma/Jasmine + headless Chrome no run on plain `node:20` — no Chrome, and `node:20` Debian base miss shared library headless Chrome need). `./scripts/smoke-tests.sh` run on host against already-run backend.
 
 Rebuild `business-lab-frontend-test` (`docker build -t business-lab-frontend-test -f
