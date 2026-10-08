@@ -90,12 +90,14 @@ services:
       # only ever reads/writes apps/<name>/ — this mount exists solely for
       # the dashboard to update its own checkout.
       - ${REPO_ROOT:?REPO_ROOT must be set to an absolute path in .env}:${REPO_ROOT}
-      # Read-only view of the host root, purely so the health check can df it.
-      # Without this the only filesystem the backend can measure is its own
-      # overlay — which follows Docker's data-root, so moving that storage to
-      # another filesystem would leave the host's root silently unwatched
-      # (plan.md §83.3).
-      - /:/hostfs:ro
+      # One world-readable file from the host's root filesystem, purely so the
+      # health check can df it: `df` on a file reports the filesystem holding
+      # it. Without this the only filesystem the backend can measure is its
+      # own overlay — which follows Docker's data-root, so moving that storage
+      # to another filesystem would leave the host's root silently unwatched
+      # (plan.md §83.3). Not `/:/hostfs`: that exposed /etc/shadow, SSH keys
+      # and every home directory to any file-read bug (plan.md §905).
+      - /etc/os-release:/hostfs/os-release:ro
       - backups-data:/app/backups
       # The backend's own log files. On the container's writable layer they
       # died with it, which erased the day under investigation twice in one

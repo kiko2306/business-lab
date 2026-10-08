@@ -135,12 +135,13 @@ export function parseDfOutput(stdout: string): DiskUsage {
  */
 const DOCKER_DISK_PATH = '/';
 /**
- * The host's root filesystem, bind-mounted read-only. Once Docker's storage
+ * A file on the host's root filesystem, bind-mounted read-only (`df` on a
+ * file measures the filesystem holding it). Once Docker's storage
  * moves off the root LV, nothing else would be watching the filesystem holding
  * the OS and its logs — it would fill up with the dashboard reporting a
  * healthy figure for somewhere else entirely (§83.3).
  */
-const SYSTEM_DISK_PATH = '/hostfs';
+export const SYSTEM_DISK_PATH = '/hostfs/os-release';
 
 export interface NamedDiskUsage extends DiskUsage {
   name: string;

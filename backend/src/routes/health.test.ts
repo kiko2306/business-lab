@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearSystemHealthCache, dedupeDisks, parseDfOutput, readSystemHealth } from './health';
+import { readFileSync } from 'fs';
+import path from 'path';
+import {
+  SYSTEM_DISK_PATH,
+  clearSystemHealthCache,
+  dedupeDisks,
+  parseDfOutput,
+  readSystemHealth,
+} from './health';
 import { query } from '../utils/database';
 
 vi.mock('../utils/database', () => ({ query: vi.fn() }));
@@ -135,5 +143,19 @@ describe('readSystemHealth', () => {
   it('shares one in-flight measurement between callers that arrive together', async () => {
     const [a, b] = await Promise.all([readSystemHealth(), readSystemHealth()]);
     expect(b).toBe(a);
+  });
+});
+
+// plan.md §905. The backend only needs `df` on the host root, so it gets one
+// world-readable file from that filesystem, not the whole host tree.
+describe('host root mount', () => {
+  const compose = readFileSync(path.resolve(__dirname, '../../../docker-compose.yml'), 'utf8');
+
+  it('does not bind-mount the entire host filesystem', () => {
+    expect(compose).not.toMatch(/^\s*-\s*\/:\/hostfs/m);
+  });
+
+  it('mounts exactly the file the system disk row measures', () => {
+    expect(compose).toContain(`- /etc/os-release:${SYSTEM_DISK_PATH}:ro`);
   });
 });

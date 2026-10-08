@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.169.6] — 2026-10-08
+
+### Security
+
+- Health check mounts one host file instead of the whole host root
+
 ## [0.169.5] — 2026-10-08
 
 ### Changed

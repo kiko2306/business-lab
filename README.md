@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.169.5** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.169.6** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -236,11 +236,10 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
       and `apps/tally/app/web` are still on `^18.2.0`, so they carry the same four advisories as the
       dashboard did. Same recipe (`ng update` one major at a time, run the workspace's own tests);
       each is its own build, so do them as separate commits.
-- [ ] **🔴 Re-weigh the `/:/hostfs:ro` mount (plan.md §889 item 7)** — `docker-compose.yml:98`
-      gives the backend the entire host filesystem read-only so the health check can `df` the
-      host root. That means any path-traversal or RCE in the backend reads every app's env file,
-      every SSH key and `/etc/shadow`. Either narrow it to what `df` needs or write down why the
-      whole-root mount is accepted, so it is a decision rather than a leftover.
+- [ ] **Beta-test the narrowed host-disk mount (plan.md §905)** — on `beta`, after the update
+      recreates the backend: Home/Utils health still shows a "system" disk row with a sensible
+      percentage (or one merged row while Docker and root share a filesystem), and on the host
+      `docker compose exec backend ls /hostfs` shows only `os-release`.
 - [ ] **Beta-test per-service post-start reconcilers (plan.md §901)** — on `beta`, after the update
       rebuilds the backend: restart ITFlow and Uptime Kuma from the Apps page and confirm their
       first-admin, mail/cron and monitor wiring still land (backend log shows no "Post-start
