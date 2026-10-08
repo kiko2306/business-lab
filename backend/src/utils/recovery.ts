@@ -34,7 +34,20 @@ export function recoveryStatusBody(enabled: boolean, req: Request): { enabled: b
   return { enabled, available: isLocalRequest(req) };
 }
 
+/**
+ * Whether this request came in over loopback — the gate on `/recovery/enable`
+ * and `/recovery/reset-admin-password`.
+ *
+ * The socket's own peer address, never `req.ip`. Under `trust proxy` Express
+ * derives `req.ip` from `X-Forwarded-For`, so the gate on the two endpoints that
+ * can reset an admin password was settable by a header. Nothing outside the
+ * compose network reaches this container and nginx overwrites that header
+ * (§516), so this is not a known live bypass — but `TRUST_PROXY` is
+ * operator-settable and `proxy-addr` had just shipped an IP-spoofing advisory
+ * (§875), and a localhost check has no business reading a header at all
+ * (plan.md §879 item 4).
+ */
 export function isLocalRequest(req: Request): boolean {
-  const ip = req.ip || req.socket?.remoteAddress || '';
+  const ip = req.socket?.remoteAddress ?? '';
   return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
 }

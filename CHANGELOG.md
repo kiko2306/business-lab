@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.166.7] — 2026-10-08
+
+### Security
+
+- The recovery-mode localhost gate now reads the socket's peer address instead of the proxy-derived req.ip, so no forwarding header can claim loopback (plan.md §883).
+
 ## [0.166.6] — 2026-10-08
 
 ### Security
