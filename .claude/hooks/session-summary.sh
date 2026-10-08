@@ -14,14 +14,16 @@ Active .claude guards for this session:
 - No router changes, no console configuration on the host — see CLAUDE.md.
 EOF
 
+# Headlines only: the full TODO (~70 KB) plus plan tail was injected at every start and
+# /clear and re-read every turn (plan.md §894). Item bodies are read on demand.
 echo
-echo "README.md TODO section:"
-awk '/^## TODO/{f=1} f && /^## / && !/^## TODO/{exit} f' README.md
+echo "README.md open TODO items (read an item's full text only when picking it up):"
+awk '/^## TODO/{f=1;next} f && /^## /{exit} f && (/^### / || /^- \[ \] \*\*/)' README.md |
+  sed -E 's/^(- \[ \] \*\*[^*]*\*\*).*/\1/'
 
 echo
 echo "git status:"
 git status --short
 
 echo
-echo "plan.md tail (last section):"
-tail -c 4000 plan.md
+echo "plan.md: read a section with ./scripts/plan-section.sh <N>; tail is in plan-index.md."

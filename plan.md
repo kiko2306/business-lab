@@ -38399,3 +38399,5 @@ Decided: JWT_SECRET rotation makes a sealed value read as empty (= "not configur
 ## 894. Session token cost, logged as first priority
 
 [ ] todo. Usage limit drains fast. Measured 2026-10-08: SessionStart hook injects ~77 KB (full README TODO + plan tail + git status) per start and per `/clear`; `CLAUDE.md` 18 KB, memory 41 KB, `plan.md` 2.2 MB, `plan-index.md` 76 KB; 197 session logs, several 20 MB+, 87 sessions on Oct 2 alone (each paid startup). Seven README items under "FIRST", ordered by saving: shrink hook, slim TODO, squash plan.md, trim CLAUDE.md, prune memory, habits, review style plugins.
+
+Shrink-hook item landed: `.claude/hooks/session-summary.sh` now prints guard summary, one headline per open README item, and git status (80 KB → ~8 KB, scales with open-item count). Dropped the `plan.md` tail; section reads go via `scripts/plan-section.sh`. Guard: `scripts/test-session-summary.sh` (size cap 10 KB, headlines present, item bodies absent). Rejected: cap at 6 KB — 96 open items alone need ~8 KB.
