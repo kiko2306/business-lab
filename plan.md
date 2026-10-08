@@ -38385,3 +38385,7 @@ Ordered most-severe first, which is the order to work them in. Each was re-verif
 ## 891. query() uses pool.query
 
 [x] done. §889 item 14. `utils/database.ts` `query()` was connect/query/release-in-finally, which is what `pool.query` does. Now one line. No new test: whole suite covers it.
+
+## 892. nodemailer 6 → 10
+
+[x] done. §889 item 2. `nodemailer` ^6.9.14 → ^10.0.16, `@types/nodemailer` ^8.0.2. Only call site is `utils/mailSend.ts` (createTransport + sendMail + close): signatures unchanged. Only edit: `Transporter` now a named type import, since new typings drop the `nodemailer.Transporter` namespace form. Backend typecheck + 1449 tests green. Real SMTP send unverified here: README beta item carries it. Gotcha: `npm install --save-dev` for the types package also moved nodemailer into devDependencies; put back by hand.

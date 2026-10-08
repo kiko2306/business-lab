@@ -7,7 +7,7 @@
  * `nodemailer` rather than reimplementing SMTP.
  */
 
-import nodemailer from 'nodemailer';
+import nodemailer, { type Transporter } from 'nodemailer';
 import { getMailConfig, MailConfig } from './mailSettings';
 
 export interface OutgoingMail {
@@ -19,7 +19,7 @@ export interface OutgoingMail {
   headers?: Record<string, string>;
 }
 
-function transportFor(config: MailConfig): nodemailer.Transporter {
+function transportFor(config: MailConfig): Transporter {
   return nodemailer.createTransport({
     host: config.smtpHost,
     port: config.smtpPort,

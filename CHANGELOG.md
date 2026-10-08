@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.167.4] — 2026-10-08
+
+### Changed
+
+- nodemailer 6 to 10, closing the last high-severity advisory
+
 ## [0.167.3] — 2026-10-08
 
 ### Changed

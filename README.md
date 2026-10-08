@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.167.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.167.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -222,13 +222,9 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
       migration re-wraps what is already stored. On `beta` afterwards: test the Cloudflare token,
       send a test email, run an AI-backed action, and save the exposure settings — each has to
       still authenticate, and the Settings page must still show the masked value, not ciphertext.
-- [ ] **🔴 Bump `nodemailer` 6 → 10 (plan.md §889 item 2)** — the one high-severity advisory left
-      after §875, with 15 CVEs behind it: quadratic and recursive addressparser DoS,
-      recipient-domain bypasses via IDN/punycode and RFC 5322 comments, CRLF injection in `List-*`
-      headers, and a process-global DNS cache that reuses TLS `servername` across transports. A
-      breaking major: read its changelog for the transport and `sendMail` signature changes. On
-      `beta`: send a test email from Settings, invite a user and confirm the set-password link
-      arrives, and check the backup/alert mails still send.
+- [ ] **Beta-test nodemailer 10 (plan.md §892)** — on `beta`, after the update rebuilds the backend:
+      send a test email from Settings, invite a user and confirm the set-password link arrives,
+      and check the backup/alert mails still send.
 - [ ] **🔴 Bump Angular 18 → 21 (plan.md §889 item 3)** — four high-severity runtime advisories in
       `@angular/core`: sanitization bypass via directive host bindings, hydration DOM clobbering
       and response-cache poisoning, XSS via i18n event-handler attributes. Two majors of
