@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import jwt from 'jsonwebtoken';
-import { signMfaToken, signRefreshToken, verifyAccessToken, verifyMfaToken, verifyRefreshToken } from './jwt';
+import { signAccessToken, signMfaToken, signRefreshToken, verifyAccessToken, verifyMfaToken, verifyRefreshToken } from './jwt';
 
 const ORIGINAL = { ...process.env };
 
@@ -51,5 +51,39 @@ describe('signRefreshToken', () => {
     expect(a).not.toBe(b);
     expect(verifyRefreshToken(a).id).toBe(7);
     expect(verifyRefreshToken(b).id).toBe(7);
+  });
+});
+
+// plan.md §879 item 1. Nothing but the secret told an access token from a
+// refresh token, and getRefreshSecret() falls back to JWT_SECRET when
+// JWT_REFRESH_SECRET is unset — which docker-compose.yml passes as an empty
+// string. On such a deployment a refresh token worked as a Bearer token for its
+// full 7 days, including after logout revoked it, because that path never
+// consults refresh_tokens.
+describe('access token purpose', () => {
+  it('round-trips its payload', () => {
+    const decoded = verifyAccessToken(signAccessToken({ id: 9, username: 'ana', roles: ['admin'] }));
+    expect(decoded.id).toBe(9);
+    expect(decoded.username).toBe('ana');
+    expect(decoded.roles).toEqual(['admin']);
+  });
+
+  it('refuses a refresh token signed under the very same secret', () => {
+    const shared = process.env.JWT_SECRET as string;
+    const refreshLike = jwt.sign({ id: 9, jti: 'x' }, shared, { expiresIn: '7d' });
+    expect(() => verifyAccessToken(refreshLike)).toThrow();
+  });
+
+  it('refuses a token that carries another purpose', () => {
+    const wrongPurpose = jwt.sign({ id: 9, purpose: 'mfa' }, process.env.JWT_SECRET as string, { expiresIn: '1h' });
+    expect(() => verifyAccessToken(wrongPurpose)).toThrow();
+  });
+
+  it('refuses an access token minted before the claim existed', () => {
+    // What every signed-in session is holding at deploy time: valid signature,
+    // no purpose. It has to fail so the frontend refreshes instead of carrying
+    // on with a token this check cannot vouch for.
+    const legacy = jwt.sign({ id: 9, username: 'ana', roles: [] }, process.env.JWT_SECRET as string, { expiresIn: '1h' });
+    expect(() => verifyAccessToken(legacy)).toThrow();
   });
 });

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.166.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.166.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -211,12 +211,14 @@ it is done — not ticked off and left behind. Section references point at
 
 The security remainder of the same review, four items, each its own commit and version bump.
 
-- [ ] **Beta-test the access-token purpose claim (plan.md §879 item 1)** — on `beta`, after the
-      update: you are signed out once (every access token issued before the change is now
-      rejected, and the page should take you to the sign-in screen rather than hang). Then sign
-      in again, leave a tab open for over an hour and confirm it keeps working without a
-      re-login (that is the silent refresh), sign in once with 2FA, and use **Sign out** and
-      confirm the next page load asks for a password.
+- [ ] **Beta-test the access-token purpose claim (plan.md §879 item 1)** — on `beta`, keep a
+      tab signed in *across* the update, then click around: every access token issued before
+      the change is now rejected, so the first request 401s and the app spends its refresh token
+      for a new one behind the scenes. You should **not** be signed out and should see no error —
+      if you land on the sign-in screen, that silent refresh is broken. Then leave a tab open for
+      over an hour and confirm it still works (the same refresh, on the normal hourly schedule),
+      sign in once with 2FA, and use **Sign out** and confirm the next page load asks for a
+      password.
 - [ ] **Beta-test the live-status stream after the ticket change (plan.md §879 item 2)** — on
       `beta`, open the Apps page: the cards flip to Running within ~15 s of a start without a
       manual refresh (that is the WebSocket, or the SSE fallback, authenticating with a ticket).

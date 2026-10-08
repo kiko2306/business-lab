@@ -54,8 +54,26 @@ export interface MfaTokenPayload {
   purpose: 'mfa';
 }
 
+/**
+ * What an access token says it is. Signed into the token and checked on verify,
+ * because the secret alone did not distinguish one: `getRefreshSecret()` falls
+ * back to `JWT_SECRET` when `JWT_REFRESH_SECRET` is unset (and
+ * `docker-compose.yml` passes it as an empty string), so on such a deployment a
+ * refresh token presented as `Authorization: Bearer` verified, set `req.user`
+ * and carried the whole API — for its full 7 days, and after logout revoked it,
+ * since nothing on that path reads `refresh_tokens` (plan.md §879 item 1).
+ *
+ * Only the access token gained a claim. Adding one to the refresh token would
+ * invalidate every token in flight and sign everybody out, and it is not what
+ * closes the hole: a *refresh* token is already checked against the database
+ * row, which is what revocation hangs off.
+ */
+const ACCESS_PURPOSE = 'access';
+
 export function signAccessToken(payload: AuthAccessPayload): string {
-  return jwt.sign(payload, getAccessSecret(), { expiresIn: ACCESS_EXPIRES as jwt.SignOptions['expiresIn'] });
+  return jwt.sign({ ...payload, purpose: ACCESS_PURPOSE }, getAccessSecret(), {
+    expiresIn: ACCESS_EXPIRES as jwt.SignOptions['expiresIn'],
+  });
 }
 
 export function signRefreshToken(payload: AuthRefreshPayload): string {
@@ -69,9 +87,20 @@ export function signRefreshToken(payload: AuthRefreshPayload): string {
   });
 }
 
-/** Verify and decode an access token. Throws if invalid or expired. */
+/**
+ * Verify and decode an access token. Throws if invalid, expired, or not an
+ * access token — which includes one minted before `purpose` existed. That is
+ * deliberate: at deploy time every signed-in session is holding such a token,
+ * and the frontend answers a 401 by spending its refresh token for a new one,
+ * so the cost is one silent refresh rather than a token this check cannot
+ * actually vouch for.
+ */
 export function verifyAccessToken(token: string): AuthAccessPayload {
-  return jwt.verify(token, getAccessSecret()) as AuthAccessPayload;
+  const decoded = jwt.verify(token, getAccessSecret()) as AuthAccessPayload & { purpose?: string };
+  if (decoded.purpose !== ACCESS_PURPOSE) {
+    throw new Error('Not an access token');
+  }
+  return decoded;
 }
 
 /**
