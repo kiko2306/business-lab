@@ -1,6 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { requestJson } from '../utils/httpJson';
-import { countTokenZones, ensureIngressRoute, lookupZone, testCloudflareTunnelAccess } from './cloudflareTunnelClient';
+import {
+  countTokenZones,
+  ensureIngressRoute,
+  lookupZone,
+  testCloudflareTunnelAccess,
+  verifyCloudflareToken,
+} from './cloudflareTunnelClient';
 
 vi.mock('../utils/httpJson', () => ({
   requestJson: vi.fn(),
@@ -282,5 +288,40 @@ describe('lookupZone', () => {
       raw: '',
     });
     await expect(lookupZone('token', 'example.com')).rejects.toThrow('Authentication error');
+  });
+});
+
+describe('verifyCloudflareToken', () => {
+  it('reports a verified token', async () => {
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body: { success: true }, raw: '' });
+    expect(await verifyCloudflareToken('tok')).toEqual({
+      success: true,
+      message: 'Cloudflare token verified successfully.',
+    });
+    const [url, options] = mockedRequestJson.mock.calls.at(-1)!;
+    expect(url).toBe('https://api.cloudflare.com/client/v4/user/tokens/verify');
+    expect(options?.headers).toMatchObject({ Authorization: 'Bearer tok' });
+  });
+
+  it("passes on Cloudflare's own reason when it rejects the token", async () => {
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 400,
+      body: { success: false, errors: [{ message: 'Invalid API Token' }] },
+      raw: '',
+    });
+    expect(await verifyCloudflareToken('bad')).toEqual({ success: false, message: 'Invalid API Token' });
+  });
+
+  it('falls back to a generic rejection when no reason is given', async () => {
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 403, body: { success: false }, raw: '' });
+    expect(await verifyCloudflareToken('bad')).toEqual({
+      success: false,
+      message: 'Cloudflare rejected the supplied token.',
+    });
+  });
+
+  it('throws when the reply is not JSON', async () => {
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 502, body: null, raw: '<html>' });
+    await expect(verifyCloudflareToken('tok')).rejects.toThrow('Unable to parse Cloudflare verification response.');
   });
 });

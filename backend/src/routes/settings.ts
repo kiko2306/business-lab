@@ -1,4 +1,3 @@
-import https from 'https';
 import { isIP } from 'net';
 import { Router, Request, Response } from 'express';
 import { query } from '../utils/database';
@@ -50,7 +49,7 @@ import { getService } from '../config/services';
 import { CrowdsecUnavailableError, listCrowdsecBans, unbanCrowdsecIp } from '../services/crowdsecBans';
 import { runAlertTest } from '../services/alertTest';
 import { testNpmConnection } from '../services/npmClient';
-import { testCloudflareTunnelAccess, countTokenZones } from '../services/cloudflareTunnelClient';
+import { testCloudflareTunnelAccess, countTokenZones, verifyCloudflareToken } from '../services/cloudflareTunnelClient';
 import { openSettingValue, setSetting, setSettings } from '../utils/settingsStore';
 import {
   AI_FEATURES,
@@ -113,53 +112,6 @@ async function getStoredToken(): Promise<string | null> {
   const result = await query<{ value: string }>('SELECT value FROM settings WHERE key = $1', [CLOUDFLARE_TOKEN_KEY]);
   const stored = result.rows[0]?.value;
   return stored ? openSettingValue(CLOUDFLARE_TOKEN_KEY, stored) : null;
-}
-
-interface CloudflareVerifyResult {
-  success: boolean;
-  message: string;
-}
-
-function verifyCloudflareToken(token: string): Promise<CloudflareVerifyResult> {
-  return new Promise((resolve, reject) => {
-    const request = https.request(
-      'https://api.cloudflare.com/client/v4/user/tokens/verify',
-      {
-        method: 'GET',
-        headers: {
-          Authorization: 'Bearer ' + token,
-          'Content-Type': 'application/json',
-        },
-      },
-      (response) => {
-        let body = '';
-
-        response.on('data', (chunk) => {
-          body += chunk;
-        });
-
-        response.on('end', () => {
-          try {
-            const parsed = JSON.parse(body);
-            const statusCode = response.statusCode ?? 500;
-            if (statusCode >= 200 && statusCode < 300 && parsed.success) {
-              resolve({ success: true, message: 'Cloudflare token verified successfully.' });
-              return;
-            }
-
-            const errorMessage = parsed?.errors?.[0]?.message || 'Cloudflare rejected the supplied token.';
-            resolve({ success: false, message: errorMessage });
-          } catch {
-            reject(new Error('Unable to parse Cloudflare verification response.'));
-          }
-        });
-      }
-    );
-
-    request.on('error', (error) => reject(error));
-    request.setTimeout(10000, () => request.destroy(new Error('Cloudflare verification timed out.')));
-    request.end();
-  });
 }
 
 router.get('/cloudflare-token', async (_req: Request, res: Response) => {

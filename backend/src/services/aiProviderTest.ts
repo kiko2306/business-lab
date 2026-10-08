@@ -5,32 +5,17 @@
  * so this dispatches per provider rather than pretending they're uniform;
  * what they share is the request/response plumbing below.
  *
- * Deliberately raw `https`, not each provider's SDK — the whole job is
+ * Deliberately the shared JSON client, not each provider's SDK — the whole job is
  * "does this key authenticate," which a bare models-list call answers with
  * a 200/401, at no token cost.
  */
 
-import https from 'https';
+import { requestJson } from '../utils/httpJson';
 import { AiProviderId } from '../utils/aiSettings';
 
 export interface AiKeyTestResult {
   success: boolean;
   message: string;
-}
-
-function requestJson(url: string, headers: Record<string, string>): Promise<{ status: number; body: string }> {
-  return new Promise((resolve, reject) => {
-    const request = https.request(url, { method: 'GET', headers }, (response) => {
-      let body = '';
-      response.on('data', (chunk) => {
-        body += chunk;
-      });
-      response.on('end', () => resolve({ status: response.statusCode ?? 500, body }));
-    });
-    request.on('error', (error) => reject(error));
-    request.setTimeout(10000, () => request.destroy(new Error('AI provider verification timed out.')));
-    request.end();
-  });
 }
 
 function errorDetail(body: string, status: number): string {
@@ -74,7 +59,17 @@ function verifyRequest(provider: AiProviderId, apiKey: string): { url: string; h
 
 export async function testAiProviderKey(provider: AiProviderId, apiKey: string): Promise<AiKeyTestResult> {
   const { url, headers } = verifyRequest(provider, apiKey);
-  const { status, body } = await requestJson(url, headers);
+  let status: number;
+  let body: string;
+  try {
+    const response = await requestJson(url, { headers, timeout: 10000 });
+    status = response.statusCode;
+    body = response.raw;
+  } catch (error) {
+    // requestJson's messages name the URL, and Google's carries the key as a query
+    // param; this text ends up in the route's response.
+    throw new Error((error as Error).message.split(apiKey).join('[key]').split(encodeURIComponent(apiKey)).join('[key]'));
+  }
   const label = PROVIDER_LABEL[provider];
 
   if (status >= 200 && status < 300) {

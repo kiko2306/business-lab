@@ -131,6 +131,23 @@ export async function lookupZone(apiToken: string, baseDomain: string): Promise<
   return { zoneId: zone.id, accountId: zone.account.id };
 }
 
+export interface CloudflareVerifyResult {
+  success: boolean;
+  message: string;
+}
+
+/** Does Cloudflare accept this API token at all? A transport or parse failure throws. */
+export async function verifyCloudflareToken(apiToken: string): Promise<CloudflareVerifyResult> {
+  const response = await requestJson<CloudflareApiEnvelope<unknown>>(`${API_BASE}/user/tokens/verify`, {
+    headers: { Authorization: `Bearer ${apiToken}` },
+  });
+  if (!response.body) throw new Error('Unable to parse Cloudflare verification response.');
+  if (response.statusCode >= 200 && response.statusCode < 300 && response.body.success) {
+    return { success: true, message: 'Cloudflare token verified successfully.' };
+  }
+  return { success: false, message: response.body.errors?.[0]?.message || 'Cloudflare rejected the supplied token.' };
+}
+
 /**
  * How many zones the API token can see. A per-zone-scoped token
  * (Zone Resources → Specific zone) returns 1 (or 0 before the zone exists);

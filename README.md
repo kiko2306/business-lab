@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.169.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.169.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -254,10 +254,10 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
       belongs to it. Behaviour must not change: the §719 isolation test and the ordering
       constraints in that list's doc comment (ITFlow mail/cron after the wizard, Uptime Kuma
       notification after its admin) are the contract.
-- [ ] **🔴 Use `requestJson` for the last two hand-rolled HTTP clients (plan.md §889 item 10)** —
-      `verifyCloudflareToken` (`routes/settings.ts`) and `aiProviderTest.ts` each re-implement
-      request, accumulate, `JSON.parse` and a timeout that `utils/httpJson.ts` already provides.
-      Fold them in; the Cloudflare token test and an AI provider test are the check.
+- [ ] **Beta-test the shared HTTP client on the two key checks (plan.md §900)** — on `beta`: Settings →
+      Cloudflare → "Test token" with the real token must say verified (and with a wrong one, show
+      Cloudflare's own reason); Settings → AI → test each stored provider key (Anthropic, Google, Groq)
+      must say verified, and a deliberately wrong key must say "Key rejected: …".
 - [ ] **🔴 Split `routes/settings.ts` (plan.md §889 item 11)** — 979 lines covering Cloudflare, AI
       keys, exposure, mail, backup target, health thresholds and the update branch. One router per
       concern, mounted together, so the capability gates stay exactly where they are.
