@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import http, { Server } from 'http';
+import { Socket } from 'net';
 import * as services from '../config/services';
 import {
   aggregateContainerState,
   groupExposureRows,
   healthProbeReachable,
   hostNetworkPortMappings,
+  checkHealthHttp,
   parseDockerPs,
   getServiceStatus,
   publishedPortMissing,
@@ -321,5 +324,84 @@ describe('serviceDiskFacts', () => {
     serviceDiskFacts('authelia');
     serviceDiskFacts('paperless');
     expect(services.resolveComposeFile).toHaveBeenCalledTimes(2);
+  });
+});
+
+// plan.md §884 item 2. The timeout answered `resolve(false)` and left the
+// request alone — the `timeout` option it passes only arms the socket timer,
+// whose event was unhandled. So an app that accepts the connection and never
+// answers (wedged, mid-boot, or holding the port without serving) leaked one
+// connection per 15 s broadcast tick for as long as it stayed that way.
+describe('checkHealthHttp against a server that never answers', () => {
+  let server: Server;
+  let url: string;
+  /** Sockets the server has accepted and not yet seen closed. */
+  let open: Set<Socket>;
+
+  beforeEach(async () => {
+    open = new Set();
+    // Accepts, registers the socket, and deliberately never writes a response.
+    server = http.createServer(() => {});
+    server.on('connection', (socket) => {
+      open.add(socket);
+      socket.on('close', () => open.delete(socket));
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    url = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}/`;
+  });
+
+  afterEach(async () => {
+    for (const socket of open) {
+      socket.destroy();
+    }
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  it('reports unhealthy and leaves no connection behind', async () => {
+    expect(await checkHealthHttp({ url }, 60)).toBe(false);
+    // The client must have hung up. Give the close event a tick to land.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(open.size).toBe(0);
+  });
+
+  it('leaves nothing behind across repeated probes, as the 15s tick would', async () => {
+    for (let i = 0; i < 5; i += 1) {
+      expect(await checkHealthHttp({ url }, 40)).toBe(false);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(open.size).toBe(0);
+  });
+});
+
+describe('checkHealthHttp against a server that answers', () => {
+  let server: Server;
+  let url: string;
+
+  const serving = (statusCode: number) =>
+    new Promise<void>((resolve) => {
+      server = http.createServer((_req, res) => {
+        res.writeHead(statusCode);
+        res.end('ok');
+      });
+      server.listen(0, '127.0.0.1', () => {
+        const address = server.address();
+        url = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}/`;
+        resolve();
+      });
+    });
+
+  afterEach(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  it('counts 2xx and 3xx as healthy', async () => {
+    await serving(204);
+    expect(await checkHealthHttp({ url }, 2000)).toBe(true);
+  });
+
+  it('counts 4xx and 5xx as unhealthy', async () => {
+    await serving(503);
+    expect(await checkHealthHttp({ url }, 2000)).toBe(false);
   });
 });

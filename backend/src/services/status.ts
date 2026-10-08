@@ -353,22 +353,40 @@ export function healthProbeReachable(webPort: number | null, hostNetworkPort: nu
 }
 
 /**
- * Check service health via HTTP
+ * Check service health via HTTP.
+ *
+ * The timeout destroys the request, it does not merely answer `false`. It used
+ * to do only the latter, and `protocol.get`'s own `timeout` option just arms the
+ * socket timer — whose `timeout` event was unhandled, so nothing closed the
+ * connection either. An app that accepts and never answers (wedged, mid-boot,
+ * or holding the port without serving) therefore leaked one connection per 15 s
+ * broadcast tick for as long as it stayed that way (plan.md §884 item 2).
  */
 function checkHealthHttp(target: { url: string; hostHeader?: string }, timeout = 5000): Promise<boolean> {
   return new Promise((resolve) => {
     const protocol = target.url.startsWith('https') ? https : http;
-    const timeoutHandle = setTimeout(() => {
-      resolve(false);
-    }, timeout);
-
     const options = target.hostHeader ? { timeout, headers: { Host: target.hostHeader } } : { timeout };
+    // Declared before the request so both callbacks can clear it, assigned
+    // after, because the timeout handler needs the request to destroy it.
+    let timeoutHandle: ReturnType<typeof setTimeout>;
     const request = protocol.get(target.url, options, (response) => {
       clearTimeout(timeoutHandle);
       // Consider 2xx and 3xx as healthy
       resolve((response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 400);
+      // Drain rather than leave the body unread: an unconsumed response keeps
+      // the socket out of the agent's free pool.
       response.resume();
     });
+
+    const giveUp = () => {
+      clearTimeout(timeoutHandle);
+      request.destroy();
+      resolve(false);
+    };
+    timeoutHandle = setTimeout(giveUp, timeout);
+    // Belt and braces: `options.timeout` fires this when the socket goes idle,
+    // which can beat the timer above on a connection that never establishes.
+    request.on('timeout', giveUp);
 
     request.on('error', () => {
       clearTimeout(timeoutHandle);
