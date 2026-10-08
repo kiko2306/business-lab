@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.165.17** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.165.18** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -331,6 +331,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       and the progress line says "os ecrãs do painel" / "o motor do painel"; (4) §838 — during a real
       update the line reads "Step 2 of 5. Getting the update ready…" with "You can leave this page
       open…", Tab lands on it after you confirm, and when the run ends focus lands on the result.
+- [ ] **Beta-test that deleting a user locks their app logins (plan.md §869)** — on `beta`,
+      create a user, grant Samba, set a password (invite or reset); `pdbedit -L` in the Samba
+      container lists them `[U]`. Delete the user on Users: `pdbedit -L -v` now shows `[DU]` for
+      that name, and an SMB login with the old password is refused.
 - [ ] **Beta-test that Update now retries failed apps (plan.md §863)** — on `beta`, break one app's
       pull (e.g. point its image at a missing tag in a throwaway state, or stop the registry reach),
       press Update now after a pull that touches that app: the run lands with a warning naming it; fix

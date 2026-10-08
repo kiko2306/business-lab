@@ -30,6 +30,7 @@ import {
 } from '../services/userAppAccess';
 import { syncAutheliaUsersSafe } from '../services/autheliaSync';
 import { deprovisionNoSsoCredentials, fanOutNoSsoCredentials } from '../services/noSsoCredentialFanout';
+import { deprovisionNoSsoAppsForUser } from '../services/userDeletionCleanup';
 import { createInvitation } from '../services/userInvitations';
 import { sendMail, mailIsConfigured } from '../utils/mailSend';
 import { getDashboardBaseUrl } from '../utils/generalSettings';
@@ -509,6 +510,9 @@ router.delete('/:id', validateParams(schemas.userIdParam), async (req: Request, 
     if (targetIsWebmaster.rows[0].n > 0 && (await webmasterCount()) <= 1) {
       return res.status(400).json({ error: 'At least one account must keep the webmaster role.' });
     }
+
+    // Before the row goes: the deprovisioners look the account up through it.
+    await deprovisionNoSsoAppsForUser(id);
 
     const result = await query<{ username: string }>('DELETE FROM users WHERE id = $1 RETURNING username', [id]);
     const user = result.rows[0];
