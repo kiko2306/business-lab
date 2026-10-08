@@ -331,10 +331,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       and the progress line says "os ecrãs do painel" / "o motor do painel"; (4) §838 — during a real
       update the line reads "Step 2 of 5. Getting the update ready…" with "You can leave this page
       open…", Tab lands on it after you confirm, and when the run ends focus lands on the result.
-- [ ] **Beta-test the "Waiting for a password" label (plan.md §868)** — on `beta`, open Users:
-      `mat`, `miguel` and `frias` (Samba granted, no account yet) show "Waiting for a password:
-      Samba…" under the email, in EN and pt-PT; sign one in once (or reset their password), reload:
-      the line is gone and `pdbedit -L` in the Samba container lists them.
 - [ ] **Beta-test that Update now retries failed apps (plan.md §863)** — on `beta`, break one app's
       pull (e.g. point its image at a missing tag in a throwaway state, or stop the registry reach),
       press Update now after a pull that touches that app: the run lands with a warning naming it; fix
