@@ -214,6 +214,11 @@ owner. Listed most-severe first, which is the order to take them in. Each was re
 against the tree at `0.167.1`. Test first, own commit and version bump each; delete an item when
 its fix lands (a fix still needing a `beta` look leaves its own beta item behind).
 
+- [ ] **Beta-test the nginx backend re-resolve (plan.md §897)** — on `beta`, after the update rebuilds
+      the frontend: open the dashboard and sign in. Then recreate only the backend
+      (`docker compose up -d --force-recreate backend` on the host) and, within ~15 seconds and with
+      no frontend restart, reload the dashboard: login and `/api` calls must work, not 502. Live
+      status (WebSocket, `/ws/services`) must reconnect too.
 - [ ] **Beta-test sealed third-party secrets (plan.md §893)** — on `beta`, after the update: test the
       Cloudflare token, send a test email, run an AI-backed action, test the NPM connection and save
       the exposure settings, and run a backup to a password-protected target. Each has to still
