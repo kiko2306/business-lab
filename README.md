@@ -207,6 +207,30 @@ two — the guarantees are.
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
 
+### 🟠 FIRST — cut session token cost (plan.md §894)
+
+Sessions burn the usage limit fast: the SessionStart hook alone injects ~77 KB (~20k tokens) at
+every start and every `/clear`, and it is re-read on every later turn. Take these in order, top
+first; this block comes before everything below. Delete each item when it lands.
+
+- [ ] **Shrink the SessionStart hook** — `.claude/hooks/session-summary.sh` prints the whole README
+      TODO section (~70 KB), the `plan.md` tail and git status. Print only the open-item headlines
+      (`grep -n '^- \[ \] \*\*' README.md`) and drop the plan tail. Check: new session start injects
+      under ~5 KB.
+- [ ] **Slim the README TODO** — keep a short open-items index; move the long "what to check and
+      how" text out of the always-read path so step 1 of the working loop stays cheap.
+- [ ] **Squash old `plan.md` sections** — file is 2.2 MB and `plan-index.md` 76 KB. Archive or
+      squash finished sections (keep the tried-and-rejected record, drop iteration detail), then
+      `./scripts/plan-index.sh`.
+- [ ] **Trim `CLAUDE.md`** (18 KB, loaded every session) — move rarely needed parts (adding-an-app
+      checklist, exposure and homepage conventions) into `docs/` files read on demand.
+- [ ] **Prune memory** — delete `session-state-2026-09-10.md` and `session-state-2026-09-12.md`
+      (~12 KB stale logs; git and `plan.md` hold the record) and drop their `MEMORY.md` lines.
+- [ ] **Work habits** — one task per session, `/compact` or continue instead of `/clear`, run big
+      test/build output through `tail` or a subagent. Note in `docs/` or `CLAUDE.md`.
+- [ ] **Review always-on style plugins** — caveman and ponytail add rules to every turn; decide
+      which stay on by default.
+
 ### 🔴 URGENT — review remainder (plan.md §889)
 
 The fourteen findings of the 2026-10-08 review that have not landed, all marked urgent by the
