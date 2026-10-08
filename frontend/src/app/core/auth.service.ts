@@ -152,11 +152,13 @@ export class AuthService {
       return throwError(() => new Error('No refresh token available.'));
     }
 
+    // Read the token from storage, not memory: another tab may have rotated it, and
+    // spending this tab's stale copy would read as a replay and sign every session out.
     if (!this.refreshRequest$) {
       this.refreshRequest$ = this.http
-        .post<{ accessToken: string; roles?: Role[]; capabilities?: string[] }>(
+        .post<{ accessToken: string; refreshToken?: string; roles?: Role[]; capabilities?: string[] }>(
           `${API_BASE_URL}/auth/refresh`,
-          { refreshToken: this.refreshTokenSubject.value },
+          { refreshToken: this.readStoredSession().refreshToken ?? this.refreshTokenSubject.value },
           {
             context: new HttpContext()
               .set(SKIP_AUTH, true)
@@ -165,7 +167,7 @@ export class AuthService {
         )
         .pipe(
           tap((response) =>
-            this.updateAccessToken(response.accessToken, response.roles, response.capabilities)
+            this.updateAccessToken(response.accessToken, response.roles, response.capabilities, response.refreshToken)
           ),
           map((response) => response.accessToken),
           finalize(() => {
@@ -258,7 +260,12 @@ export class AuthService {
     localStorage.setItem(this.storageKey, JSON.stringify(response));
   }
 
-  private updateAccessToken(accessToken: string, roles?: Role[], capabilities?: string[]): void {
+  private updateAccessToken(
+    accessToken: string,
+    roles?: Role[],
+    capabilities?: string[],
+    refreshToken?: string
+  ): void {
     const current = this.readStoredSession();
     // A refresh also re-reports the user's roles and effective capabilities —
     // fold them into the stored user so a session opened before §152 (or
@@ -274,11 +281,12 @@ export class AuthService {
         : current.user;
     const updatedSession = {
       accessToken,
-      refreshToken: current.refreshToken,
+      refreshToken: refreshToken ?? current.refreshToken,
       user,
     };
 
     this.accessTokenSubject.next(accessToken);
+    if (refreshToken) this.refreshTokenSubject.next(refreshToken);
     if (user !== current.user) {
       this.userSubject.next(user);
     }

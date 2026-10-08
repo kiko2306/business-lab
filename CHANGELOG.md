@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.168.0] — 2026-10-08
+
+### Security
+
+- Refresh tokens rotate on every refresh; replaying a spent token revokes the user's sessions
+
 ## [0.167.6] — 2026-10-08
 
 ### Security

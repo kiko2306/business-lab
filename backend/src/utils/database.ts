@@ -228,6 +228,10 @@ export async function ensureUserAppAccessSchema(): Promise<void> {
   // (where their real password passes through the bcrypt check) fan it
   // out then, instead of silently never provisioning it.
   await query('ALTER TABLE user_app_access ADD COLUMN IF NOT EXISTS pending_fanout BOOLEAN NOT NULL DEFAULT FALSE');
+
+  // Set when /auth/refresh spends a token. Kept (not deleted) until expiry so a
+  // replay of a spent token can be told apart from an unknown one (plan.md §896).
+  await query('ALTER TABLE refresh_tokens ADD COLUMN IF NOT EXISTS rotated_at TIMESTAMPTZ');
 }
 
 /**

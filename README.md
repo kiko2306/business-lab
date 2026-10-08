@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.167.6** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.168.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -228,13 +228,13 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
       migration (`ng update` per major, not in one jump). Watch the standalone-component and
       control-flow changes. On `beta`: every page loads, the 585 specs pass, the service worker
       updates rather than serving a stale shell, and the CSP reports no violation.
-- [ ] **🔴 Rotate refresh tokens (plan.md §889 item 4)** — one refresh token stays valid for its
-      whole 7 days with no reuse detection, and the pair lives in `localStorage`, so one XSS is a
-      7-day session. Issue a new refresh token on every `/auth/refresh`, revoke the one spent, and
-      treat a second use of a spent token as a compromise (revoke that user's whole family). On
-      `beta`: sign in, leave a tab open over an hour so it refreshes, confirm you stay signed in;
-      then replay an old refresh token with `curl` and confirm it is refused and the session is
-      cut. Moving the refresh token to an httpOnly cookie is the bigger follow-up, not this item.
+- [ ] **Beta-test refresh-token rotation (plan.md §896)** — on `beta`, after the update rebuilds the
+      backend: sign in, leave a tab open over an hour so it refreshes, confirm you stay signed in;
+      open a second tab and let both refresh, confirm neither signs out. Then copy the
+      `refreshToken` from `localStorage` (`homelab.session`), let the app refresh once, wait over 30
+      seconds and replay the copied token with `curl -X POST …/api/auth/refresh`: it must return 401
+      and the next refresh in the app must then fail (every session revoked, sign in again). An
+      `refresh_reuse` row must appear in the audit log.
 - [ ] **🔴 Decide whether the no-SSO fanout should wait for the second factor (plan.md §889 item
       5)** — `/auth/login` fans out credentials to no-SSO apps on a correct *password*, before any
       TOTP step, so someone with the password but not the code can still drive app-account

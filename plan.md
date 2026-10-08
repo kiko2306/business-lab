@@ -38417,3 +38417,9 @@ Style-plugin item closed: owner decided to keep caveman and ponytail on by defau
 ## 895. Output caps on runArgv and requestJson (§889 item 8)
 
 [x] done. `runArgv` (spawn, no limit) and `requestJson` (response body) now stop at 4 MB, matching `runShell`'s `maxBuffer`. `runArgv` keeps its never-reject contract: on overflow it SIGKILLs and resolves code -1 with stderr "Output exceeded N bytes; killed" plus what arrived. `requestJson` destroys the request and rejects with "exceeded". Tests first: a 6 MB flood and a 5 MB response both failed (the flood hung to the 5 s timeout), then passed. Rejected: a per-call `maxBytes` option — no caller needs a different ceiling, add when one does.
+
+## 896. Refresh-token rotation and reuse detection (§889 item 4)
+
+[x] done in code, beta test open. `/auth/refresh` now spends the presented token (`refresh_tokens.rotated_at`, set by one UPDATE that also checks live/unrevoked/unexpired, so concurrent refreshes cannot both win) and returns a new one. A spent token replayed after 30 s revokes every session of that user and writes a `refresh_reuse` audit row; inside 30 s it is only refused. Logic in `services/refreshRotation.ts`; `storeRefreshToken` shared with sign-in. Spent rows survive the purge until expiry (purge only drops revoked/expired), which is what makes replay distinguishable from unknown.
+
+Trap found while designing: the frontend refreshed with its in-memory token, so with two tabs the second would spend a stale copy, look like a replay and revoke everything. `refreshAccessToken` now reads the token from `localStorage` at call time. Decided: user-wide revoke rather than per-chain families (no family id column; one user rarely has more than a few sessions). Rejected: httpOnly cookie — the bigger follow-up the item already names. Tests first: 4 backend (claim/invalid/grace/compromise), 2 frontend (stores rotated token, spends other tab's token); E2E suite passes.

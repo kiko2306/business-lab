@@ -16,6 +16,7 @@ import setupModeMiddleware from '../middleware/setupMode';
 import authMiddleware from '../middleware/auth';
 import { schemas, validateBody, validateParams } from '../middleware/validation';
 import { writeAuditLog } from '../utils/audit';
+import { claimRefreshToken } from '../services/refreshRotation';
 import { effectiveCapabilities } from '../auth/capabilities';
 import { getUserCapabilities, getUserRoles, setUserRoles } from '../services/userRoles';
 import { acceptInvitation, verifyInvitation } from '../services/userInvitations';
@@ -95,6 +96,18 @@ interface UserRow {
   email?: string | null;
 }
 
+/** Mint a refresh token and persist it; shared by sign-in and rotation on /auth/refresh. */
+async function storeRefreshToken(userId: number): Promise<string> {
+  const refreshToken = signRefreshToken({ id: userId });
+  const refreshExpiry = new Date(Date.now() + refreshTokenExpiryMs());
+  await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [
+    userId,
+    refreshToken,
+    refreshExpiry,
+  ]);
+  return refreshToken;
+}
+
 /**
  * Issue an access + refresh token pair for a fully-authenticated user and
  * persist the refresh token. The shared tail of a password-only login and the
@@ -108,13 +121,7 @@ async function issueSession(user: { id: number; username: string }): Promise<{
   const [roles, grants] = await Promise.all([getUserRoles(user.id), getUserCapabilities(user.id)]);
   const capabilities = effectiveCapabilities(roles, grants);
   const accessToken = signAccessToken({ id: user.id, username: user.username, roles });
-  const refreshToken = signRefreshToken({ id: user.id });
-  const refreshExpiry = new Date(Date.now() + refreshTokenExpiryMs());
-  await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [
-    user.id,
-    refreshToken,
-    refreshExpiry,
-  ]);
+  const refreshToken = await storeRefreshToken(user.id);
   return {
     accessToken,
     refreshToken,
@@ -419,28 +426,25 @@ router.post('/refresh', authLimiter, validateBody(schemas.authRefresh), async (r
   const { refreshToken } = req.body;
 
   try {
-    const decoded = verifyRefreshToken(refreshToken);
+    verifyRefreshToken(refreshToken);
 
-    const result = await query<{ id: number; user_id: number; revoked: boolean; expires_at: string; username: string }>(
-      `SELECT rt.id, rt.user_id, rt.revoked, rt.expires_at,
-              u.username
-       FROM refresh_tokens rt
-       JOIN users u ON u.id = rt.user_id
-       WHERE rt.token = $1`,
-      [refreshToken]
-    );
-    const row = result.rows[0];
-
-    if (!row || row.revoked || new Date(row.expires_at) < new Date()) {
+    const claim = await claimRefreshToken(refreshToken);
+    if (!claim.ok) {
+      if (claim.reason === 'reuse-compromise') {
+        await writeAuditLog({ userId: claim.userId, action: 'refresh_reuse', resource: 'auth', result: 'failure' });
+      }
       return res.status(401).json({ error: 'Refresh token is invalid or expired' });
     }
 
-    const [roles, grants] = await Promise.all([
-      getUserRoles(decoded.id),
-      getUserCapabilities(decoded.id),
-    ]);
-    const accessToken = signAccessToken({ id: decoded.id, username: row.username, roles });
-    return res.json({ accessToken, roles, capabilities: effectiveCapabilities(roles, grants) });
+    const [roles, grants] = await Promise.all([getUserRoles(claim.userId), getUserCapabilities(claim.userId)]);
+    const accessToken = signAccessToken({ id: claim.userId, username: claim.username, roles });
+    const newRefreshToken = await storeRefreshToken(claim.userId);
+    return res.json({
+      accessToken,
+      refreshToken: newRefreshToken,
+      roles,
+      capabilities: effectiveCapabilities(roles, grants),
+    });
   } catch {
     return res.status(401).json({ error: 'Refresh token is invalid or expired' });
   }

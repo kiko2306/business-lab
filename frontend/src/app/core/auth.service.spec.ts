@@ -97,4 +97,32 @@ describe('AuthService', () => {
       error: (error) => expect(error.message).toBe('No refresh token available.'),
     });
   });
+
+  // The backend rotates the refresh token on every refresh; keeping the old one
+  // would make the next refresh look like a replay and sign the user out.
+  it('stores the rotated refresh token returned by a refresh', () => {
+    service.completeMfaLogin('mfa-token', '123456').subscribe();
+    httpMock.expectOne(`${API_BASE_URL}/auth/login/totp`).flush(authResponse);
+
+    service.refreshAccessToken().subscribe();
+    const req = httpMock.expectOne(`${API_BASE_URL}/auth/refresh`);
+    expect(req.request.body).toEqual({ refreshToken: authResponse.refreshToken });
+    req.flush({ accessToken: 'new-access', refreshToken: 'new-refresh' });
+
+    service.refreshAccessToken().subscribe();
+    const next = httpMock.expectOne(`${API_BASE_URL}/auth/refresh`);
+    expect(next.request.body).toEqual({ refreshToken: 'new-refresh' });
+    next.flush({ accessToken: 'newer-access', refreshToken: 'newer-refresh' });
+  });
+
+  it('spends the refresh token another tab stored, not its own stale copy', () => {
+    service.completeMfaLogin('mfa-token', '123456').subscribe();
+    httpMock.expectOne(`${API_BASE_URL}/auth/login/totp`).flush(authResponse);
+    localStorage.setItem('homelab.session', JSON.stringify({ ...authResponse, refreshToken: 'from-other-tab' }));
+
+    service.refreshAccessToken().subscribe();
+    const req = httpMock.expectOne(`${API_BASE_URL}/auth/refresh`);
+    expect(req.request.body).toEqual({ refreshToken: 'from-other-tab' });
+    req.flush({ accessToken: 'a', refreshToken: 'b' });
+  });
 });
