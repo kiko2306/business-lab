@@ -207,6 +207,27 @@ two — the guarantees are.
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
 
+### Review batch 3, 2026-10-08 (plan.md §884)
+
+Infrastructure robustness, five items. Three touch Docker or nginx, so they need a real look.
+
+- [ ] **Beta-test the pinned socket proxy (plan.md §884 item 1)** — on `beta`, after the update:
+      `docker ps` shows both `docker-socket-proxy` and `watchdog-docker-proxy` running on
+      `tecnativa/docker-socket-proxy:v0.5.0`, and the dashboard still starts and stops an app
+      (that is the backend's whole Docker path going through the first one). Trigger an update
+      from the Update page and confirm it completes — the watchdog's proxy is the one that path
+      leans on.
+- [ ] **Beta-test that the stack serves nothing before its schema is ready (plan.md §884 item
+      3)** — on `beta`, restart the backend and reload the dashboard immediately: you should get
+      either a clean load or a connection refused, never a page with errors about missing tables.
+      The backend log should show the schema lines before "listening on port".
+- [ ] **Beta-test nginx connection reuse (plan.md §884 item 5)** — on `beta`, open the Apps page
+      and leave it a few minutes: live status still arrives within ~15 s of a start (that is the
+      WebSocket upgrade, which must still work), a startup-log stream still runs to the end, and
+      ordinary pages (Users, Settings, Backups) still load. Then upload something oversized if
+      you can — a config save with a very long value — and confirm the message says the request
+      was too large rather than showing a server error.
+
 ### Review batch 2, 2026-10-08 (plan.md §879)
 
 The security remainder of the same review, four items, each its own commit and version bump.
