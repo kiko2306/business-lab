@@ -38305,13 +38305,13 @@ No behaviour change expected, and none in the tests: nothing outside `business-l
 
 ## 884. Review batch 3: infrastructure robustness
 
-[-] active. Five items from the §873 review's remainder, picked as the next batch (2026-10-08). Each its own commit and version bump.
+[x] done. Five items from the §873 review's remainder, picked as the next batch (2026-10-08). Each its own commit and version bump.
 
 1. [x] **`tecnativa/docker-socket-proxy:latest`, twice.** The component that mediates every Docker API call this backend makes, on a floating tag, so a rebuild can land an unreviewed image inside the one security boundary that exists between the dashboard and the host daemon. Upstream's `latest` is currently the same digest as `v0.5.0` (`sha256:1f5038b5…`, 2026-07-27) and that is what the host already runs, so pinning to the version tag changes no bytes. The root compose also has no "Last checked for a newer image" header at all, unlike every file under `apps/` (§449) — the date-comment ritual that moves a tracked image forward never covered the core stack.
 2. [x] **The health probe leaks a socket on every timeout.** `checkHealthHttp` (`status.ts`) answers a timeout with `resolve(false)` and never destroys the request; the `timeout` option it passes only arms the socket timer, whose event is unhandled. One unreachable app leaks a connection per 15 s broadcast tick, for as long as it stays unreachable.
 3. [x] **Requests are served before the schema exists.** `index.ts` fires about a dozen `ensure*` migration chains unawaited and calls `app.listen` on the next line. On a first boot or an upgrade, early requests hit tables that are not there yet. The sweepers and reconcilers can stay after `listen` — they are long-running and must not delay readiness — but the schema cannot.
 4. [x] **An oversized body answers 500.** The global error handler ignores `err.type === 'entity.too.large'`, so exceeding `REQUEST_BODY_LIMIT` (32 kb) is reported as an internal error rather than 413, and the client cannot tell a too-big request from a broken server.
-5. [ ] **`Connection: upgrade` on every proxied API request.** `frontend/nginx.conf` sets it unconditionally in all three proxy locations, not just for a WebSocket handshake, which stops nginx reusing an upstream connection for ordinary API calls. The standard shape is a `map $http_upgrade $connection_upgrade` at http scope.
+5. [x] **`Connection: upgrade` on every proxied API request.** `frontend/nginx.conf` sets it unconditionally in all three proxy locations, not just for a WebSocket handshake, which stops nginx reusing an upstream connection for ordinary API calls. The standard shape is a `map $http_upgrade $connection_upgrade` at http scope.
 
 ## 885. The socket proxies get a version pin
 
@@ -38340,3 +38340,11 @@ Tested against a real `http.createServer` that accepts and never writes, countin
 What did *not* move behind the gate: `ensureCoreSidecars` (runs compose), the exposure reconcilers (talk to Cloudflare), and every sweeper. They are now `startBackgroundWork()`, called after `listen`. Holding readiness on them would trade a startup race for a minutes-long dark window — and the watchdog (§295) treats a backend that is not answering as one to replace.
 
 **413 instead of 500.** The global error handler ignored body-parser's `type`, so exceeding `REQUEST_BODY_LIMIT` (32 kb) looked to a client exactly like a broken server. Now `middleware/errorHandler.ts`: `entity.too.large` → 413, `entity.parse.failed` → 400, the CORS denial → 403 as before, everything else → 500 with the message in the log. The two client faults are deliberately *not* logged — a 32 kb paste is the caller's business, and logging it every time buries the faults that are ours. Keyed on `type` rather than the message text, which is the part of body-parser's API that is stable.
+
+## 888. nginx stops closing every upstream connection
+
+[x] done (config only); live check is a README beta item. §884 item 5. All three proxy locations in `frontend/nginx.conf` set `proxy_set_header Connection 'upgrade'` unconditionally — the `/api` exact match, `/api/` and `/ws/`. That is correct for a WebSocket handshake and wrong for everything else: it tells the backend to tear the connection down after the response, so nginx could never keep an upstream connection alive and every ordinary API call paid a fresh TCP handshake to `backend:3000`.
+
+Now a `map $http_upgrade $connection_upgrade` at the top of the file (installed as `conf.d/default.conf`, which nginx includes from its `http` block, so the context is right) — `upgrade` by default, `close` when the header is absent or empty — and all three locations use the variable. nginx's own documented shape.
+
+Verified with a real `nginx -t` in an `nginx:alpine` container (with a stub `real-ip-from.conf` and `--add-host backend:127.0.0.1`, since the config names an upstream that does not resolve outside the compose network), not just by reading it. The browser E2E suite then passed against the rebuilt stack, which is what exercises the paths that must still upgrade: live service status over the WebSocket, and the startup-log stream.
