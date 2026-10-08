@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.169.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.169.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -256,11 +256,7 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
 - [ ] **🔴 Split `routes/settings.ts` (plan.md §889 item 11)** — 979 lines covering Cloudflare, AI
       keys, exposure, mail, backup target, health thresholds and the update branch. One router per
       concern, mounted together, so the capability gates stay exactly where they are.
-- [ ] **🔴 Decide whether both route prefixes are still needed (plan.md §889 item 13)** — every
-      router is mounted twice, at `''` and `/api` (`index.ts:172`), doubling the Express layer
-      stack. The bare prefix exists for a deployment pointing a dedicated API hostname at this
-      server. Check whether anything actually uses it (the frontend's nginx proxies `/api/`), and
-      drop it or record why it stays.
+
 ### Review batch 3, 2026-10-08 (plan.md §884)
 
 Infrastructure robustness, five items. Three touch Docker or nginx, so they need a real look.

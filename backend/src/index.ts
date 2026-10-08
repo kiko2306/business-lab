@@ -166,9 +166,13 @@ app.get(['/version', '/api/version'], (_req: Request, res: Response) => {
   res.json({ version: getAppVersion() });
 });
 
-// Every router is served both at the root (e.g. /auth/login) and under the
-// legacy /api prefix (e.g. /api/auth/login) so that deployments pointing a
-// dedicated API hostname at this server do not need the redundant /api segment.
+// Every router is served both at the root (e.g. /auth/login) and under /api
+// (e.g. /api/auth/login). /api is what the dashboard's nginx proxies. The bare
+// prefix stays for a deployment that sets API_URL (.env.example, baked into the
+// frontend build): the frontend then addresses the backend directly at its root,
+// with no /api segment (frontend/src/app/core/api.ts). Dropping it would break
+// those deployments for the cost of ~20 non-matching prefix checks per request
+// (plan.md §902).
 const ROUTE_PREFIXES = ['', '/api'];
 
 const protectedGate = () => [apiLimiter, setupModeMiddleware(false), authMiddleware];
