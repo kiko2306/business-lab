@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Request, Response } from 'express';
 import { WebSocket, WebSocketServer } from 'ws';
 import { Server } from 'http';
@@ -64,20 +65,27 @@ export function createStreamTicket(userId: number): string {
       streamTickets.delete(key);
     }
   }
-  const ticket = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+  // A ticket is an auth credential: it opens the live status stream for 60 s
+  // without an Authorization header. It used to be `Date.now().toString(36)`
+  // plus `Math.random().toString(36).slice(2, 14)` — Math.random() is not a
+  // CSPRNG (V8's generator state is recoverable from a handful of outputs, so
+  // one observed ticket predicts the next), and the timestamp prefix both
+  // shrank the guessing space and said when it was issued (plan.md §879 item 2).
+  const ticket = crypto.randomUUID();
   streamTickets.set(ticket, { userId, expiresAt: Date.now() + 60 * 1000 });
   return ticket;
 }
 
+/**
+ * The access token from the Authorization header, and only from there. It used
+ * to fall back to `?token=…`, which wrote access tokens into nginx's access log
+ * on every stream request — and nothing needed it: a browser that cannot set a
+ * header on an `EventSource` uses `?ticket=` instead, which is what both the
+ * frontend and the startup-log stream pass (plan.md §879 item 2).
+ */
 function getTokenFromRequest(req: Request): string | null {
   const authHeader = req.headers['authorization'];
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.slice(7);
-  }
-  if (typeof req.query?.token === 'string') {
-    return req.query.token;
-  }
-  return null;
+  return authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 }
 
 /**
