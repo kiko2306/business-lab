@@ -213,9 +213,6 @@ Sessions burn the usage limit fast: the SessionStart hook alone injects ~77 KB (
 every start and every `/clear`, and it is re-read on every later turn. Take these in order, top
 first; this block comes before everything below. Delete each item when it lands.
 
-- [ ] **Squash old `plan.md` sections** — file is 2.2 MB and `plan-index.md` 76 KB. Archive or
-      squash finished sections (keep the tried-and-rejected record, drop iteration detail), then
-      `./scripts/plan-index.sh`.
 - [ ] **Trim `CLAUDE.md`** (18 KB, loaded every session) — move rarely needed parts (adding-an-app
       checklist, exposure and homepage conventions) into `docs/` files read on demand.
 - [ ] **Prune memory** — delete `session-state-2026-09-10.md` and `session-state-2026-09-12.md`
