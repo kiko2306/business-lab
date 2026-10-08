@@ -14,6 +14,7 @@ export const SHARED_FOLDERS_BY_APP: Record<string, string[]> = {
   jellyfin: ['media'],
   navidrome: ['music'],
   immich: ['photos'],
+  docuseal: ['signed'],
 };
 
 export function ensureSharedFolders(serviceName: string, appDir: string): void {

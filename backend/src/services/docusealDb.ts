@@ -138,3 +138,28 @@ export async function reconcileDocusealAdminPassword(email: string, password: st
   if (output === 'not-found') return 'not-found';
   return 'failed';
 }
+
+// Signed PDFs live in ActiveStorage blobs under /data/storage with opaque
+// keys, so there is nothing to share as-is. This copies each completed
+// submitter's documents to /signed (the shared tree, mounted in compose) with
+// a readable name; existing files are skipped so a run is cheap to repeat.
+const COPY_SIGNED_SCRIPT = [
+  'n = 0',
+  'Submitter.where.not(completed_at: nil).find_each do |s|',
+  '  s.documents.each do |doc|',
+  "    name = \"#{s.submission_id}-#{s.id}-#{doc.filename}\".gsub(/[^\\w.\\-]/, '_')",
+  "    path = File.join('/signed', name)",
+  '    next if File.exist?(path)',
+  '    File.binwrite(path, doc.download)',
+  '    n += 1',
+  '  end',
+  'end',
+  'puts "copied:#{n}"',
+].join('\n');
+
+/** Copy newly signed documents to the shared `signed/` folder. Returns how many were copied, or null on failure. */
+export async function copyDocusealSignedDocuments(): Promise<number | null> {
+  const output = await runDocusealRailsScript(COPY_SIGNED_SCRIPT, [], process.env);
+  const match = output ? /copied:(\d+)/.exec(output) : null;
+  return match ? Number(match[1]) : null;
+}

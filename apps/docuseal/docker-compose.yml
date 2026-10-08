@@ -42,6 +42,10 @@ services:
       # defaults to SQLite when DATABASE_URL is unset, which is plenty for a
       # single-box deployment and keeps this a one-container app.
       - ./data:/data
+      # `signed/` in the shared tree Samba serves: docusealDb.ts copies completed
+      # documents here (DocuSeal has no folder export). Created by
+      # sharedFolders.ts; /data itself is never shared (SQLite DB + secret key).
+      - ../nextcloud/data/shared/signed:/signed
     healthcheck:
       # Rails' built-in health endpoint (Rails::HealthController at /up): 200
       # once booted, 5xx if it can't reach its DB. BusyBox wget (Alpine base);

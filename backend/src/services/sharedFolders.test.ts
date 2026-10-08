@@ -23,6 +23,7 @@ describe('ensureSharedFolders', () => {
       jellyfin: ['media'],
       navidrome: ['music'],
       immich: ['photos'],
+      docuseal: ['signed'],
     });
   });
 

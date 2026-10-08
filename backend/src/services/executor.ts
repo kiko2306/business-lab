@@ -44,6 +44,7 @@ import { syncAutheliaOidcClientsSafe } from './autheliaOidcClients';
 import { applyImmichConfig } from './immichConfig';
 import { reconcileImmichFirstAdmin } from './immichAdminBootstrap';
 import { reconcileDocusealFirstAdmin } from './docusealAdminBootstrap';
+import { reconcileDocusealSignedCopy } from './docusealSignedCopy';
 import { reconcileKimaiAdminAccount } from './kimaiAdminBootstrap';
 import { reconcileTwentyFirstAdmin } from './twentyAdminBootstrap';
 import { reconcileN8nFirstAdmin } from './n8nAdminBootstrap';
@@ -258,6 +259,8 @@ const POST_UP_RECONCILERS: ((serviceName: string) => Promise<unknown>)[] = [
   // the outer gate and this just creates the admin account. After `up`; no-op
   // otherwise.
   reconcileDocusealFirstAdmin,
+  // DocuSeal: copy signed PDFs to the shared signed/ folder (§872). After `up`.
+  reconcileDocusealSignedCopy,
   // Paperless: promote the Authelia admin, or the header-trusted login lands
   // on a permissionless account and the UI 403s (§247 follow-up). After `up`.
   reconcilePaperlessUsers,

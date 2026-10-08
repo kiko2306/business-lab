@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { exec } from 'child_process';
 import { resolveComposeFile } from '../config/services';
-import { archiveDocusealUser, reconcileDocusealAdminPassword, setDocusealUserPassword } from './docusealDb';
+import {
+  archiveDocusealUser,
+  copyDocusealSignedDocuments,
+  reconcileDocusealAdminPassword,
+  setDocusealUserPassword,
+} from './docusealDb';
 
 vi.mock('child_process', () => ({ exec: vi.fn() }));
 vi.mock('../config/services', () => ({ resolveComposeFile: vi.fn() }));
@@ -154,5 +159,29 @@ describe('reconcileDocusealAdminPassword', () => {
     }) as unknown as typeof exec);
     const result = await reconcileDocusealAdminPassword('a@example.com', 'pw');
     expect(result).toBe('failed');
+  });
+});
+
+describe('copyDocusealSignedDocuments', () => {
+  it('runs a rails script that writes completed documents to /signed and returns the copied count', async () => {
+    let command = '';
+    mockedExec.mockImplementation(((c: string, _o: unknown, cb: (...a: unknown[]) => void) => {
+      command = c;
+      cb(null, 'copied:3\n', '');
+    }) as unknown as typeof exec);
+
+    expect(await copyDocusealSignedDocuments()).toBe(3);
+
+    const script = Buffer.from(/echo (\S+) \| base64/.exec(command)![1], 'base64').toString();
+    expect(script).toContain('/signed');
+    expect(script).toContain('completed_at');
+    expect(script).toContain('File.exist?');
+  });
+
+  it('returns null when the one-off container fails', async () => {
+    mockedExec.mockImplementation(((_c: string, _o: unknown, cb: (...a: unknown[]) => void) => {
+      cb(new Error('boom'), '', '');
+    }) as unknown as typeof exec);
+    expect(await copyDocusealSignedDocuments()).toBeNull();
   });
 });

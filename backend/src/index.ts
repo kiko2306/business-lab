@@ -45,6 +45,7 @@ import { syncAutheliaAccessControlSafe } from './services/autheliaAccessControl'
 import { syncAutheliaOidcClientsSafe } from './services/autheliaOidcClients';
 import { reconcileRemovedAppProjects } from './services/removedAppCleanup';
 import { startExposureReconciler } from './services/exposureReconciler';
+import { startDocusealSignedCopySweeper } from './services/docusealSignedCopy';
 import { startCriticalServiceHealthMonitor } from './services/criticalServiceHealth';
 import { regenerateHomepageServices } from './services/homepageConfig';
 import { ensureCoreSidecars, ensureSelfUpdateTable, reconcileDanglingSelfUpdateRun, startSelfUpdateCheckSweeper } from './services/selfUpdate';
@@ -304,6 +305,8 @@ reconcileRemovedAppProjects().catch((err: Error) => {
 // live NPM/Cloudflare state so hand-edits or a rotated token that broke
 // provisioning get caught and fixed instead of sitting silently broken.
 startExposureReconciler();
+// DocuSeal signed PDFs → shared signed/ folder, hourly while running (§872).
+startDocusealSignedCopySweeper();
 // Tailscale/NetBird: auto-restart after repeated external-reachability
 // failures — the fast-cadence counterpart to the exposure reconciler above,
 // independent of Uptime Kuma's own monitors so the recovery path doesn't go

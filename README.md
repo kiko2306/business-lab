@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.165.19** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.165.20** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -547,17 +547,20 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       video shows. Navidrome shows the song after its scan. Immich → Administration →
       External Libraries lists "Shared photos" and the photo appears. Check the three
       folders exist and an SMB user can write them (no "access denied").
-- [ ] **Share more apps over Samba (plan.md §871)** — checked, not built; each hits a
-      real obstacle, owner picks. **Paperless:** a mount of its `data/export` needs a
-      scheduled `document_exporter` run (no console step allowed), while exposing
-      `media/documents/{originals,archive}` read-only in Samba needs a nested mount that
-      makes Docker create root-owned dirs if Paperless has never started, and file names
-      are only readable once `PAPERLESS_FILENAME_FORMAT` is set. **Stirling-PDF:**
-      pipeline folders need a pipeline JSON per watch folder, and Stirling is a
-      browser-upload tool, so a plain `pdf-in/` folder does nothing. **DocuSeal:** no
-      folder export; `/data` holds the SQLite DB, so it must not be shared — the only
-      route is a job that copies signed PDFs to `signed/`. Delete the item once decided
-      or built.
+- [ ] **Share Paperless and Stirling-PDF over Samba (plan.md §871, §872)** — not built.
+      **Paperless:** bind-mounting the share over its `media/documents/archive` hides every
+      existing archive file; the alternative is a `PAPERLESS_POST_CONSUME_SCRIPT` that copies
+      each new document to the share (only new documents; rides the ClamAV managed compose
+      fragment in `paperlessClamav.ts`, which is conditional). Names need
+      `PAPERLESS_FILENAME_FORMAT`. **Stirling-PDF:** pipeline folders need a pipeline JSON per
+      folder; leave out unless wanted. Owner picks; delete the item once decided or built.
+- [ ] **Beta-test DocuSeal signed-PDF copy (plan.md §872)** — on `beta`, start DocuSeal,
+      sign one submission to the end, then wait for the next start or the hourly sweep.
+      A PDF named `<submission>-<submitter>-<file>.pdf` appears in `signed/` of the share
+      over SMB; a second run copies nothing new (backend log "Copied N signed DocuSeal
+      document(s)"). If the log says "signed-document copy failed", the rails script's
+      model calls (`Submitter#documents`) need correcting; they were written without a
+      live DocuSeal to check.
 - [ ] **One-off: move the live ITFlow data onto the dev box (plan.md §865)** — planned,
       not run. **Blocked: owner must decide how the 3 live users merge with the 2 dev users
       before the import (step 5).** Then run §865 steps 1–8 and delete this item once the

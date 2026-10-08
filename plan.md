@@ -38175,3 +38175,11 @@ Not done, proposed earlier: Paperless archive export, Stirling-PDF pipeline fold
 - Stirling-PDF: `/pipeline` watch folders need a JSON pipeline definition per folder; Stirling otherwise takes files by browser upload, so a plain shared folder does nothing.
 - DocuSeal: no folder export; `/data` has the SQLite DB and secret key, so must not go on SMB. Only option is a dashboard job copying signed PDFs out.
 README item rewritten with the obstacles; owner picks which, if any.
+
+## 872. DocuSeal signed PDFs copied to the share
+
+[x] done (code); live check is a README beta item. DocuSeal has no folder export and `/data` holds the SQLite DB + secret key, so `/data` is never shared. `copyDocusealSignedDocuments` (`docusealDb.ts`) runs a rails script in a one-off container (same `runDocusealRailsScript` path as the password sync): every completed submitter's `documents` go to `/signed` as `<submission>-<submitter>-<file>`, existing files skipped. `docusealSignedCopy.ts` runs it after each DocuSeal start (executor reconciler list) and hourly while running (`index.ts`). Compose mounts `../nextcloud/data/shared/signed:/signed`; `sharedFolders.ts` makes the folder.
+
+Unverified: the Ruby calls (`Submitter#documents`, `doc.download`) are from memory of DocuSeal's models, no live instance was available. Failure shows as a warning in the backend log, never blocks a start.
+
+Paperless NOT built after all: a nested bind over `media/documents/archive` hides existing archive files (regression), and the alternative (`PAPERLESS_POST_CONSUME_SCRIPT`) piggybacks on the ClamAV-conditional managed compose fragment. Stirling-PDF left out as agreed. README item rewritten.
