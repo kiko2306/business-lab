@@ -38167,3 +38167,11 @@ Immich has no config-file knob for libraries. `immichEnsurePhotosLibrary` (`immi
 Removed `JELLYFIN_MEDIA_DIR` / `NAVIDROME_MUSIC_DIR` (§ earlier host-path override): the share is the library now. Rejected: mounting Immich's `data/upload` over SMB (Immich owns that layout + DB); Immich read-write (it only indexes in place).
 
 Not done, proposed earlier: Paperless archive export, Stirling-PDF pipeline folders, DocuSeal signed-PDF copy. Awaiting user go-ahead.
+
+## 871. Paperless / Stirling-PDF / DocuSeal on the share: checked, not built
+
+[x] done (research only). Read the three compose files before building (§870 follow-up). Rejected for now, nothing code-changed:
+- Paperless: `./data/export` is only filled by a manual `document_exporter` run (breaks "no console step"). Sharing `media/documents/archive` via a nested Samba mount makes Docker create a root-owned mountpoint if Paperless has not started, which then blocks Paperless writing it. File names are uuid-ish unless `PAPERLESS_FILENAME_FORMAT` is set.
+- Stirling-PDF: `/pipeline` watch folders need a JSON pipeline definition per folder; Stirling otherwise takes files by browser upload, so a plain shared folder does nothing.
+- DocuSeal: no folder export; `/data` has the SQLite DB and secret key, so must not go on SMB. Only option is a dashboard job copying signed PDFs out.
+README item rewritten with the obstacles; owner picks which, if any.

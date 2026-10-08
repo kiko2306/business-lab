@@ -547,11 +547,17 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       video shows. Navidrome shows the song after its scan. Immich → Administration →
       External Libraries lists "Shared photos" and the photo appears. Check the three
       folders exist and an SMB user can write them (no "access denied").
-- [ ] **Share more apps over Samba (plan.md §870)** — not built, awaiting go-ahead:
-      Paperless archive export to `archive/`, Stirling-PDF pipeline watch folders
-      `pdf-in/` → `pdf-out/`, DocuSeal signed-PDF copy to `signed/` (no native folder
-      export; needs a small job). Delete the item once decided or built.
-
+- [ ] **Share more apps over Samba (plan.md §871)** — checked, not built; each hits a
+      real obstacle, owner picks. **Paperless:** a mount of its `data/export` needs a
+      scheduled `document_exporter` run (no console step allowed), while exposing
+      `media/documents/{originals,archive}` read-only in Samba needs a nested mount that
+      makes Docker create root-owned dirs if Paperless has never started, and file names
+      are only readable once `PAPERLESS_FILENAME_FORMAT` is set. **Stirling-PDF:**
+      pipeline folders need a pipeline JSON per watch folder, and Stirling is a
+      browser-upload tool, so a plain `pdf-in/` folder does nothing. **DocuSeal:** no
+      folder export; `/data` holds the SQLite DB, so it must not be shared — the only
+      route is a job that copies signed PDFs to `signed/`. Delete the item once decided
+      or built.
 - [ ] **One-off: move the live ITFlow data onto the dev box (plan.md §865)** — planned,
       not run. **Blocked: owner must decide how the 3 live users merge with the 2 dev users
       before the import (step 5).** Then run §865 steps 1–8 and delete this item once the
