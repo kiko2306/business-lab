@@ -207,15 +207,6 @@ two — the guarantees are.
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
 
-### 🟠 FIRST — cut session token cost (plan.md §894)
-
-Sessions burn the usage limit fast: the SessionStart hook alone injects ~77 KB (~20k tokens) at
-every start and every `/clear`, and it is re-read on every later turn. Take these in order, top
-first; this block comes before everything below. Delete each item when it lands.
-
-- [ ] **Review always-on style plugins** — caveman and ponytail add rules to every turn; decide
-      which stay on by default.
-
 ### 🔴 URGENT — review remainder (plan.md §889)
 
 The fourteen findings of the 2026-10-08 review that have not landed, all marked urgent by the
