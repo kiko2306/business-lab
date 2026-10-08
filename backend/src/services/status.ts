@@ -234,7 +234,7 @@ export function parseDockerPs(stdout: string): DockerSnapshot {
  * can't be reached, so callers can tell "no containers" from "no answer" —
  * the latter leaves a service `unknown` rather than claiming it stopped.
  */
-export function dockerPsSnapshot(): Promise<DockerSnapshot | null> {
+function dockerPsSnapshot(): Promise<DockerSnapshot | null> {
   return new Promise((resolve) => {
     // Single-quoted for the shell: the Go template's own double quotes around
     // the label name must survive to docker, or it parses `com` as a function

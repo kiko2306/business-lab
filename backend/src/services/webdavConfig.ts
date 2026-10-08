@@ -29,7 +29,7 @@ function yamlQuote(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-export function webdavConfigPath(appDir: string): string {
+function webdavConfigPath(appDir: string): string {
   return path.join(appDir, 'data', 'config.yml');
 }
 

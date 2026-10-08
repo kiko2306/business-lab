@@ -67,7 +67,7 @@ function runValidate(command: string): Promise<ValidationResult> {
   });
 }
 
-export async function validateAutheliaConfig(candidateText: string): Promise<ValidationResult> {
+async function validateAutheliaConfig(candidateText: string): Promise<ValidationResult> {
   const resolved = resolveComposeFile(SERVICE);
   if (!resolved?.composeFile) return { ok: true, ran: false, message: 'Authelia not installed' };
 

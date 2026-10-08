@@ -38229,3 +38229,19 @@ Left alone deliberately: `nodemailer` 6 → 10 is a breaking major (15 advisorie
 **Health.** The shell header polls `/health/system` every 5 s per open tab, and each call ran `SELECT 1`, a thresholds query and two `df` spawns — four queries and four spawns a poll with two tabs open. `readSystemHealth()` caches the whole body for 4 s. It also fixes a bug the cache made obvious: `lastCpu` is a module global, so two callers arriving together each diffed against the other's snapshot and reported different CPU figures for the same instant — an `inFlight` promise means concurrent callers now share one measurement. `PUT /health/thresholds` clears the cache, or a save would look like it had not taken for a few seconds.
 
 `systemHealthHandler` is now three lines over `readSystemHealth()`; the measurement moved to `measureSystemHealth()`, unchanged apart from returning the body instead of writing the response.
+
+## 877. Dead code, dead scripts, dead doc
+
+[x] done. §873 item 4, first half — nothing here changes behaviour.
+
+**Four exported functions whose only reference was their own declaration**, deleted: `getSecondaryExposureRows` (`exposure.ts` — `status.ts` reads the whole table once per pass instead, §798), `readAppliedKopiaMount` (`kopiaTargetApply.ts`), `n8nWorkflowsDir` (`n8nWorkflows.ts`, whose own comment admitted "not currently used elsewhere, kept for symmetry"), `isRole` (`capabilities.ts`). Removing the n8n one left `resolveComposeFile` unused in that file; dropped from the import.
+
+**Eight exports used only inside their own file** lost the keyword, so the module surface says what it means: `validateAutheliaConfig`, `webdavConfigPath`, `runSession`, `resolveGuacamoleBaseUrl`, `getDisks`, `syncAutheliaOidcClients`, `syncDocusealSignedCopy`, `dockerPsSnapshot`.
+
+**Three scripts from Phase A (2026-08-24), untouched since**: `scripts/start-container.sh`, `stop-container.sh`, `update-container.sh`. They do by hand what the dashboard does, which is principle 2 backwards, and nothing referenced them but this file's own early tree listing. Those historical lines stay as written — plan.md is a log.
+
+**`errors/netbird-mobile-sso-check-403.md`** deleted; its successor said so itself, and the successor's cross-link now points at the git history instead of a missing file.
+
+**`.vscode/`** added to `.gitignore`, beside `.claude/settings.local.json` for the same reason.
+
+**`docs/openapi.yaml` kept, against the review's own suggestion.** It looks stale — 25 of ~80 endpoints, last touched 2026-09-03 — but §357's "decisions taken and not revisited" already records it as *deliberately* a curated partial spec. The actual defect was the README calling it "API reference (OpenAPI)" with no hint of that, so the link now says what it covers.

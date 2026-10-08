@@ -272,19 +272,6 @@ export async function applyKopiaTarget(target: BackupTarget): Promise<ApplyResul
   };
 }
 
-/** Current mount values, for reporting what Kopia will actually use. */
-export function readAppliedKopiaMount(): Record<string, string> | null {
-  const resolved = resolveComposeFile(KOPIA_SERVICE);
-  if (!resolved?.appDir) return null;
-  const envPath = path.join(resolved.appDir, '.env');
-  if (!fs.existsSync(envPath)) return null;
-  const values = parseEnvFile(envPath);
-  return {
-    type: values.BACKUP_MOUNT_TYPE ?? '',
-    options: values.BACKUP_MOUNT_OPTIONS ?? '',
-    device: values.BACKUP_MOUNT_DEVICE ?? '',
-  };
-}
 
 /**
  * The real repository encryption password Kopia's entrypoint will actually

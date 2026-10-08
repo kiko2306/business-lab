@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.166.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.166.3** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -41,7 +41,7 @@ against this model.
 - Turnkey build spec — hardware, disk partitioning, the default small-office app profile: [/docs/turnkey-build-spec.md](/docs/turnkey-build-spec.md)
 - Data protection position — controller vs processor, backup key custody, the DR promise: [/docs/data-protection-position.md](/docs/data-protection-position.md)
 - Commercial plan — pricing structure, onboarding timeline, support model: [/docs/commercial-plan.md](/docs/commercial-plan.md)
-- API reference (OpenAPI): [/docs/openapi.yaml](/docs/openapi.yaml)
+- API reference (OpenAPI, partial — auth, services, settings and users, not every route): [/docs/openapi.yaml](/docs/openapi.yaml)
 - Recovery & troubleshooting: [/docs/recovery-troubleshooting.md](/docs/recovery-troubleshooting.md)
 - Two-factor authentication (TOTP) for the dashboard login: [/docs/two-factor.md](/docs/two-factor.md)
 - Licence due diligence (every image vs the resale model): [/docs/licences.md](/docs/licences.md)

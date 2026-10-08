@@ -48,7 +48,7 @@ const RETRY_DELAY_MS = 3000;
  * cross-project host-gateway + published-port resolution to drive Guacamole's
  * REST API as an authenticated admin.
  */
-export async function resolveGuacamoleBaseUrl(): Promise<string> {
+async function resolveGuacamoleBaseUrl(): Promise<string> {
   return appBaseUrl(GUACAMOLE_SERVICE, FALLBACK_PORT);
 }
 

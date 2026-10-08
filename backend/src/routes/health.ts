@@ -163,7 +163,7 @@ async function measureDisk(name: string, path: string): Promise<NamedDiskUsage |
  * data-root move they are the same filesystem, and showing one row twice
  * would just look like a bug.
  */
-export async function getDisks(): Promise<NamedDiskUsage[]> {
+async function getDisks(): Promise<NamedDiskUsage[]> {
   const measured = await Promise.all([
     measureDisk('docker', DOCKER_DISK_PATH),
     measureDisk('system', SYSTEM_DISK_PATH),

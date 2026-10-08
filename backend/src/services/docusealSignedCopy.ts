@@ -13,7 +13,7 @@ import { getServiceStatus } from './status';
 const DOCUSEAL_SERVICE = 'docuseal';
 const INTERVAL_MS = 60 * 60 * 1000;
 
-export async function syncDocusealSignedCopy(): Promise<void> {
+async function syncDocusealSignedCopy(): Promise<void> {
   try {
     const copied = await copyDocusealSignedDocuments();
     if (copied === null) {

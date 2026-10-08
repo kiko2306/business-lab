@@ -71,6 +71,10 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Editor workspace settings — personal, like .claude/settings.local.json below.
+# Untracked and unignored, it sat in `git status` on every run.
+.vscode/
+
 # Claude Code — the project rules, settings and hooks are shared; personal
 # overrides and scheduler state are not.
 .claude/settings.local.json

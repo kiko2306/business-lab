@@ -16,7 +16,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import logger from '../utils/logger';
-import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
+import { getPublishedUpstreamPort } from '../config/services';
 import { getAlertNotifyConfig } from '../utils/alertNotify';
 import { readAppEnvValue } from './appEnv';
 
@@ -239,11 +239,4 @@ export async function applyN8nWorkflows(serviceName: string, appDir: string): Pr
   } catch (error) {
     logger.warn('n8n: could not render managed workflows', { error: (error as Error).message });
   }
-}
-
-// Not currently used elsewhere, kept for symmetry with resolveComposeFile-based
-// callers/tests.
-export function n8nWorkflowsDir(): string | null {
-  const resolved = resolveComposeFile(N8N_SERVICE);
-  return resolved ? path.join(resolved.appDir, WORKFLOWS_DIR_RELATIVE) : null;
 }

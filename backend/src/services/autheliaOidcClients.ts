@@ -208,7 +208,7 @@ export interface OidcClientsSyncResult {
 }
 
 /** Regenerate the managed OIDC client block and, if it moved, restart Authelia. */
-export async function syncAutheliaOidcClients(trigger: string): Promise<OidcClientsSyncResult> {
+async function syncAutheliaOidcClients(trigger: string): Promise<OidcClientsSyncResult> {
   const configPath = getConfigPath();
   if (!configPath || !fs.existsSync(configPath)) {
     return { changed: false, restarted: false, clientCount: 0, reason: 'authelia-not-installed' };

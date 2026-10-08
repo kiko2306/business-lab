@@ -285,7 +285,7 @@ type SessionOutcome = 'unreachable' | 'lists-not-seen' | 'done' | 'failed';
  * Exported for the test — the ack-correlation/list-collection logic is the
  * part that silently breaks if the protocol shifts.
  */
-export function runSession(baseWsUrl: string, notification: Record<string, unknown>, monitors: DesiredMonitor[]): Promise<SessionOutcome> {
+function runSession(baseWsUrl: string, notification: Record<string, unknown>, monitors: DesiredMonitor[]): Promise<SessionOutcome> {
   return new Promise((resolve) => {
     let settled = false;
     let nextAckId = 1;

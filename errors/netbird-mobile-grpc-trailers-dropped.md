@@ -2,7 +2,8 @@
 
 **Reported:** 2026-08-27
 **Where:** NetBird Android app → Change Server screen
-**Supersedes:** [`errors/netbird-mobile-sso-check-403.md`](./netbird-mobile-sso-check-403.md)
+**Supersedes:** the earlier `netbird-mobile-sso-check-403.md` write-up, deleted — its
+403 was a symptom of the trailers bug described here, and it is in the git history.
  (that doc's fixes resolved the 403 it describes — this is a *different*,
  later error that appeared once the 403 was gone).
 

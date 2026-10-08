@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.166.3] — 2026-10-08
+
+### Changed
+
+- Delete four exported functions nothing called, three Phase-A container scripts the dashboard replaced, and a superseded NetBird write-up; drop the export keyword from eight functions used only inside their own file (plan.md §877).
+
 ## [0.166.2] — 2026-10-08
 
 ### Performance
