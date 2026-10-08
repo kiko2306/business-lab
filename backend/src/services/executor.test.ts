@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { describeUpdate, parseComposeImages, runPostUpReconcilers, servicesWithBuild } from './executor';
+import { getService } from '../config/services';
+import {
+  POST_UP_RECONCILERS,
+  describeUpdate,
+  parseComposeImages,
+  runPostUpReconcilers,
+  servicesWithBuild,
+} from './executor';
 
 vi.mock('../utils/logger', () => ({ default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
@@ -81,7 +88,7 @@ describe('runPostUpReconcilers', () => {
     };
     const after = async (name: string) => void calls.push(`third:${name}`);
 
-    await expect(runPostUpReconcilers('paperless', [ok, boom, after])).resolves.toBeUndefined();
+    await expect(runPostUpReconcilers('paperless', { paperless: [ok, boom, after] })).resolves.toBeUndefined();
 
     expect(calls).toEqual(['first:paperless', 'third:paperless']);
   });
@@ -90,8 +97,53 @@ describe('runPostUpReconcilers', () => {
     const order: number[] = [];
     const step = (n: number) => async () => void order.push(n);
 
-    await runPostUpReconcilers('itflow', [step(1), step(2), step(3)]);
+    await runPostUpReconcilers('itflow', { itflow: [step(1), step(2), step(3)] });
 
     expect(order).toEqual([1, 2, 3]);
+  });
+
+  // plan.md §901: every start used to walk all 27 entries, each returning on a name
+  // check. Now a start runs only the entries registered under its own name.
+  it("runs only the started service's reconcilers", async () => {
+    const calls: string[] = [];
+    const record = (label: string) => async (name: string) => void calls.push(`${label}:${name}`);
+
+    await runPostUpReconcilers('immich', { immich: [record('a')], nextcloud: [record('b'), record('c')] });
+
+    expect(calls).toEqual(['a:immich']);
+  });
+
+  it('does nothing for a service with no reconcilers', async () => {
+    const reconciler = vi.fn();
+    await expect(runPostUpReconcilers('whoami', { immich: [reconciler] })).resolves.toBeUndefined();
+    expect(reconciler).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST_UP_RECONCILERS', () => {
+  it('is keyed by real registry services', () => {
+    for (const name of Object.keys(POST_UP_RECONCILERS)) {
+      expect(getService(name), name).toBeDefined();
+    }
+  });
+
+  // The old flat list had 28 entries; losing one in the regrouping would silently
+  // stop an app's first-admin bootstrap.
+  it('still holds all 28 reconcilers, none twice', () => {
+    const all = Object.values(POST_UP_RECONCILERS).flat();
+    expect(all).toHaveLength(28);
+    expect(new Set(all).size).toBe(28);
+  });
+
+  // The ordering constraints from the old list's doc comment, now within one service.
+  it('keeps the ordering constraints inside a service', () => {
+    const names = (service: string) => POST_UP_RECONCILERS[service].map((fn) => fn.name);
+    const itflow = names('itflow');
+    expect(itflow.indexOf('reconcileItflowFirstAdmin')).toBeLessThan(itflow.indexOf('reconcileItflowMailCron'));
+    expect(itflow.indexOf('reconcileItflowFirstAdmin')).toBeLessThan(itflow.indexOf('reconcileItflowBillingModule'));
+    const kuma = names('uptime-kuma');
+    expect(kuma.indexOf('reconcileUptimeKumaFirstAdmin')).toBeLessThan(
+      kuma.indexOf('reconcileUptimeKumaMailNotification')
+    );
   });
 });

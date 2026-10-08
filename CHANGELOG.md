@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.169.3] — 2026-10-08
+
+### Changed
+
+- Post-start reconcilers run only for the app being started
+
 ## [0.169.2] — 2026-10-08
 
 ### Fixed

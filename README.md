@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.169.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.169.3** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -248,16 +248,11 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
       host root. That means any path-traversal or RCE in the backend reads every app's env file,
       every SSH key and `/etc/shadow`. Either narrow it to what `df` needs or write down why the
       whole-root mount is accepted, so it is a decision rather than a leftover.
-- [ ] **🔴 Run only an app's own post-start reconcilers (plan.md §889 item 9)** —
-      `POST_UP_RECONCILERS` in `services/executor.ts` runs all 27 entries on every app start and
-      each no-ops on the service name. Derive the list from the registry so a start runs only what
-      belongs to it. Behaviour must not change: the §719 isolation test and the ordering
-      constraints in that list's doc comment (ITFlow mail/cron after the wizard, Uptime Kuma
-      notification after its admin) are the contract.
-- [ ] **Beta-test the shared HTTP client on the two key checks (plan.md §900)** — on `beta`: Settings →
-      Cloudflare → "Test token" with the real token must say verified (and with a wrong one, show
-      Cloudflare's own reason); Settings → AI → test each stored provider key (Anthropic, Google, Groq)
-      must say verified, and a deliberately wrong key must say "Key rejected: …".
+- [ ] **Beta-test per-service post-start reconcilers (plan.md §901)** — on `beta`, after the update
+      rebuilds the backend: restart ITFlow and Uptime Kuma from the Apps page and confirm their
+      first-admin, mail/cron and monitor wiring still land (backend log shows no "Post-start
+      reconciler … failed"), and that starting an app with no reconciler (e.g. whoami) still
+      succeeds.
 - [ ] **🔴 Split `routes/settings.ts` (plan.md §889 item 11)** — 979 lines covering Cloudflare, AI
       keys, exposure, mail, backup target, health thresholds and the update branch. One router per
       concern, mounted together, so the capability gates stay exactly where they are.
