@@ -207,6 +207,88 @@ two — the guarantees are.
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
 
+### 🔴 URGENT — review remainder (plan.md §889)
+
+The fourteen findings of the 2026-10-08 review that have not landed, all marked urgent by the
+owner. Listed most-severe first, which is the order to take them in. Each was re-verified
+against the tree at `0.167.1`. Test first, own commit and version bump each; delete an item when
+its fix lands (a fix still needing a `beta` look leaves its own beta item behind).
+
+- [ ] **🔴 Seal the third-party secrets at rest (plan.md §889 item 1)** — the Cloudflare tunnel
+      token, NPM password, SMTP password and every AI provider key sit in the `settings` table as
+      plaintext, while TOTP secrets are AES-GCM sealed under a `JWT_SECRET`-derived key
+      (`utils/totpSecret.ts`). One database dump hands over all of them. Use the same
+      `sealSecret`/`openSecret`; the read path has to accept both shapes during rollover, and a
+      migration re-wraps what is already stored. On `beta` afterwards: test the Cloudflare token,
+      send a test email, run an AI-backed action, and save the exposure settings — each has to
+      still authenticate, and the Settings page must still show the masked value, not ciphertext.
+- [ ] **🔴 Bump `nodemailer` 6 → 10 (plan.md §889 item 2)** — the one high-severity advisory left
+      after §875, with 15 CVEs behind it: quadratic and recursive addressparser DoS,
+      recipient-domain bypasses via IDN/punycode and RFC 5322 comments, CRLF injection in `List-*`
+      headers, and a process-global DNS cache that reuses TLS `servername` across transports. A
+      breaking major: read its changelog for the transport and `sendMail` signature changes. On
+      `beta`: send a test email from Settings, invite a user and confirm the set-password link
+      arrives, and check the backup/alert mails still send.
+- [ ] **🔴 Bump Angular 18 → 21 (plan.md §889 item 3)** — four high-severity runtime advisories in
+      `@angular/core`: sanitization bypass via directive host bindings, hydration DOM clobbering
+      and response-cache poisoning, XSS via i18n event-handler attributes. Two majors of
+      migration (`ng update` per major, not in one jump). Watch the standalone-component and
+      control-flow changes. On `beta`: every page loads, the 585 specs pass, the service worker
+      updates rather than serving a stale shell, and the CSP reports no violation.
+- [ ] **🔴 Rotate refresh tokens (plan.md §889 item 4)** — one refresh token stays valid for its
+      whole 7 days with no reuse detection, and the pair lives in `localStorage`, so one XSS is a
+      7-day session. Issue a new refresh token on every `/auth/refresh`, revoke the one spent, and
+      treat a second use of a spent token as a compromise (revoke that user's whole family). On
+      `beta`: sign in, leave a tab open over an hour so it refreshes, confirm you stay signed in;
+      then replay an old refresh token with `curl` and confirm it is refused and the session is
+      cut. Moving the refresh token to an httpOnly cookie is the bigger follow-up, not this item.
+- [ ] **🔴 Decide whether the no-SSO fanout should wait for the second factor (plan.md §889 item
+      5)** — `/auth/login` fans out credentials to no-SSO apps on a correct *password*, before any
+      TOTP step, so someone with the password but not the code can still drive app-account
+      provisioning. The comment at `routes/auth.ts` says settling it there is deliberate (it is
+      the one moment the plaintext exists server-side); the question is whether it belongs in
+      `/auth/login/totp` instead for a 2FA account. Decide and record the reasoning either way —
+      if it moves, test on `beta` that a 2FA sign-in still provisions a newly granted Samba share.
+- [ ] **🔴 Reject a branch name starting with `-` (plan.md §889 item 6)** — `isValidBranchName`
+      (`utils/generalSettings.ts:58`) matches `-x`, which reaches `git fetch origin <branch>` as a
+      flag rather than a ref. `system:update` only, so the reach is small, but anchoring the first
+      character to `[A-Za-z0-9]` is one line and one test.
+- [ ] **🔴 Re-weigh the `/:/hostfs:ro` mount (plan.md §889 item 7)** — `docker-compose.yml:98`
+      gives the backend the entire host filesystem read-only so the health check can `df` the
+      host root. That means any path-traversal or RCE in the backend reads every app's env file,
+      every SSH key and `/etc/shadow`. Either narrow it to what `df` needs or write down why the
+      whole-root mount is accepted, so it is a decision rather than a leftover.
+- [ ] **🔴 Cap the output `runArgv` and `requestJson` accumulate (plan.md §889 item 8)** —
+      `utils/run.ts:92` grows `stdout` with no limit while its sibling `runShell` caps at 4 MB, so
+      a chatty `docker compose` can grow the heap unbounded; `utils/httpJson.ts:57` does the same
+      with a response body, which is a hostile input. Cap both and fail loudly at the cap.
+- [ ] **🔴 Run only an app's own post-start reconcilers (plan.md §889 item 9)** —
+      `POST_UP_RECONCILERS` in `services/executor.ts` runs all 27 entries on every app start and
+      each no-ops on the service name. Derive the list from the registry so a start runs only what
+      belongs to it. Behaviour must not change: the §719 isolation test and the ordering
+      constraints in that list's doc comment (ITFlow mail/cron after the wizard, Uptime Kuma
+      notification after its admin) are the contract.
+- [ ] **🔴 Use `requestJson` for the last two hand-rolled HTTP clients (plan.md §889 item 10)** —
+      `verifyCloudflareToken` (`routes/settings.ts`) and `aiProviderTest.ts` each re-implement
+      request, accumulate, `JSON.parse` and a timeout that `utils/httpJson.ts` already provides.
+      Fold them in; the Cloudflare token test and an AI provider test are the check.
+- [ ] **🔴 Split `routes/settings.ts` (plan.md §889 item 11)** — 979 lines covering Cloudflare, AI
+      keys, exposure, mail, backup target, health thresholds and the update branch. One router per
+      concern, mounted together, so the capability gates stay exactly where they are.
+- [ ] **🔴 Stop authenticating twice on `/services` and `/settings` (plan.md §889 item 12)** —
+      `index.ts` applies `authMiddleware` at the mount and then all 11 routes inside
+      `routes/services.ts` apply `auth` again: two JWT verifies per request. Drop the inner one,
+      keeping the per-route capability gates, and confirm with a `curl` that an unauthenticated
+      request still 401s on every one of them.
+- [ ] **🔴 Decide whether both route prefixes are still needed (plan.md §889 item 13)** — every
+      router is mounted twice, at `''` and `/api` (`index.ts:172`), doubling the Express layer
+      stack. The bare prefix exists for a deployment pointing a dedicated API hostname at this
+      server. Check whether anything actually uses it (the frontend's nginx proxies `/api/`), and
+      drop it or record why it stays.
+- [ ] **🔴 Simplify `query()` to `pool.query()` (plan.md §889 item 14)** —
+      `utils/database.ts:41` does `connect()`, query, `release()` in a `finally`, which is exactly
+      what `pool.query` does. One-line change, covered by the whole suite.
+
 ### Review batch 3, 2026-10-08 (plan.md §884)
 
 Infrastructure robustness, five items. Three touch Docker or nginx, so they need a real look.

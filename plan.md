@@ -38348,3 +38348,32 @@ What did *not* move behind the gate: `ensureCoreSidecars` (runs compose), the ex
 Now a `map $http_upgrade $connection_upgrade` at the top of the file (installed as `conf.d/default.conf`, which nginx includes from its `http` block, so the context is right) — `upgrade` by default, `close` when the header is absent or empty — and all three locations use the variable. nginx's own documented shape.
 
 Verified with a real `nginx -t` in an `nginx:alpine` container (with a stub `real-ip-from.conf` and `--add-host backend:127.0.0.1`, since the config names an upstream that does not resolve outside the compose network), not just by reading it. The browser E2E suite then passed against the rebuilt stack, which is what exercises the paths that must still upgrade: live service status over the WebSocket, and the startup-log stream.
+
+## 889. Review remainder, logged as urgent
+
+[ ] todo, all of it. The 2026-10-08 whole-repo review raised 33 items. Nineteen landed across §874-§888, two were retracted after reading the record (§878 the duplicated hotel sample, §877 `docs/openapi.yaml`). These fourteen are what is left; the owner asked for them as README items marked urgent, so they go in as one block rather than being rationed into batches.
+
+Ordered most-severe first, which is the order to work them in. Each was re-verified against the tree at `0.167.1` before being written down — none is stale.
+
+**Security**
+
+1. **Third-party secrets sit in `settings` as plaintext** while TOTP secrets are AES-GCM sealed (`utils/totpSecret.ts`). Cloudflare tunnel token, NPM password, SMTP password, every AI provider key. A database dump hands over all of them. Needs `sealSecret`/`openSecret` on write, a read path that accepts both shapes during rollover, and a re-wrap migration.
+2. **`nodemailer` 6 → 10** — one high-severity advisory left after §875, and 15 CVEs behind it: addressparser DoS (quadratic and recursive), recipient-domain validation bypasses via IDN/punycode and RFC 5322 comments, CRLF injection in `List-*` headers, a process-global DNS cache that reuses TLS `servername` across transports. A breaking major, so it wants its own slice with a live mail-send test.
+3. **Angular 18 → 21** — four high-severity runtime advisories in `@angular/core`: sanitization bypass via directive host bindings, hydration DOM clobbering and response-cache poisoning, XSS via i18n event-handler attributes. Two majors of framework migration.
+4. **Refresh tokens do not rotate**, and the pair lives in `localStorage`. One token stays valid for its whole 7 days with no reuse detection, so one XSS is a 7-day session. Rotation on every `/auth/refresh` plus reuse detection is the fix; moving the refresh token to an httpOnly cookie is the larger one.
+5. **The no-SSO credential fanout runs before the second factor** (`routes/auth.ts`, the `getPendingNoSsoFanoutApps` block in `/auth/login`). Someone holding the password but not the TOTP code can still drive app-account provisioning. The comment says settling it there is deliberate; the question is whether it should wait for `/auth/login/totp`.
+6. **`isValidBranchName` admits a leading `-`** (`utils/generalSettings.ts:58`): `/^[A-Za-z0-9._/-]{1,120}$/` matches `-x`, which reaches `git fetch origin <branch>` as a flag rather than a ref. `system:update` only, so low, but anchoring the first character to `[A-Za-z0-9]` is one line.
+7. **`/:/hostfs:ro`** (`docker-compose.yml:98`) gives the backend the whole host filesystem for one `df`. Any path-traversal or RCE there reads every app's env file, every key, `/etc/shadow`. A documented trade-off worth re-weighing against a narrower mount.
+
+**Robustness**
+
+8. **`runArgv` accumulates output with no cap** (`utils/run.ts:92`) while `runShell` caps at 4 MB. A chatty `docker compose` can grow the heap unbounded. Same in `requestJson` (`utils/httpJson.ts:57`), where the response body is a hostile input.
+
+**Refactors**
+
+9. **`POST_UP_RECONCILERS` runs all 27 entries on every app start** (`services/executor.ts`), each no-oping on the service name. Derive the list from the registry so a start runs only its own.
+10. **Two hand-rolled HTTP clients duplicate `utils/httpJson.ts`** — `verifyCloudflareToken` (`routes/settings.ts`) and `aiProviderTest.ts` each re-implement request, accumulate, `JSON.parse`, timeout. `requestJson` already does all of it.
+11. **`routes/settings.ts` is 979 lines** across Cloudflare, AI keys, exposure, mail, backup target, health thresholds and the update branch. Split per concern.
+12. **`/services` and `/settings` authenticate twice** — `index.ts` applies `authMiddleware` at the mount, then every route inside `routes/services.ts` applies `auth` again (11 of them). Two JWT verifies per request.
+13. **Every router is mounted twice**, at `''` and `/api` (`index.ts:172`), doubling the Express layer stack. The legacy prefix is the reason; whether both are still needed is the question.
+14. **`query()` wraps `pool.query()` the long way** (`utils/database.ts:41`): `connect()`, query, `release()` in a `finally` is exactly what `pool.query` does.
