@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CAPABILITIES, effectiveCapabilities, hasCapability } from './capabilities';
+import { CAPABILITIES, effectiveCapabilities, hasCapability, webmasterOnlyReason } from './capabilities';
 
 const ALL = [...CAPABILITIES].sort();
 
@@ -53,5 +53,35 @@ describe('hasCapability', () => {
     expect(hasCapability(['admin'], ['audit:view'], 'users:manage')).toBe(false);
     expect(hasCapability(['admin'], ['audit:view'], 'audit:view')).toBe(true);
     expect(hasCapability(['user'], [], 'apps:control')).toBe(false);
+  });
+});
+
+// plan.md §873 item 1. `admin` holds users:manage by default, so without this
+// an admin promoted a second account to webmaster, reset its password and
+// signed in as it — or just reset the sitting webmaster's password.
+describe('webmasterOnlyReason', () => {
+  it('lets a webmaster do anything', () => {
+    expect(webmasterOnlyReason(['webmaster'], ['webmaster'])).toBeNull();
+    expect(webmasterOnlyReason(['webmaster'], ['admin'], ['webmaster'])).toBeNull();
+    expect(webmasterOnlyReason(['webmaster', 'admin'], ['webmaster'], ['user'])).toBeNull();
+  });
+
+  it('stops a non-webmaster granting the webmaster role', () => {
+    expect(webmasterOnlyReason(['admin'], ['user'], ['webmaster'])).toMatch(/webmaster/i);
+    expect(webmasterOnlyReason(['admin'], ['admin'], ['admin', 'webmaster'])).toMatch(/webmaster/i);
+  });
+
+  it('stops a non-webmaster touching an account that holds the role', () => {
+    // No nextRoles: a password reset or a delete, which changes no roles but
+    // is just as much a takeover of that account.
+    expect(webmasterOnlyReason(['admin'], ['webmaster'])).toMatch(/webmaster/i);
+    expect(webmasterOnlyReason(['admin'], ['webmaster'], ['user'])).toMatch(/webmaster/i);
+  });
+
+  it('leaves an admin its ordinary accounts', () => {
+    expect(webmasterOnlyReason(['admin'], ['user'], ['admin'])).toBeNull();
+    expect(webmasterOnlyReason(['admin'], ['admin'], ['user'])).toBeNull();
+    expect(webmasterOnlyReason(['admin'], ['user'])).toBeNull();
+    expect(webmasterOnlyReason(['admin'], [])).toBeNull();
   });
 });

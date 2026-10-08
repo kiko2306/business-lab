@@ -36,7 +36,7 @@ describe('Users list is one line per person', () => {
         { provide: OperationsService, useValue: operations },
         { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
         { provide: SettingsService, useValue: { getMailSettings: () => of({ configured: true }) } },
-        { provide: AuthService, useValue: { user$: of({ id: 1 }), hasCapability: () => of(true) } },
+        { provide: AuthService, useValue: { user$: of({ id: 1 }), hasCapability: () => of(true), isWebmaster: () => true } },
         { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
       ],
     }).compileComponents();

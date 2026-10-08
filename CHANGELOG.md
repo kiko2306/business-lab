@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.166.0] — 2026-10-08
+
+### Security
+
+- Only a webmaster can grant the webmaster role, or reset or delete a webmaster's account — an admin holds users:manage by default and could otherwise promote a second account and sign in as it (plan.md §873 item 1).
+
 ## [0.165.20] — 2026-10-08
 
 ### Added

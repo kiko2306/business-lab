@@ -49,7 +49,10 @@ export class UsersComponent implements OnInit {
   private readonly confirm = inject(ConfirmService);
   protected readonly translate = inject(TranslateService);
 
-  protected readonly allRoles = ALL_ROLES;
+  // Only a webmaster may hand out the webmaster role or reach into an account
+  // that holds it — the API refuses the rest (plan.md §873 item 1), so the
+  // checkbox and the row buttons for it are not offered either.
+  protected readonly allRoles = this.auth.isWebmaster() ? ALL_ROLES : ALL_ROLES.filter((role) => role !== 'webmaster');
   protected readonly allCapabilities = ALL_CAPABILITIES;
   protected readonly presets = CAPABILITY_PRESETS;
 
@@ -208,6 +211,15 @@ export class UsersComponent implements OnInit {
 
   protected newCapsValid(): boolean {
     return !this.newCapsShown() || this.selectedCaps(this.newCaps).length > 0;
+  }
+
+  /**
+   * Whether this caller may change this account at all: a non-webmaster may
+   * not touch one that holds `webmaster` (plan.md §873 item 1). Gates the row's
+   * Edit roles, Reset password and Delete, each of which the API now refuses.
+   */
+  protected canAdminister(user: AdminUser): boolean {
+    return this.auth.isWebmaster() || !user.roles.includes('webmaster');
   }
 
   /** A row gets the Features editor when it is an admin and not a webmaster. */

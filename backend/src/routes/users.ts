@@ -10,7 +10,7 @@ import { query } from '../utils/database';
 import { hashPassword } from '../utils/password';
 import { schemas, validateBody, validateParams } from '../middleware/validation';
 import { writeAuditLog } from '../utils/audit';
-import { Capability, effectiveCapabilities, Role } from '../auth/capabilities';
+import { Capability, effectiveCapabilities, Role, webmasterOnlyReason } from '../auth/capabilities';
 import {
   getCapabilitiesForUsers,
   getRolesForUsers,
@@ -80,6 +80,30 @@ async function sendInvitation(
     console.error('Invite email failed:', (error as Error).message);
     return 'The account was created but the invite email could not be sent — use “Resend invite”.';
   }
+}
+
+/**
+ * The 403 message when this caller may not administer this target, or null.
+ *
+ * Roles are read fresh from the database on both sides, same reasoning as
+ * `requireCapability`: a demotion has to bite at once, not when the caller's
+ * access token runs out. `targetId` is null when there is no target yet (the
+ * create route), where only `nextRoles` can be out of bounds.
+ */
+async function webmasterGuard(
+  req: Request,
+  targetId: number | null,
+  nextRoles?: Role[]
+): Promise<string | null> {
+  const callerId = req.user?.id;
+  if (!callerId) {
+    return 'Not authenticated.';
+  }
+  const [callerRoles, targetRoles] = await Promise.all([
+    getUserRoles(callerId),
+    targetId === null ? Promise.resolve<string[]>([]) : getUserRoles(targetId),
+  ]);
+  return webmasterOnlyReason(callerRoles, targetRoles, nextRoles);
 }
 
 /** Reject any submitted app name that isn't currently grantable. */
@@ -170,6 +194,12 @@ router.post('/', validateBody(schemas.userCreate), async (req: Request, res: Res
       return res.status(400).json({ error: badApp });
     }
 
+    // Otherwise an admin invites a webmaster account to an address it controls.
+    const forbidden = await webmasterGuard(req, null, roles);
+    if (forbidden) {
+      return res.status(403).json({ error: forbidden });
+    }
+
     const result = await query<UserRow>(
       `INSERT INTO users (username, email, is_setup_complete)
        VALUES ($1, $2, TRUE)
@@ -234,6 +264,11 @@ router.put(
       const target = await query<{ username: string }>('SELECT username FROM users WHERE id = $1', [id]);
       if (!target.rows[0]) {
         return res.status(404).json({ error: 'User not found.' });
+      }
+
+      const forbidden = await webmasterGuard(req, id, roles);
+      if (forbidden) {
+        return res.status(403).json({ error: forbidden });
       }
 
       // Don't let the last `webmaster` be demoted — that would leave nobody
@@ -438,6 +473,12 @@ router.put(
     const { password } = req.body;
 
     try {
+      // A reset hands the account over, so a webmaster's is a webmaster's own.
+      const forbidden = await webmasterGuard(req, id);
+      if (forbidden) {
+        return res.status(403).json({ error: forbidden });
+      }
+
       const passwordHash = await hashPassword(password);
       // Revoke the account's refresh tokens in the same statement: a reset is
       // usually "someone else may have this password", and without it an old
@@ -497,6 +538,11 @@ router.delete('/:id', validateParams(schemas.userIdParam), async (req: Request, 
   }
 
   try {
+    const forbidden = await webmasterGuard(req, id);
+    if (forbidden) {
+      return res.status(403).json({ error: forbidden });
+    }
+
     const countResult = await query<{ count: number }>('SELECT COUNT(*)::int AS count FROM users');
     if (countResult.rows[0].count <= 1) {
       return res.status(400).json({ error: 'At least one account must remain.' });

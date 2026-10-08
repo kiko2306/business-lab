@@ -165,11 +165,12 @@
                   >
                     {{ (resendingId === user.id ? 'users.resendInvite.sending' : 'users.resendInviteButton') | t }}
                   </button>
-                  <button class="btn btn-outline-secondary edit-roles" *ngIf="user.id !== currentUserId" (click)="startRolesEdit(user)">{{ 'users.editRolesButton' | t }}</button>
+                  <button class="btn btn-outline-secondary edit-roles" *ngIf="user.id !== currentUserId && canAdminister(user)" (click)="startRolesEdit(user)">{{ 'users.editRolesButton' | t }}</button>
                   <button class="btn btn-outline-secondary" (click)="startAccessEdit(user)">{{ 'users.editAccessButton' | t }}</button>
-                  <button class="btn btn-outline-secondary" *ngIf="user.active !== false" (click)="startPasswordReset(user.id)">{{ 'users.resetPasswordButton' | t }}</button>
+                  <button class="btn btn-outline-secondary" *ngIf="user.active !== false && canAdminister(user)" (click)="startPasswordReset(user.id)">{{ 'users.resetPasswordButton' | t }}</button>
                   <button
                     class="btn btn-outline-danger"
+                    *ngIf="canAdminister(user)"
                     (click)="deleteUser(user)"
                     [disabled]="user.id === currentUserId"
                     [attr.title]="'users.deleteTitleAttr' | t"

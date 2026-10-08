@@ -68,6 +68,39 @@ export function effectiveCapabilities(
   return [];
 }
 
+/**
+ * Why `callerRoles` may not administer an account holding `targetRoles` —
+ * `null` when they may. `nextRoles` is the role set the action would leave the
+ * target with, omitted for an action that changes no roles (a password reset,
+ * a delete).
+ *
+ * `users:manage` alone was the whole gate on those routes, and `admin` holds
+ * it by default — so an admin promoted a second account to `webmaster`, reset
+ * its password and signed in as it, or simply reset the sitting webmaster's
+ * password (plan.md §873 item 1). The role is the superuser (§152, "never
+ * narrowed per account"), so handing it out, taking it away, and reaching into
+ * an account that already holds it are all a webmaster's own business.
+ *
+ * Deliberately not applied to `PUT /users/:id/access`: an admin editing a
+ * webmaster's email or app list hands over nothing it can sign in with.
+ */
+export function webmasterOnlyReason(
+  callerRoles: readonly string[],
+  targetRoles: readonly string[],
+  nextRoles?: readonly string[]
+): string | null {
+  if (callerRoles.includes('webmaster')) {
+    return null;
+  }
+  if (targetRoles.includes('webmaster')) {
+    return 'Only a webmaster can change a webmaster account.';
+  }
+  if (nextRoles?.includes('webmaster')) {
+    return 'Only a webmaster can grant the webmaster role.';
+  }
+  return null;
+}
+
 /** Whether an account with these roles + grant rows holds `capability`. */
 export function hasCapability(
   roles: readonly string[],

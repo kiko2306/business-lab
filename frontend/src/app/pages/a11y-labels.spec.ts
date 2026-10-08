@@ -179,7 +179,7 @@ describe('page form controls carry an accessible name', () => {
         { provide: OperationsService, useValue: operations },
         { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
         { provide: SettingsService, useValue: { getMailSettings: () => of({ configured: false }) } },
-        { provide: AuthService, useValue: { user$: of(null), hasCapability: () => of(false) } },
+        { provide: AuthService, useValue: { user$: of(null), hasCapability: () => of(false), isWebmaster: () => true } },
         { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
       ],
     }).compileComponents();
@@ -216,7 +216,7 @@ describe('page form controls carry an accessible name', () => {
   it('Users: names the new-account username and email fields', async () => {
     const element = await render(UsersComponent, [
       { provide: SettingsService, useValue: { getMailSettings: () => of({ configured: false }) } },
-      { provide: AuthService, useValue: { user$: of(null), hasCapability: () => of(false) } },
+      { provide: AuthService, useValue: { user$: of(null), hasCapability: () => of(false), isWebmaster: () => true } },
       { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
     ]);
     expect(unnamedControls(element)).toEqual([]);
