@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.166.1] — 2026-10-08
+
+### Security
+
+- Bump proxy-addr, joi and qs: the proxy-addr advisory (IP spoofing via an IPv4-mapped IPv6 trust subnet) lands on the trust-proxy hop every rate limiter and the recovery-mode localhost gate read (plan.md §875).
+
 ## [0.166.0] — 2026-10-08
 
 ### Security
