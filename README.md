@@ -236,13 +236,6 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
       and `apps/tally/app/web` are still on `^18.2.0`, so they carry the same four advisories as the
       dashboard did. Same recipe (`ng update` one major at a time, run the workspace's own tests);
       each is its own build, so do them as separate commits.
-- [ ] **🔴 Decide whether the no-SSO fanout should wait for the second factor (plan.md §889 item
-      5)** — `/auth/login` fans out credentials to no-SSO apps on a correct *password*, before any
-      TOTP step, so someone with the password but not the code can still drive app-account
-      provisioning. The comment at `routes/auth.ts` says settling it there is deliberate (it is
-      the one moment the plaintext exists server-side); the question is whether it belongs in
-      `/auth/login/totp` instead for a 2FA account. Decide and record the reasoning either way —
-      if it moves, test on `beta` that a 2FA sign-in still provisions a newly granted Samba share.
 - [ ] **🔴 Re-weigh the `/:/hostfs:ro` mount (plan.md §889 item 7)** — `docker-compose.yml:98`
       gives the backend the entire host filesystem read-only so the health check can `df` the
       host root. That means any path-traversal or RCE in the backend reads every app's env file,
