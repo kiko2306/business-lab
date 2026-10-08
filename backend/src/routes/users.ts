@@ -22,6 +22,7 @@ import {
 import {
   clearPendingNoSsoFanout,
   getAppAccessForUsers,
+  getPendingFanoutForUsers,
   getGrantableAppOptionNames,
   getGrantableAppOptions,
   getUserAppAccess,
@@ -113,10 +114,11 @@ router.get('/', async (_req: Request, res: Response) => {
       'SELECT id, username, email, created_at, (password_hash IS NOT NULL) AS active FROM users ORDER BY id ASC'
     );
     const ids = result.rows.map((row) => row.id);
-    const [roles, grants, appAccess] = await Promise.all([
+    const [roles, grants, appAccess, pendingApps] = await Promise.all([
       getRolesForUsers(ids),
       getCapabilitiesForUsers(ids),
       getAppAccessForUsers(ids),
+      getPendingFanoutForUsers(ids),
     ]);
     const items = result.rows.map((row) => ({
       ...row,
@@ -128,6 +130,7 @@ router.get('/', async (_req: Request, res: Response) => {
       // user. The Roles/Features editor pre-ticks from this.
       capabilities: effectiveCapabilities(roles[row.id] ?? [], grants[row.id] ?? []),
       appAccess: appAccess[row.id] ?? [],
+      pendingApps: pendingApps[row.id] ?? [],
     }));
     return res.json({ items });
   } catch (error) {

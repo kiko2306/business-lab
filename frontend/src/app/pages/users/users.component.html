@@ -141,6 +141,9 @@
                 <div class="form-text mt-0" *ngIf="user.appAccess?.length">
                   {{ (user.appAccess?.length === 1 ? 'users.appCount.one' : 'users.appCount.other') | t:{ count: user.appAccess?.length ?? 0 } }}
                 </div>
+                <div class="form-text mt-0" *ngIf="user.pendingApps?.length">
+                  {{ 'users.pendingApps' | t:{ apps: pendingAppsLabel(user) } }}
+                </div>
               </td>
               <td [attr.data-label]="'users.table.roles' | t">
                 <div class="d-flex flex-wrap gap-1">

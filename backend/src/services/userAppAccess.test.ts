@@ -19,6 +19,7 @@ import {
   getAppAccessOptions,
   getGrantableAppOptionNames,
   getGrantableAppOptions,
+  getPendingFanoutForUsers,
   getPendingNoSsoFanoutApps,
   setUserAppAccess,
 } from './userAppAccess';
@@ -200,6 +201,22 @@ describe('getAppAccessForUsers', () => {
   it('short-circuits with no ids', async () => {
     const out = await getAppAccessForUsers([]);
     expect(out).toEqual({});
+    expect(query).not.toHaveBeenCalled();
+  });
+});
+
+describe('getPendingFanoutForUsers', () => {
+  it('groups pending apps by user id and defaults every asked id to an empty list', async () => {
+    query.mockResolvedValue({ rows: [{ user_id: 1, service_name: 'samba' }, { user_id: 3, service_name: 'samba' }] });
+
+    const out = await getPendingFanoutForUsers([1, 2, 3]);
+
+    expect(out).toEqual({ 1: ['samba'], 2: [], 3: ['samba'] });
+    expect(String(query.mock.calls[0][0])).toContain('pending_fanout = TRUE');
+  });
+
+  it('short-circuits with no ids', async () => {
+    expect(await getPendingFanoutForUsers([])).toEqual({});
     expect(query).not.toHaveBeenCalled();
   });
 });

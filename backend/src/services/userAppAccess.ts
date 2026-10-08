@@ -140,6 +140,29 @@ export async function getAppAccessForUsers(userIds: number[]): Promise<Record<nu
   return out;
 }
 
+/**
+ * Apps each account is granted but cannot use yet: the grant waits for the
+ * account's next sign-in or password reset, the only moments the plaintext
+ * password a no-SSO app needs is available (§493). `{ [userId]: string[] }`.
+ */
+export async function getPendingFanoutForUsers(userIds: number[]): Promise<Record<number, string[]>> {
+  const out: Record<number, string[]> = {};
+  for (const id of userIds) {
+    out[id] = [];
+  }
+  if (userIds.length === 0) {
+    return out;
+  }
+  const result = await query<{ user_id: number; service_name: string }>(
+    'SELECT user_id, service_name FROM user_app_access WHERE user_id = ANY($1::int[]) AND pending_fanout = TRUE ORDER BY service_name ASC',
+    [userIds]
+  );
+  for (const row of result.rows) {
+    (out[row.user_id] ??= []).push(row.service_name);
+  }
+  return out;
+}
+
 export interface AppAccessDiff {
   added: string[];
   removed: string[];

@@ -38149,3 +38149,7 @@ Cut-over: live URL, DNS and tunnel untouched by this plan.
 Addendum (same beta run, after the §867 fix): rows now land, but the 200-char clip cut the tail, which was the Uptime Kuma verdict (six IPs come first). Fix: verdict moved before the IP list (`name (verdict): error detail`); full detail stays in `metadata`. Test in `criticalServiceHealth.test.ts`.
 
 Verified on the dev box 2026-10-07 (0.165.16, Tailscale stopped ~5 min): `probe-failed` rows read `name (Uptime Kuma: pending): ECONNRESET after N ms; resolves to …`; `restarted` and `recovered` rows proven in the earlier run. §840's beta item closed.
+
+## 868. Users: show grants waiting for a password
+
+[x] done. Granting a no-SSO app (Samba) to an account whose plaintext password the dashboard never saw only marks `pending_fanout`; the app login appears at the account's next dashboard sign-in or an admin password reset (§493). Nothing on the Users page said so: `mat`, `miguel`, `frias` were granted Samba on the dev box and had no `pdbedit` account. Fix: `GET /api/users` adds `pendingApps` (`getPendingFanoutForUsers`), and the row shows "Waiting for a password: Samba…". Rejected: LDAP/AD shared directory so Samba reads Authelia's password (new app, Authelia backend swap, Samba image swap; NT hash cannot be derived from Authelia's argon2/bcrypt); generated Samba password (user wants one password everywhere). Tests: `userAppAccess.test.ts`, `users-list.spec.ts`.

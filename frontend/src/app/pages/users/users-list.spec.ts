@@ -13,6 +13,7 @@ import { ToastService } from '../../core/toast.service';
 // and what they can do. The list opens by default and a row is one line; roles
 // and features are edited in their own row, like access and password.
 const admin = { id: 2, username: 'ines', email: 'i@b.pt', created_at: '2026-01-01', roles: ['admin'], capabilities: ['apps:control', 'backups:manage'], appAccess: [], active: true };
+const staffPending = { id: 4, username: 'rui', email: 'r@b.pt', created_at: '2026-01-03', roles: ['user'], capabilities: [], appAccess: ['samba'], pendingApps: ['samba'], active: true };
 const staff = { id: 3, username: 'ana', email: 'a@b.pt', created_at: '2026-01-02', roles: ['user'], capabilities: [], appAccess: [], active: true };
 const me = { id: 1, username: 'owner', email: 'o@b.pt', created_at: '2026-01-01', roles: ['webmaster'], capabilities: [], appAccess: [], active: true };
 
@@ -26,7 +27,7 @@ describe('Users list is one line per person', () => {
   beforeEach(async () => {
     localStorage.clear();
     const operations = jasmine.createSpyObj('OperationsService', ['listUsers', 'listAppAccessOptions']);
-    operations.listUsers.and.returnValue(of({ items: [me, admin, staff] }));
+    operations.listUsers.and.returnValue(of({ items: [me, admin, staff, staffPending] }));
     operations.listAppAccessOptions.and.returnValue(of({ items: [] }));
     await TestBed.configureTestingModule({
       imports: [UsersComponent],
@@ -49,7 +50,7 @@ describe('Users list is one line per person', () => {
   afterEach(() => localStorage.clear());
 
   it('shows the accounts without anyone having to open a panel, and leaves the add form closed', () => {
-    expect(rows().length).toBe(3);
+    expect(rows().length).toBe(4);
     expect(element.querySelector('form')).toBeNull();
   });
 
@@ -73,6 +74,11 @@ describe('Users list is one line per person', () => {
     (editor.querySelector('.roles-cancel') as HTMLButtonElement).click();
     detect();
     expect(element.querySelector('.roles-editor')).toBeNull();
+  });
+
+  it('says a granted app is waiting for the next sign-in or password reset', () => {
+    expect(row('rui').textContent).toContain('Waiting for a password');
+    expect(row('ana').textContent).not.toContain('Waiting for a password');
   });
 
   it('does not offer to edit your own roles', () => {

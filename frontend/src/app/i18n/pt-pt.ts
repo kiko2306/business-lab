@@ -493,6 +493,7 @@ export const ptPT: Record<string, string> = {
   'users.pendingInviteBadge': 'Convite pendente',
   'users.appCount.one': '{{count}} aplicação',
   'users.appCount.other': '{{count}} aplicações',
+  'users.pendingApps': 'À espera de palavra-passe: {{apps}}. Aplica-se no próximo início de sessão ou reposição de palavra-passe.',
   'users.saveRolesButton': 'Guardar funções',
   'users.cannotChangeOwnRoles': 'Não pode alterar as suas próprias funções.',
   'users.saveFeaturesButton': 'Guardar funcionalidades',

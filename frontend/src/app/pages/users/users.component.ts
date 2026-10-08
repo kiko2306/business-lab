@@ -419,6 +419,11 @@ export class UsersComponent implements OnInit {
     return this.appOptions.find((option) => option.serviceName === serviceName)?.label ?? serviceName;
   }
 
+  /** Granted apps still waiting for this account's next sign-in or password reset, as "A, B". */
+  protected pendingAppsLabel(user: AdminUser): string {
+    return (user.pendingApps ?? []).map((name) => this.appLabel(name)).join(', ');
+  }
+
   /** Apps ticked in the open access editor but not granted today, as "A, B". */
   protected accessAdded(user: AdminUser): string {
     return this.appOptions

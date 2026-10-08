@@ -586,6 +586,8 @@ export interface AdminUser {
   // Managed apps this account may reach — through Authelia SSO, or (§480) a
   // no-SSO app that mirrors this account's own credentials instead.
   appAccess?: string[];
+  // Granted apps still waiting for a sign-in or password reset (§493).
+  pendingApps?: string[];
   // false while the account's set-password invite is still outstanding (§158).
   active?: boolean;
 }

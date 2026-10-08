@@ -493,6 +493,7 @@ export const en: Record<string, string> = {
   'users.pendingInviteBadge': 'Pending invite',
   'users.appCount.one': '{{count}} app',
   'users.appCount.other': '{{count}} apps',
+  'users.pendingApps': 'Waiting for a password: {{apps}}. Applies at their next sign-in or password reset.',
   'users.saveRolesButton': 'Save roles',
   'users.cannotChangeOwnRoles': 'You can’t change your own roles.',
   'users.saveFeaturesButton': 'Save features',
