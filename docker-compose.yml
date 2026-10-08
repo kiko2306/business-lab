@@ -1,4 +1,10 @@
 
+# Last checked for a newer image: 2026-10-08 - bump this date (even with no
+# other change) when re-checking the third-party images below, same ritual as
+# every file under apps/ (§449). Only `postgres` and the two socket proxies are
+# third-party here; `business-lab-backend` and `-frontend` are built from this
+# repo by the self-update path.
+#
 # Pins the compose project name regardless of the checkout directory's own
 # name (Compose otherwise derives it from the directory, which is how this
 # stack ended up running as "homelab-management" — the original clone dir).
@@ -123,7 +129,14 @@ services:
   docker-socket-proxy:
     mem_limit: 128m
     mem_reservation: 32m
-    image: tecnativa/docker-socket-proxy:latest
+    # Pinned to a version tag, unlike the `latest`-tracking apps under apps/:
+    # this is the only thing standing between the dashboard and the host's
+    # Docker daemon, so a rebuild must not be able to land an image nobody
+    # looked at inside that boundary. v0.5.0 is the same digest `latest` carried
+    # when this was pinned (sha256:1f5038b5…, 2026-07-27) and what the box was
+    # already running, so the pin changed no bytes (plan.md §884 item 1).
+    # Re-check it with the date comment at the top of this file.
+    image: tecnativa/docker-socket-proxy:v0.5.0
     environment:
       CONTAINERS: 1
       IMAGES: 1
@@ -226,7 +239,9 @@ services:
   watchdog-docker-proxy:
     mem_limit: 128m
     mem_reservation: 32m
-    image: tecnativa/docker-socket-proxy:latest
+    # Same pin, same reasoning as docker-socket-proxy above — and this one holds
+    # DELETE, which that one does not.
+    image: tecnativa/docker-socket-proxy:v0.5.0
     environment:
       CONTAINERS: 1
       IMAGES: 1

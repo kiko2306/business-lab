@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.166.8] — 2026-10-08
+
+### Security
+
+- Pin both docker-socket-proxy instances to v0.5.0 instead of latest — the only boundary between the dashboard and the host Docker daemon should not change image without review (plan.md §885).
+
 ## [0.166.7] — 2026-10-08
 
 ### Security
