@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.167.2] — 2026-10-08
+
+### Fixed
+
+- Update branch name can no longer start with a dash, so it cannot reach git as a flag
+
 ## [0.167.1] — 2026-10-08
 
 ### Performance

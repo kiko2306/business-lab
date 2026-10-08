@@ -17,6 +17,11 @@ describe('isValidBranchName', () => {
     expect(isValidBranchName('../../etc/passwd')).toBe(false);
   });
 
+  it('rejects a leading dash — it would reach `git fetch` as a flag', () => {
+    expect(isValidBranchName('-x')).toBe(false);
+    expect(isValidBranchName('--upload-pack=x')).toBe(false);
+  });
+
   it('rejects shell metacharacters — this gets interpolated into a git argv', () => {
     expect(isValidBranchName('main; rm -rf /')).toBe(false);
     expect(isValidBranchName('main`whoami`')).toBe(false);

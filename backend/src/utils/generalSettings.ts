@@ -55,7 +55,7 @@ export async function setAppTimezone(tz: string): Promise<void> {
 
 /** A plausible git branch/ref name — no shell metacharacters, no `..`, since it's interpolated into a `git` argv. */
 export function isValidBranchName(branch: unknown): branch is string {
-  return typeof branch === 'string' && /^[A-Za-z0-9._/-]{1,120}$/.test(branch.trim()) && !branch.includes('..');
+  return typeof branch === 'string' && /^[A-Za-z0-9][A-Za-z0-9._/-]{0,119}$/.test(branch.trim()) && !branch.includes('..');
 }
 
 export async function getUpdateBranch(): Promise<string> {

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.167.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.167.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -249,10 +249,6 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
       the one moment the plaintext exists server-side); the question is whether it belongs in
       `/auth/login/totp` instead for a 2FA account. Decide and record the reasoning either way —
       if it moves, test on `beta` that a 2FA sign-in still provisions a newly granted Samba share.
-- [ ] **🔴 Reject a branch name starting with `-` (plan.md §889 item 6)** — `isValidBranchName`
-      (`utils/generalSettings.ts:58`) matches `-x`, which reaches `git fetch origin <branch>` as a
-      flag rather than a ref. `system:update` only, so the reach is small, but anchoring the first
-      character to `[A-Za-z0-9]` is one line and one test.
 - [ ] **🔴 Re-weigh the `/:/hostfs:ro` mount (plan.md §889 item 7)** — `docker-compose.yml:98`
       gives the backend the entire host filesystem read-only so the health check can `df` the
       host root. That means any path-traversal or RCE in the backend reads every app's env file,

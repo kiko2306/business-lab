@@ -38377,3 +38377,7 @@ Ordered most-severe first, which is the order to work them in. Each was re-verif
 12. **`/services` and `/settings` authenticate twice** — `index.ts` applies `authMiddleware` at the mount, then every route inside `routes/services.ts` applies `auth` again (11 of them). Two JWT verifies per request.
 13. **Every router is mounted twice**, at `''` and `/api` (`index.ts:172`), doubling the Express layer stack. The legacy prefix is the reason; whether both are still needed is the question.
 14. **`query()` wraps `pool.query()` the long way** (`utils/database.ts:41`): `connect()`, query, `release()` in a `finally` is exactly what `pool.query` does.
+
+## 890. Branch name cannot start with a dash
+
+[x] done. §889 item 6. `isValidBranchName` regex now anchors first char to `[A-Za-z0-9]`; `-x` would reach `git fetch origin <branch>` as flag. One test added. Length cap kept at 120.
