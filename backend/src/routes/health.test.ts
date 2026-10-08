@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { dedupeDisks, parseDfOutput } from './health';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearSystemHealthCache, dedupeDisks, parseDfOutput, readSystemHealth } from './health';
+import { query } from '../utils/database';
+
+vi.mock('../utils/database', () => ({ query: vi.fn() }));
 
 describe('parseDfOutput', () => {
   // Verbatim `df -Pk /` from the host this runs on.
@@ -80,5 +83,57 @@ describe('dedupeDisks', () => {
   it('keeps a single row when only one filesystem could be measured', () => {
     // /hostfs is absent in dev and CI; one row is the correct answer there.
     expect(dedupeDisks([disk('docker', '/', 105_000_000_000, 58_000_000_000)])).toHaveLength(1);
+  });
+});
+
+// plan.md §873 item 3. The shell header polls /health/system every 5 s per open
+// tab, and each call ran two database queries and spawned two `df` processes.
+// Nothing in the answer changes meaningfully inside a few seconds, and with two
+// tabs open the figures disagreed as well: `lastCpu` is a module global that
+// every concurrent caller overwrites, so each one diffed against the other's
+// snapshot.
+describe('readSystemHealth', () => {
+  const mockedQuery = vi.mocked(query);
+
+  beforeEach(() => {
+    clearSystemHealthCache();
+    mockedQuery.mockReset();
+    mockedQuery.mockResolvedValue({ rows: [{ ok: 1 }] } as never);
+  });
+
+  afterEach(() => clearSystemHealthCache());
+
+  it('answers a second caller from the cache, without touching the host again', async () => {
+    const first = await readSystemHealth();
+    const queriesAfterFirst = mockedQuery.mock.calls.length;
+    expect(queriesAfterFirst).toBeGreaterThan(0);
+
+    const second = await readSystemHealth();
+    expect(second).toBe(first);
+    expect(mockedQuery.mock.calls.length).toBe(queriesAfterFirst);
+  });
+
+  it('measures again once the cache is cleared', async () => {
+    const first = await readSystemHealth();
+    const queriesAfterFirst = mockedQuery.mock.calls.length;
+    clearSystemHealthCache();
+    const second = await readSystemHealth();
+    expect(second).not.toBe(first);
+    expect(mockedQuery.mock.calls.length).toBeGreaterThan(queriesAfterFirst);
+  });
+
+  it('still reports the shape the header renders', async () => {
+    const body = await readSystemHealth();
+    expect(body.status === 'ok' || body.status === 'degraded').toBe(true);
+    expect(body.database).toBe('ok');
+    expect(body.memory.totalBytes).toBeGreaterThan(0);
+    expect(body.cpu.percentUsed).toBeGreaterThanOrEqual(0);
+    expect(body.thresholds.diskPercent).toBeGreaterThan(0);
+    expect(Array.isArray(body.alerts)).toBe(true);
+  });
+
+  it('shares one in-flight measurement between callers that arrive together', async () => {
+    const [a, b] = await Promise.all([readSystemHealth(), readSystemHealth()]);
+    expect(b).toBe(a);
   });
 });

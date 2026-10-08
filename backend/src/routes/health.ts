@@ -202,58 +202,117 @@ router.put('/thresholds', requireCapability('settings:manage'), validateBody(sch
       health_memory_threshold: String(memoryPercent),
       health_load_threshold: String(loadPerCpu),
     });
+    // The cached reading carries the old thresholds and the alerts derived from
+    // them, so a save would otherwise appear not to have taken for a few
+    // seconds — the one thing on this page a person watches for a reaction.
+    clearSystemHealthCache();
     return res.json({ message: 'Health thresholds updated.' });
   } catch {
     return res.status(500).json({ error: 'Unable to update thresholds.' });
   }
 });
 
+export interface SystemHealth {
+  status: 'ok' | 'degraded';
+  database: 'ok' | 'error';
+  disks: NamedDiskUsage[];
+  cpu: { percentUsed: number };
+  memory: { percentUsed: number; totalBytes: number; usedBytes: number };
+  load: { oneMinute: number; loadPerCpu: number };
+  thresholds: Thresholds;
+  alerts: { metric: string; value: number; threshold: number }[];
+  timestamp: string;
+}
+
+/**
+ * The shell header polls this every 5 s for as long as a tab is open, and each
+ * call cost two database queries plus two `df` process spawns — four queries
+ * and four spawns per 5 s with two tabs open, for an answer that cannot
+ * meaningfully change in that time (plan.md §873 item 3).
+ *
+ * The cache also fixes a second bug: `lastCpu` is a module global, so two
+ * callers arriving together each diffed against the other's snapshot and
+ * reported different CPU figures for the same instant. `inFlight` means
+ * concurrent callers share one measurement instead of racing it.
+ */
+const SYSTEM_HEALTH_TTL_MS = 4000;
+let healthCache: { expiresAt: number; body: SystemHealth } | null = null;
+let inFlight: Promise<SystemHealth> | null = null;
+
+/** Drop the cached reading — for tests, and for anything that needs it fresh. */
+export function clearSystemHealthCache(): void {
+  healthCache = null;
+  inFlight = null;
+}
+
+export function readSystemHealth(): Promise<SystemHealth> {
+  if (healthCache && Date.now() < healthCache.expiresAt) {
+    return Promise.resolve(healthCache.body);
+  }
+  if (inFlight) {
+    return inFlight;
+  }
+  inFlight = measureSystemHealth()
+    .then((body) => {
+      healthCache = { body, expiresAt: Date.now() + SYSTEM_HEALTH_TTL_MS };
+      return body;
+    })
+    .finally(() => {
+      inFlight = null;
+    });
+  return inFlight;
+}
+
+async function measureSystemHealth(): Promise<SystemHealth> {
+  const [dbResult, thresholds, disks, cpuPercent] = await Promise.all([
+    query<{ ok: number }>('SELECT 1 AS ok'),
+    getThresholds(),
+    getDisks(),
+    readCpuPercent(),
+  ]);
+
+  const memTotal = os.totalmem();
+  const memFree = os.freemem();
+  const memUsed = memTotal - memFree;
+  const memoryPercent = Math.round((memUsed / memTotal) * 100);
+  const oneMinuteLoad = os.loadavg()[0];
+  const cpuCount = os.cpus().length || 1;
+  const loadPerCpu = oneMinuteLoad / cpuCount;
+
+  const alerts: { metric: string; value: number; threshold: number }[] = [];
+  // One alert per filesystem, named, so "disk is at 91%" says which one.
+  for (const disk of disks) {
+    if (disk.percentUsed >= thresholds.diskPercent) {
+      alerts.push({
+        metric: disks.length > 1 ? `disk:${disk.name}` : 'disk',
+        value: disk.percentUsed,
+        threshold: thresholds.diskPercent,
+      });
+    }
+  }
+  if (memoryPercent >= thresholds.memoryPercent) {
+    alerts.push({ metric: 'memory', value: memoryPercent, threshold: thresholds.memoryPercent });
+  }
+  if (loadPerCpu >= thresholds.loadPerCpu) {
+    alerts.push({ metric: 'load', value: loadPerCpu, threshold: thresholds.loadPerCpu });
+  }
+
+  return {
+    status: alerts.length ? 'degraded' : 'ok',
+    database: dbResult.rows[0]?.ok === 1 ? 'ok' : 'error',
+    disks,
+    cpu: { percentUsed: cpuPercent },
+    memory: { percentUsed: memoryPercent, totalBytes: memTotal, usedBytes: memUsed },
+    load: { oneMinute: oneMinuteLoad, loadPerCpu },
+    thresholds,
+    alerts,
+    timestamp: new Date().toISOString(),
+  };
+}
+
 async function systemHealthHandler(_req: Request, res: Response) {
   try {
-    const [dbResult, thresholds, disks, cpuPercent] = await Promise.all([
-      query<{ ok: number }>('SELECT 1 AS ok'),
-      getThresholds(),
-      getDisks(),
-      readCpuPercent(),
-    ]);
-
-    const memTotal = os.totalmem();
-    const memFree = os.freemem();
-    const memUsed = memTotal - memFree;
-    const memoryPercent = Math.round((memUsed / memTotal) * 100);
-    const oneMinuteLoad = os.loadavg()[0];
-    const cpuCount = os.cpus().length || 1;
-    const loadPerCpu = oneMinuteLoad / cpuCount;
-
-    const alerts: { metric: string; value: number; threshold: number }[] = [];
-    // One alert per filesystem, named, so "disk is at 91%" says which one.
-    for (const disk of disks) {
-      if (disk.percentUsed >= thresholds.diskPercent) {
-        alerts.push({
-          metric: disks.length > 1 ? `disk:${disk.name}` : 'disk',
-          value: disk.percentUsed,
-          threshold: thresholds.diskPercent,
-        });
-      }
-    }
-    if (memoryPercent >= thresholds.memoryPercent) {
-      alerts.push({ metric: 'memory', value: memoryPercent, threshold: thresholds.memoryPercent });
-    }
-    if (loadPerCpu >= thresholds.loadPerCpu) {
-      alerts.push({ metric: 'load', value: loadPerCpu, threshold: thresholds.loadPerCpu });
-    }
-
-    return res.json({
-      status: alerts.length ? 'degraded' : 'ok',
-      database: dbResult.rows[0]?.ok === 1 ? 'ok' : 'error',
-      disks,
-      cpu: { percentUsed: cpuPercent },
-      memory: { percentUsed: memoryPercent, totalBytes: memTotal, usedBytes: memUsed },
-      load: { oneMinute: oneMinuteLoad, loadPerCpu },
-      thresholds,
-      alerts,
-      timestamp: new Date().toISOString(),
-    });
+    return res.json(await readSystemHealth());
   } catch {
     return res.status(500).json({ error: 'Unable to run health checks.' });
   }

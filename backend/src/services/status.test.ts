@@ -9,6 +9,8 @@ import {
   getServiceStatus,
   publishedPortMissing,
   resolveAdditionalExposureUrls,
+  serviceDiskFacts,
+  clearServiceDiskFactsCache,
 } from './status';
 import { ServiceAdditionalExposure, ServiceExposureRow, ServicePortMapping } from '../types';
 
@@ -265,5 +267,59 @@ describe('getServiceStatus with a lost port publish', () => {
       cycle([{ hostPort: '10100', containerPort: '9091', protocol: 'tcp' }])
     );
     expect(status.state).toBe('running');
+  });
+});
+
+// plan.md §873 item 3. A status pass read the disk once per service: several
+// existsSync in resolveComposeFile, a readFileSync of the compose file and of
+// the app's env file in getPublishedUpstreamPort, then the two pin files —
+// roughly 150 synchronous reads across the registry, on the 15 s broadcast
+// tick and again on every GET /services/status, with a second open tab
+// doubling it.
+describe('serviceDiskFacts', () => {
+  beforeEach(() => {
+    clearServiceDiskFactsCache();
+    vi.spyOn(services, 'resolveComposeFile').mockReturnValue({
+      projectName: 'authelia',
+      appDir: '/nonexistent/authelia',
+      composeFile: '/nonexistent/authelia/docker-compose.yml',
+      composeArgs: '-f /nonexistent/authelia/docker-compose.yml',
+    });
+    vi.spyOn(services, 'getPublishedUpstreamPort').mockReturnValue(10100);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    clearServiceDiskFactsCache();
+  });
+
+  it('reads the disk once for repeated calls inside the window', () => {
+    const first = serviceDiskFacts('authelia');
+    const second = serviceDiskFacts('authelia');
+    expect(second).toBe(first);
+    expect(services.resolveComposeFile).toHaveBeenCalledTimes(1);
+    expect(services.getPublishedUpstreamPort).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports what the status payload needs', () => {
+    const facts = serviceDiskFacts('authelia');
+    expect(facts.installed).toBe(true);
+    expect(facts.publishedPort).toBe(10100);
+    // No pin files on a path that does not exist — empty, not a throw.
+    expect(facts.pinnedImages).toEqual([]);
+    expect(facts.versionPinned).toEqual([]);
+  });
+
+  it('reads again once the cache is cleared', () => {
+    serviceDiskFacts('authelia');
+    clearServiceDiskFactsCache();
+    serviceDiskFacts('authelia');
+    expect(services.resolveComposeFile).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps each service separate', () => {
+    serviceDiskFacts('authelia');
+    serviceDiskFacts('paperless');
+    expect(services.resolveComposeFile).toHaveBeenCalledTimes(2);
   });
 });

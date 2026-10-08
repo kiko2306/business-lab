@@ -34,6 +34,63 @@ export function resolveAdditionalExposureUrls(
   });
 }
 
+/** What a status payload needs from disk, for one service. */
+export interface ServiceDiskFacts {
+  /** Whether a compose file for this app is actually on disk. */
+  installed: boolean;
+  /** `getPublishedUpstreamPort` — the host port the compose file publishes. */
+  publishedPort: number | null;
+  /** Image digests the last self-update pinned (docker-compose.override.yml). */
+  pinnedImages: string[];
+  /** Version pins baked into the base compose file itself. */
+  versionPinned: string[];
+}
+
+/**
+ * Long enough to cover a whole status pass and the burst of calls a page load
+ * makes, short enough that nobody waits on it: the payload these facts go into
+ * is already up to 15 s old, and a compose port only changes on a restart.
+ */
+const DISK_FACTS_TTL_MS = 10_000;
+const diskFactsCache = new Map<string, { expiresAt: number; facts: ServiceDiskFacts }>();
+
+/**
+ * The on-disk facts for one service, cached for `DISK_FACTS_TTL_MS`.
+ *
+ * Every one of these is a synchronous read, and a status pass wanted all four
+ * for every app in the registry: `resolveComposeFile` (several `existsSync`),
+ * `getPublishedUpstreamPort` (which re-resolves, then reads the compose file
+ * and the app's env file), `pinnedImages` and `baseTagPins`. Across ~44 apps
+ * that is roughly 150 blocking reads — on the 15 s broadcast tick, and again
+ * on every `GET /services/status`, so two open tabs paid it four times a
+ * minute each for answers that cannot change between ticks (plan.md §873
+ * item 3). Same shape as `isRecoveryModeEnabled`'s cache.
+ */
+export function serviceDiskFacts(serviceName: string): ServiceDiskFacts {
+  const cached = diskFactsCache.get(serviceName);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.facts;
+  }
+
+  const resolved = resolveComposeFile(serviceName);
+  const facts: ServiceDiskFacts = {
+    installed: Boolean(resolved?.composeFile),
+    publishedPort: getPublishedUpstreamPort(serviceName, getService(serviceName)?.exposurePortEnvVar) ?? null,
+    pinnedImages: resolved?.appDir ? [...pinnedImages(resolved.appDir).values()] : [],
+    versionPinned: resolved?.composeFile ? baseTagPins(resolved.composeFile) : [],
+  };
+  diskFactsCache.set(serviceName, { facts, expiresAt: Date.now() + DISK_FACTS_TTL_MS });
+  return facts;
+}
+
+/**
+ * Drop the cache above. For tests, and for a caller that has just rewritten an
+ * app's compose or pin files and wants the next status pass to see it.
+ */
+export function clearServiceDiskFactsCache(): void {
+  diskFactsCache.clear();
+}
+
 /**
  * The host and database facts a status pass needs, each fetched exactly once
  * however many services the pass covers: one `docker ps -a` and one read of
@@ -350,12 +407,10 @@ export async function getServiceStatus(
 
     // `compose down` removes containers, so an installed app with no containers
     // is stopped rather than unknown. Uninstalled apps stay unknown.
-    const resolved = resolveComposeFile(serviceName);
-    const installed = Boolean(resolved?.composeFile);
-    const state: ServiceState = containerState === 'unknown' && installed ? 'stopped' : containerState;
+    const disk = serviceDiskFacts(serviceName);
+    const state: ServiceState = containerState === 'unknown' && disk.installed ? 'stopped' : containerState;
 
-    const webPort =
-      state === 'running' ? getPublishedUpstreamPort(serviceName, service.exposurePortEnvVar) ?? null : null;
+    const webPort = state === 'running' ? disk.publishedPort : null;
 
     // Without a configured check there's nothing to fail, so a running
     // service is reported healthy; only an actual check can mark it unhealthy.
@@ -411,15 +466,6 @@ export async function getServiceStatus(
       state === 'running'
         ? resolveAdditionalExposureUrls(service.additionalExposures, exposure.secondary.get(serviceName) ?? [])
         : [];
-    // Image digests the last self-update (§209) pinned into
-    // docker-compose.override.yml (composeOverride.ts). Non-empty means the
-    // app is frozen on a specific build until "Unpin" — surfaced so the card
-    // can say so.
-    const pinned = resolved?.appDir ? [...pinnedImages(resolved.appDir).values()] : [];
-    // Version pin baked into docker-compose.yml itself (compat, not
-    // self-update) — informational badge only, see baseTagPins' docstring.
-    const versionPinned = resolved?.composeFile ? baseTagPins(resolved.composeFile) : [];
-
     return {
       name: serviceName,
       label: service.label,
@@ -432,8 +478,11 @@ export async function getServiceStatus(
       adminUserManagementSupported: Boolean(service.supportsAdminUserManagement),
       dependsOn: service.dependsOn,
       requires: service.requires,
-      pinnedImages: pinned,
-      versionPinned,
+      // Non-empty pinnedImages means the app is frozen on a specific build
+      // until "Unpin" (§209); versionPinned is a tag in the base compose file
+      // itself (compat, not self-update) — an informational badge only.
+      pinnedImages: disk.pinnedImages,
+      versionPinned: disk.versionPinned,
       ports,
       exposedHostname,
       webPath: service.webPath,

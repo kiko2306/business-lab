@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.166.2] — 2026-10-08
+
+### Performance
+
+- Cache the per-service compose/pin reads and the system-health reading: a status pass made roughly 150 synchronous file reads across the registry every 15 s, and /health/system ran two queries plus two df spawns on every 5 s poll per open tab (plan.md §876).
+
 ## [0.166.1] — 2026-10-08
 
 ### Security
