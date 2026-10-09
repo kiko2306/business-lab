@@ -13,11 +13,10 @@ import { AGE_GROUPS, Checkin, CheckinExtra, CheckinGuest, DOCUMENT_TYPES, emptyE
  * `location.pathname` below.
  */
 @Component({
-  selector: 'app-root',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  templateUrl: './app.component.html',
-  styleUrl: './app.component.css',
+    selector: 'app-root',
+    imports: [CommonModule, FormsModule],
+    templateUrl: './app.component.html',
+    styleUrl: './app.component.css'
 })
 export class AppComponent implements OnInit {
   private api = inject(ApiService);
