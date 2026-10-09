@@ -38351,7 +38351,7 @@ Verified with a real `nginx -t` in an `nginx:alpine` container (with a stub `rea
 
 ## 889. Review remainder, logged as urgent
 
-[ ] todo, all of it. The 2026-10-08 whole-repo review raised 33 items. Nineteen landed across §874-§888, two were retracted after reading the record (§878 the duplicated hotel sample, §877 `docs/openapi.yaml`). These fourteen are what is left; the owner asked for them as README items marked urgent, so they go in as one block rather than being rationed into batches.
+[x] done. All fourteen landed or were rejected on purpose (§890-§906). The 2026-10-08 whole-repo review raised 33 items. Nineteen landed across §874-§888, two were retracted after reading the record (§878 the duplicated hotel sample, §877 `docs/openapi.yaml`). These fourteen are what is left; the owner asked for them as README items marked urgent, so they go in as one block rather than being rationed into batches.
 
 Ordered most-severe first, which is the order to work them in. Each was re-verified against the tree at `0.167.1` before being written down — none is stale.
 
@@ -38398,7 +38398,7 @@ Decided: JWT_SECRET rotation makes a sealed value read as empty (= "not configur
 
 ## 894. Session token cost, logged as first priority
 
-[ ] todo. Usage limit drains fast. Measured 2026-10-08: SessionStart hook injects ~77 KB (full README TODO + plan tail + git status) per start and per `/clear`; `CLAUDE.md` 18 KB, memory 41 KB, `plan.md` 2.2 MB, `plan-index.md` 76 KB; 197 session logs, several 20 MB+, 87 sessions on Oct 2 alone (each paid startup). Seven README items under "FIRST", ordered by saving: shrink hook, slim TODO, squash plan.md, trim CLAUDE.md, prune memory, habits, review style plugins.
+[x] done. Usage limit drains fast. Measured 2026-10-08: SessionStart hook injects ~77 KB (full README TODO + plan tail + git status) per start and per `/clear`; `CLAUDE.md` 18 KB, memory 41 KB, `plan.md` 2.2 MB, `plan-index.md` 76 KB; 197 session logs, several 20 MB+, 87 sessions on Oct 2 alone (each paid startup). Seven README items under "FIRST", ordered by saving: shrink hook, slim TODO, squash plan.md, trim CLAUDE.md, prune memory, habits, review style plugins.
 
 Shrink-hook item landed: `.claude/hooks/session-summary.sh` now prints guard summary, one headline per open README item, and git status (80 KB → ~8 KB, scales with open-item count). Dropped the `plan.md` tail; section reads go via `scripts/plan-section.sh`. Guard: `scripts/test-session-summary.sh` (size cap 10 KB, headlines present, item bodies absent). Rejected: cap at 6 KB — 96 open items alone need ~8 KB.
 
