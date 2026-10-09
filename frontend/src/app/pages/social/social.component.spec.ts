@@ -59,6 +59,13 @@ describe('SocialComponent publish', () => {
     component['edits'][d.id] = edit;
   };
 
+  // plan.md §845 minor: stored text with trailing whitespace is not an edit.
+  it('does not count trailing whitespace in the saved copy as an unsaved edit', () => {
+    const d = draft({ content: 'Saved copy  \n' });
+    setUp(d, 'Saved copy  \n');
+    expect(component.isDirty(d)).toBeFalse();
+  });
+
   it('publishes a clean draft after the plain confirm', async () => {
     setUp(draft(), 'Saved copy');
     await component.publish(draft());
@@ -210,6 +217,16 @@ describe('SocialComponent publish', () => {
       fixture.detectChanges();
       return box;
     };
+
+    it('caps the brief at the server limit and shows a counter only near it', async () => {
+      localStorage.clear();
+      setUp(draft(), 'x');
+      const el = openAll();
+      expect(el.querySelector('#prompt')!.getAttribute('maxlength')).toBe('4000');
+      expect(el.querySelector('.social-brief-count')).toBeNull();
+      await type(el, 'a'.repeat(3600));
+      expect(el.querySelector('.social-brief-count')!.textContent).toContain('3600 / 4000');
+    });
 
     it('keeps focus on the button while generating and says what is happening', async () => {
       localStorage.clear();

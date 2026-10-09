@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.171.1] — 2026-10-09
+
+### Fixed
+
+- Content: a saved draft with trailing whitespace no longer shows Save as active; the brief box shows a character counter near its 4000 limit
+
 ## [0.171.0] — 2026-10-09
 
 ### Added

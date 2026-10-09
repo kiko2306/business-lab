@@ -101,8 +101,14 @@ export class SocialComponent implements OnInit {
     });
   }
 
+  /** Joi's limit on `prompt` (middleware/validation.ts); the counter appears from 3500. */
+  readonly briefMax = 4000;
+
   isDirty(draft: SocialDraft): boolean {
-    return (this.edits[draft.id] ?? '').trim() !== draft.content && (this.edits[draft.id] ?? '').trim().length > 0;
+    const edit = (this.edits[draft.id] ?? '').trim();
+    // Both sides trimmed: the server stores the trimmed text, but content saved
+    // before that rule can carry trailing whitespace, which showed Save as live on load.
+    return edit !== draft.content.trim() && edit.length > 0;
   }
 
   save(draft: SocialDraft): void {

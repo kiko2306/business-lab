@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.171.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.171.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -386,7 +386,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       leaves it in the brief box; stop the backend and reload: the drafts area offers Try again; in
       pt-PT no English error text appears anywhere on the page; (6) done (§853) — on `beta`, a first visit lands on the open "Generate a draft" box asking "What
       should the post say?", with Drafts open too once there are drafts, and no "Brief" or "Claude"
-      anywhere, in pt-PT too. All six are done; this item is now only the `beta` looks. On `beta`, after each: open Content on a phone and
+      anywhere, in pt-PT too. All six are done (plus two minor findings, §908: trailing-whitespace dirty check, brief counter — on `beta`, paste 3600+ characters into the brief box: a "N / 4000 characters" line appears, typing stops at 4000); this item is now only the `beta` looks. On `beta`, after each: open Content on a phone and
       a laptop, EN and pt-PT.
 - [ ] **Beta-test the small pages' fixes (plan.md §855-§862)** — all seven §854 findings are in; on
       `beta`, EN and pt-PT, phone and laptop: (1-2) open an unsubscribe link from a real advert
