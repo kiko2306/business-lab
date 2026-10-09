@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.170.0] — 2026-10-09
+
+### Added
+
+- Stirling-PDF folder scanning: PDFs dropped in the share's to-stirling-compress folder come out compressed in from-stirling
+
 ## [0.169.6] — 2026-10-08
 
 ### Security

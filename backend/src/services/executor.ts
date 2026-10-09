@@ -36,6 +36,7 @@ import { ensurePaperlessDropbox } from './paperlessDropbox';
 import { reconcilePaperlessUsers } from './paperlessUsers';
 import { ensureTwentyStorage } from './twentyStorage';
 import { ensureSharedFolders } from './sharedFolders';
+import { ensureStirlingPipelines } from './stirlingPipelines';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyNpmSecurityHeaders } from './npmSecurityHeaders';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
@@ -496,6 +497,8 @@ async function composeUpWithManagedConfig(
   // Jellyfin/Navidrome/Immich: their library folder in the shared tree must
   // exist and be SMB-writable before `compose up` (no-op for other apps).
   ensureSharedFolders(serviceName, appDir);
+  // Stirling-PDF: its watched folder needs a pipeline JSON or nothing is processed.
+  ensureStirlingPipelines(serviceName, appDir);
   // Twenty: its `.local-storage` bind source must exist and be writable by
   // uid 1000 before `compose up`, or the first workspace signup 500s with
   // EACCES on mkdir (§371).

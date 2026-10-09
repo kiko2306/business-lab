@@ -48,6 +48,11 @@ services:
       - ./data/configs:/configs
       - ./data/customFiles:/customFiles
       - ./data/pipeline:/pipeline
+      # Folder scanning over the Samba share (plan.md §906): PDFs dropped in
+      # `to-stirling-compress/` come out compressed in `from-stirling/`.
+      # stirlingPipelines.ts writes the pipeline JSON into the watched folder.
+      - ../nextcloud/data/shared/to-stirling-compress:/pipeline/watchedFolders/compress
+      - ../nextcloud/data/shared/from-stirling:/pipeline/finishedFolders
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/v1/info/status | grep -q 'UP' || exit 1"]
       interval: 30s
