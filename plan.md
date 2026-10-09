@@ -38539,3 +38539,40 @@ gets the same result, stays correct as items are added, and touched one file.
 Also left alone: the clean-view plugin (it forces a `plan_steps` call per request, but that
 is a UI choice, not the agent's to make) and the caveman/ponytail SessionStart prompts
 (~11 KB, but they are the behaviour the user asked for).
+
+## 910. Where the session cost actually goes, measured
+
+Follow-up check to §909, asked for the cheapest workable setup. This time from recorded
+numbers rather than file sizes: `~/.claude.json`'s per-project block keeps the last
+session's usage, and 200 transcripts in `~/.claude/projects/` keep every tool call.
+
+Last session on this project (Sonnet 5.5): $0.3288, 561,442 cache-read input tokens,
+47,089 cache-creation, 18 plain input, 2,953 output, 576 thinking. Two things fall out:
+
+- **Cache creation is the expensive line, not cache reads.** 47k written at 1.25x input
+  price cost more than 561k read at 0.1x. Startup size is therefore the money, and every
+  `/clear` re-pays it — which is what §909's cuts were worth, now confirmed rather than
+  assumed. Thinking tokens were 576, so `effortLevel` is not a cost lever here.
+- **Wall clock 232 s, of which API 36 s.** 85% of session time was not the model. The
+  cause is in the same file: `allowedTools: []` for this project, against 14,279 recorded
+  Bash calls. Every one was a permission prompt.
+
+An allowlist is the single biggest session-time win, and it is the one change an agent
+must not make for itself: the edit was refused as self-modification, which is the guard
+working. The proposed rules (read-only commands plus this repo's own scripts; `sed`,
+`python3`, `find`, `curl`, `ssh`, `gh`, `rm`, mutating `docker compose` and
+`git commit`/`push` deliberately left prompting) are the user's to paste.
+
+Two findings worth keeping:
+
+1. **`cd <repo> && …` defeats a prefix-matched allow rule.** Permission patterns match the
+   command string from its start, so `cd /home/mat/batcave/business-lab && grep …` is not
+   `Bash(grep:*)`. 2,221 of the 14,279 calls carry that prefix, and none of them needed it —
+   the shell already starts in the repo root. Now a rule in CLAUDE.md.
+2. **45 subagent calls in 200 sessions, 32 of them `general-purpose`, all at the parent's
+   model.** That is what §909's pinned-Haiku `locate` and `checks` agents replace; the
+   generic agent inherits Opus or Sonnet and pays it for a file listing.
+
+Also applied: default model `claude-opus-5` → `claude-sonnet-5-5` at high effort, user's
+call after being shown the measured per-session cost. Opus stays one `/model` away for a
+real hunt.

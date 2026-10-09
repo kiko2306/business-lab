@@ -37,6 +37,7 @@ Every token in context be re-read every turn, so startup size and session length
 - **One task per session**, then fresh. Prefer `/compact` over `/clear`.
 - **Delegate wide work.** `locate` agent (pinned Haiku) for "where is X / what calls Y" instead of inline Grep fan-out. `checks` agent (pinned Haiku) to run `scripts/check.sh` — green run come back three line instead of thousand. Both in `.claude/agents/`.
 - **Trim output.** Pipe log through `tail -n 40` or `grep`; read only failing line.
+- **No `cd <repo> &&` prefix.** Shell already start in repo root, and permission rule match command string from start, so that prefix turn an allowed `grep` into fresh prompt. 2221 of 14279 past Bash call carry it. Use plain command, or absolute path as argument.
 - **Read narrowly.** `plan-section.sh` for plan.md. SessionStart hook already list open item — no re-read README TODO to find them.
 
 ## Commits go to `dev`; `dev` → `beta` → `main`
