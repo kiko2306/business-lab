@@ -17,11 +17,10 @@ import { AgentPackage, Identity, Overview, SoldItemsView, Store, TablesView } fr
 type Tab = 'tables' | 'items';
 
 @Component({
-  selector: 'app-shop',
-  standalone: true,
-  imports: [CommonModule, RouterLink, BarChartComponent, HourlyChartComponent, TPipe],
-  templateUrl: './shop.component.html',
-  styleUrl: './shop.component.css',
+    selector: 'app-shop',
+    imports: [CommonModule, RouterLink, BarChartComponent, HourlyChartComponent, TPipe],
+    templateUrl: './shop.component.html',
+    styleUrl: './shop.component.css'
 })
 export class ShopComponent implements OnInit, OnDestroy {
   private api = inject(ApiService);

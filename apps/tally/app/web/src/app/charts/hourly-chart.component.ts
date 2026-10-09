@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, Input } from '@angular/core';
 import { TPipe, currency, numberLocale, t } from '../i18n';
 
@@ -19,10 +19,9 @@ export interface HourlyDatum {
  * imply trade that did not happen.
  */
 @Component({
-  selector: 'app-hourly-chart',
-  standalone: true,
-  imports: [CommonModule, TPipe],
-  template: `
+    selector: 'app-hourly-chart',
+    imports: [TPipe],
+    template: `
     @if (!data.length) {
       <p class="text-body-secondary small mb-0">{{ emptyText }}</p>
     } @else {
@@ -70,7 +69,7 @@ export interface HourlyDatum {
       </p>
     }
   `,
-  styleUrl: './hourly-chart.component.css',
+    styleUrl: './hourly-chart.component.css'
 })
 export class HourlyChartComponent {
   @Input() data: HourlyDatum[] = [];

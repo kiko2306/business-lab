@@ -11,11 +11,10 @@ import { describeFailure } from '../errors';
 import { AgentPackage, EnrolmentCode, Identity, Store } from '../models';
 
 @Component({
-  selector: 'app-stores',
-  standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TPipe],
-  templateUrl: './stores.component.html',
-  styleUrl: './stores.component.css',
+    selector: 'app-stores',
+    imports: [CommonModule, FormsModule, RouterLink, TPipe],
+    templateUrl: './stores.component.html',
+    styleUrl: './stores.component.css'
 })
 export class StoresComponent implements OnInit {
   protected connection = inject(ConnectionService);

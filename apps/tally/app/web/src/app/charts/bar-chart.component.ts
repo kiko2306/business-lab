@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, Input } from '@angular/core';
 import { currency, numberLocale, t } from '../i18n';
 
@@ -21,10 +21,9 @@ export interface BarDatum {
  * this app's light and dark surfaces (plan.md §635).
  */
 @Component({
-  selector: 'app-bar-chart',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-bar-chart',
+    imports: [],
+    template: `
     @if (!data.length) {
       <p class="text-body-secondary small mb-0">{{ emptyText }}</p>
     } @else {
@@ -44,7 +43,7 @@ export interface BarDatum {
       </div>
     }
   `,
-  styleUrl: './bar-chart.component.css',
+    styleUrl: './bar-chart.component.css'
 })
 export class BarChartComponent {
   @Input() data: BarDatum[] = [];
