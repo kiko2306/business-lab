@@ -232,10 +232,10 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
       login with and without 2FA); the service worker updates rather than serving a stale shell (hard
       reload twice, check the new bundle hash loads); the browser console reports no CSP violation
       and no `NG0100` error on Home; live status (WebSocket) still updates.
-- [ ] **Bump Angular 18 → 21 in the app workspaces (plan.md §898)** — `apps/hotel/{checkin,pulse,admin}`
-      and `apps/tally/app/web` are still on `^18.2.0`, so they carry the same four advisories as the
-      dashboard did. Same recipe (`ng update` one major at a time, run the workspace's own tests);
-      each is its own build, so do them as separate commits.
+- [ ] **Beta-test the app workspaces on Angular 21 (plan.md §906)** — on `beta`, after the update
+      rebuilds Hotel and Tally: open Check-in (guest form submits), Pulse and Hotel admin (each
+      loads, signs in, shows data), and the Tally web app (day view, language switch). No console
+      errors; the pages look unchanged.
 - [ ] **Beta-test the narrowed host-disk mount (plan.md §905)** — on `beta`, after the update
       recreates the backend: Home/Utils health still shows a "system" disk row with a sensible
       percentage (or one merged row while Docker and root share a filesystem), and on the host
