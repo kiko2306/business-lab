@@ -181,6 +181,16 @@ jobs:
           DATABASE_URL: postgres://hotel:test@localhost:5436/hotel
           MYSQL_URL: mysql://root@127.0.0.1:3307/legacy
 
+  session-startup:
+    # Guards what every Claude Code session pays before its first prompt: the
+    # SessionStart hook's output and CLAUDE.md are injected at each start and
+    # /clear, then re-read every turn, so growth there is the biggest
+    # usage-limit drain (plan.md §894, §909). No Node needed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/test-session-summary.sh
+
   hotel-admin:
     # The Angular admin shell. Its theme is a generated copy of the
     # dashboard's (scripts/sync-app-theme.sh) because an app image builds from

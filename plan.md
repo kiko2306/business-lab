@@ -38493,3 +38493,49 @@ Why: the backend already holds RW mounts of the repo and `apps/` (every `.env`),
 ## 908. Content: two of §845's minor findings
 
 [x] done, beta look added to the Content README item. `isDirty` now trims both sides, so stored text with trailing whitespace no longer lights Save on load. The brief box carries `maxlength=4000` (Joi's limit) and a counter from 3500. Left out, each a judgment call: reasons on disabled Generate/Save (the button states are already self-explanatory next to an empty box), and 31-38px desktop buttons (shared theme, §824 owns it).
+
+## 909. Session startup cost cut from ~33k tokens to ~17k
+
+Asked for suggestions on session time and token usage, then to automate what could be.
+
+Measured first, because the guesses were wrong. Startup before the first prompt was
+~130 KB (≈33k tokens), re-paid on every `/clear`, and the biggest single slice was not
+this repo at all: plugin skill descriptions, which the harness injects in full for every
+enabled plugin. `find ~/.claude/plugins/cache/<p> -name SKILL.md -exec head -12 {} \; | wc -c`
+gave hyperframes 40 KB (40 skills, video/motion graphics), mattpocock 23 KB (37),
+caveman 13 KB (24), taste-skill 11 KB (13), ponytail 5 KB, impeccable 1.7 KB.
+
+What changed:
+
+1. **Disabled hyperframes, taste-skill and impeccable** in `~/.claude/settings.json`
+   `enabledPlugins`. ~53 KB (≈13k tokens) off every turn. `enabledPlugins` is user-wide,
+   not per-repo, so a design plugin enabled for another project was billing this one.
+2. **SessionStart hook: 7483 → 1855 bytes.** It listed all 91 open README headlines.
+   70 of those are host verification only the user can run on home-srv-01 — the agent can
+   never clear them, so listing them every turn bought nothing. Classify by headline verb
+   (`Beta-test|Prove|Verify|Confirm|Show|Look at|Check|Run|Compare|One-off|First real build`),
+   list the agent-actionable ones capped at 12, report the rest as a count.
+3. **`CLAUDE.md` 16547 → 12533 bytes.** Pure dedup, no rule dropped: the branch flow was
+   written twice (its own section and again in full inside working-loop step 5), the
+   dev/test-box section was three paragraphs of one idea, and the enforced-guards paragraph
+   restated what the hook now prints deterministically every session.
+4. **Two pinned-Haiku agents** in `.claude/agents/`: `locate` (read-only `file:line` table)
+   and `checks` (runs `scripts/check.sh`, reports verdict plus failing lines only). This is
+   the automatable half of "use a cheaper model per task" — the main thread's model cannot
+   be switched by a hook, but a subagent's is fixed by its own frontmatter, so wide searches
+   and long test logs leave the session at Haiku rates and never enter the main context.
+5. **Budget is now enforced, not asked for.** `scripts/test-session-summary.sh` caps the
+   hook at 3 KB and `CLAUDE.md` at 14 KB, asserts the headline cap, and checks
+   listed + queued == total open items so classification cannot silently drop one. New
+   `session-startup` CI job runs it; it needs no Node.
+
+**Rejected: splitting the README TODO into `README.md` + `docs/beta-queue.md`.** It was the
+first plan, on the theory that a 72 KB TODO section was the cost. It is not — nothing loads
+the README whole; only the hook's output reaches context. The split would have bought zero
+tokens while breaking the "README TODO is the only place open work is tracked" rule and
+adding a classification to keep in sync by hand. Classifying at print time inside the hook
+gets the same result, stays correct as items are added, and touched one file.
+
+Also left alone: the clean-view plugin (it forces a `plan_steps` call per request, but that
+is a UI choice, not the agent's to make) and the caveman/ponytail SessionStart prompts
+(~11 KB, but they are the behaviour the user asked for).
