@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.171.0] — 2026-10-09
+
+### Added
+
+- Paperless copies each new document to the share's paperless-archive folder
+
 ## [0.170.0] — 2026-10-09
 
 ### Added

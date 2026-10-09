@@ -37,6 +37,7 @@ import { reconcilePaperlessUsers } from './paperlessUsers';
 import { ensureTwentyStorage } from './twentyStorage';
 import { ensureSharedFolders } from './sharedFolders';
 import { ensureStirlingPipelines } from './stirlingPipelines';
+import { ensurePaperlessShareCopy } from './paperlessShareCopy';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyNpmSecurityHeaders } from './npmSecurityHeaders';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
@@ -499,6 +500,9 @@ async function composeUpWithManagedConfig(
   ensureSharedFolders(serviceName, appDir);
   // Stirling-PDF: its watched folder needs a pipeline JSON or nothing is processed.
   ensureStirlingPipelines(serviceName, appDir);
+  // Paperless: the post-consume script the base compose file points at must exist
+  // before `compose up`, or every consume reports a failed hook.
+  ensurePaperlessShareCopy(serviceName, appDir);
   // Twenty: its `.local-storage` bind source must exist and be writable by
   // uid 1000 before `compose up`, or the first workspace signup 500s with
   // EACCES on mkdir (§371).

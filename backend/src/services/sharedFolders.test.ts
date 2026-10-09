@@ -24,6 +24,7 @@ describe('ensureSharedFolders', () => {
       navidrome: ['music'],
       immich: ['photos'],
       docuseal: ['signed'],
+      paperless: ['paperless-archive'],
       'stirling-pdf': ['to-stirling-compress', 'from-stirling'],
     });
   });

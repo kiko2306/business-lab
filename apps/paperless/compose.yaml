@@ -48,6 +48,7 @@ services:
       # generated PAPERLESS_ADMIN_USER stays the superuser.
       PAPERLESS_ENABLE_HTTP_REMOTE_USER: "true"
       PAPERLESS_ENABLE_COMPRESSION: "true"
+      PAPERLESS_POST_CONSUME_SCRIPT: /usr/src/paperless/share-copy/post-consume-share.py
       # Worker counts pinned low (plan.md §300 B4). Paperless otherwise scales
       # both pools with the host CPU count: on a 4-core box that's ~2 gunicorn
       # web workers + 2 Celery task workers, each loading Django + the
@@ -67,6 +68,11 @@ services:
       - ./data/data:/usr/src/paperless/data
       - ./data/media:/usr/src/paperless/media
       - ./data/export:/usr/src/paperless/export
+      # New documents are also copied to the Samba share (plan.md §906):
+      # paperlessShareCopy.ts writes the script (read-only, outside the dirs
+      # Paperless chowns) and makes the share folder world-writable.
+      - ./data/share-copy:/usr/src/paperless/share-copy:ro
+      - ../nextcloud/data/shared/paperless-archive:/usr/src/paperless/share-out
       # The shared tree's one-way drop box (plan.md §219/§224/§310), not
       # Paperless's own ./data/consume — moving a file into
       # nextcloud/data/shared/to-paperless/ (visible over Samba/Nextcloud)

@@ -15,6 +15,8 @@ export const SHARED_FOLDERS_BY_APP: Record<string, string[]> = {
   navidrome: ['music'],
   immich: ['photos'],
   docuseal: ['signed'],
+  // Post-consume copies of new documents (paperlessShareCopy.ts).
+  paperless: ['paperless-archive'],
   // Watched `compress` pipeline folder + finished folder (stirlingPipelines.ts).
   'stirling-pdf': ['to-stirling-compress', 'from-stirling'],
 };
