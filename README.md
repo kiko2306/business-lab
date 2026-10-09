@@ -655,13 +655,15 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       video shows. Navidrome shows the song after its scan. Immich → Administration →
       External Libraries lists "Shared photos" and the photo appears. Check the three
       folders exist and an SMB user can write them (no "access denied").
-- [ ] **Share Paperless and Stirling-PDF over Samba (plan.md §871, §872)** — not built.
-      **Paperless:** bind-mounting the share over its `media/documents/archive` hides every
-      existing archive file; the alternative is a `PAPERLESS_POST_CONSUME_SCRIPT` that copies
-      each new document to the share (only new documents; rides the ClamAV managed compose
-      fragment in `paperlessClamav.ts`, which is conditional). Names need
-      `PAPERLESS_FILENAME_FORMAT`. **Stirling-PDF:** pipeline folders need a pipeline JSON per
-      folder; leave out unless wanted. Owner picks; delete the item once decided or built.
+- [ ] **Beta-test Paperless and Stirling-PDF on the Samba share (plan.md §907)** — on `beta`, after
+      the update recreates both. **Paperless:** consume one scan; within seconds
+      `<id>-<name>.pdf` appears in `paperless-archive/` over SMB, and the Paperless container log
+      shows no "post-consume" error; existing documents are not copied (by design). **Stirling:**
+      the share has `to-stirling-compress/compress.json` and `from-stirling/`; drop a PDF into
+      the first, wait ~1-2 min, a compressed `<name>-compress.pdf` lands in `from-stirling/`.
+      If nothing happens, the pipeline JSON key names are the suspect (written from memory,
+      no live Stirling to check) or folder scanning needs `system.enableAlphaFunctionality: true`
+      in `data/configs/settings.yml`; check `docker logs` for "pipeline".
 - [ ] **Beta-test DocuSeal signed-PDF copy (plan.md §872)** — on `beta`, start DocuSeal,
       sign one submission to the end, then wait for the next start or the hourly sweep.
       A PDF named `<submission>-<submitter>-<file>.pdf` appears in `signed/` of the share
