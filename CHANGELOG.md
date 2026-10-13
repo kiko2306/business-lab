@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.171.5] — 2026-10-13
+
+### Changed
+
+- Internal: the per-app after-start steps live in their own file, out of the 1300-line service runner
+
 ## [0.171.4] — 2026-10-13
 
 ### Changed

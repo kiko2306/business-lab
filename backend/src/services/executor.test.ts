@@ -1,12 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getService } from '../config/services';
-import {
-  POST_UP_RECONCILERS,
-  describeUpdate,
-  parseComposeImages,
-  runPostUpReconcilers,
-  servicesWithBuild,
-} from './executor';
+import { describeUpdate, parseComposeImages, servicesWithBuild } from './executor';
+import { POST_UP_RECONCILERS, runPostUpReconcilers } from './postUpReconcilers';
 
 vi.mock('../utils/logger', () => ({ default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
