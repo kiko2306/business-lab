@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -235,13 +235,6 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
 
 Infrastructure robustness, five items. Three touch Docker or nginx, so they need a real look.
 
-- [ ] **Retry after a failed start leaves the app with no published port** — 2026-10-13 at
-      0.173.0: IT Tools with 10490 held fails to start (fine), but after freeing the port a second
-      Start returns 200 and the container runs with **no** port mapping; status then says
-      "published no host port". Stop + Start fixes it, because stop removes the container. Likely: the
-      failed `up -d` leaves a created container whose port binding Docker drops; the retry
-      `up -d` starts that one instead of recreating it. Fix in the start path (e.g. remove the
-      app's half-created containers when `up` fails), test first (plan.md §917).
 - [ ] **Beta-test that daily backups run every day (plan.md §918)** — on `beta`, after the update
       restarts the backend: Backups lists one new archive on each of the next two mornings (the run
       at the scheduled hour), not every other one.
@@ -584,12 +577,12 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
 
 ### Apps page (impeccable critique, plan.md §761)
 
-- [ ] **Beta-test "Show details" after a real failed start (plan.md §774)** — *2026-10-13 at
-      0.173.0, IT Tools with 10490 held: the start API returns the compose failure text and the
-      card goes `error`.* **Try again after freeing the port fails**: it returns "started" but the
-      container runs with no published port (the "Retry after a failed start" item below). Left
-      after that fix: the row's "Couldn't start X. Try again" + "Show details" look, Try again →
-      running, and the "Starting…" Start button.
+- [ ] **Beta-test "Show details" and Try again after a real failed start (plan.md §774, §921)** —
+      *2026-10-13: the start API returns the compose failure text and the card goes `error`.* After
+      the update that ships §921: hold IT Tools' port (10490) with a listener, press Start — the row
+      shows "Couldn't start X. Try again" and "Show details" with the compose text. Free the port,
+      Try again → running **and reachable on 10490** (`docker ps` lists the port). Also look for the
+      "Starting…" Start button.
 
 - [ ] **Beta-test the "Local network" row link (plan.md §772, §773)** — the Running panel is
       gone, the Running tile filters, public links and Settings ports passed. Still unseen:

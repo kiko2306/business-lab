@@ -176,6 +176,28 @@ async function ensureExternalNetworks(serviceName: string): Promise<void> {
  * with the new values (a plain `docker compose restart` never re-substitutes
  * `${VAR}`, which is why it didn't).
  */
+/**
+ * `up -d`, and on failure remove the project's stopped containers before
+ * rethrowing. A start that fails mid-way (a held host port) leaves a Created
+ * container behind; the next `up -d` just starts that one, and Docker brings it
+ * up with its port binding dropped — "started", running, unreachable (plan.md
+ * §917). `rm -f` without `-s` only touches stopped containers, so a sibling
+ * that did come up is left alone.
+ */
+export async function composeUpOrClearFailedStart(
+  composeBase: string,
+  forceRecreate: boolean,
+  env: Record<string, string>,
+  run: typeof executeCommand = executeCommand
+): Promise<CommandResult> {
+  try {
+    return await run(`${composeBase} up -d${forceRecreate ? ' --force-recreate' : ''}`, COMPOSE_UP_TIMEOUT_MS, env);
+  } catch (error) {
+    await run(`${composeBase} rm -f`, 60000, env).catch(() => undefined);
+    throw error;
+  }
+}
+
 async function composeUpWithManagedConfig(
   serviceName: string,
   projectName: string | null,
@@ -292,9 +314,7 @@ async function composeUpWithManagedConfig(
     effectiveArgs = `${effectiveArgs} -f ${managedFragment}`;
   }
 
-  const recreate = forceRecreate ? ' --force-recreate' : '';
-  const command = `docker compose -p ${projectName} ${effectiveArgs} up -d${recreate}`;
-  const result = await executeCommand(command, COMPOSE_UP_TIMEOUT_MS, {
+  const result = await composeUpOrClearFailedStart(`docker compose -p ${projectName} ${effectiveArgs}`, forceRecreate, {
     ...(await resolveTimezoneOverride(appDir)),
     ...mailOverrides,
     ...adminSeedOverrides,

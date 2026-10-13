@@ -38696,3 +38696,11 @@ Not done, rejected:
 - `ensureSharedFolders` now async; one caller (`composeUpWithManagedConfig`).
 - Rejected: just warn and continue — app starts but SMB still cannot write library, the reason §870 exists. Rejected: `compose run samba-init` — recursive chown of the whole shared tree on every media start.
 - Same EPERM pattern lives in `ensurePaperlessDropbox` and `ensureTwentyStorage`; box shows both fine, not touched.
+
+## 921. Retry after a failed start publishes the port
+
+[x] done. Bug from §917. Reproduced with plain compose on host: port held → `up -d` fails, container left `Created` with `PortBindings` intact; free port → `up -d` starts that container, `NetworkSettings.Ports` empty. Docker drops the binding on a container whose first start failed networking. API said 200, status "published no host port".
+
+- Fix: `composeUpOrClearFailedStart` wraps every `up -d` in `composeUpWithManagedConfig` (start, recreate, update): on failure run `compose rm -f` (stopped containers only, running siblings untouched), rethrow original error. Cleanup failure swallowed.
+- Proven on host: fail → `rm -f` → free port → `up -d` = `0.0.0.0:10490->80/tcp`.
+- Rejected: `--force-recreate` on every start — recreates healthy containers on each Start click. Rejected: `compose down` on failure — stops siblings that came up and drops networks.

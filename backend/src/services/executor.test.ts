@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getService } from '../config/services';
-import { describeUpdate, parseComposeImages, servicesWithBuild } from './executor';
+import { composeUpOrClearFailedStart, describeUpdate, parseComposeImages, servicesWithBuild } from './executor';
 import { POST_UP_RECONCILERS, runPostUpReconcilers } from './postUpReconcilers';
 
 vi.mock('../utils/logger', () => ({ default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
@@ -140,5 +140,32 @@ describe('POST_UP_RECONCILERS', () => {
     expect(kuma.indexOf('reconcileUptimeKumaFirstAdmin')).toBeLessThan(
       kuma.indexOf('reconcileUptimeKumaMailNotification')
     );
+  });
+});
+
+// Found live (plan.md §917): IT Tools failed to start on a held port, and the
+// next Start after freeing it reported success with the container running and
+// **no** port published — Docker starts the leftover Created container and drops
+// its port binding. Clearing the stopped leftovers makes the retry create fresh.
+describe('composeUpOrClearFailedStart', () => {
+  const base = 'docker compose -p it-tools -f a.yml';
+
+  it('runs up and nothing else when it succeeds', async () => {
+    const run = vi.fn().mockResolvedValue({ stdout: '', stderr: '' });
+    await composeUpOrClearFailedStart(base, false, {}, run);
+    expect(run.mock.calls.map(([c]) => c)).toEqual([`${base} up -d`]);
+  });
+
+  it('removes the stopped leftovers after a failed up, then rethrows the up error', async () => {
+    const upError = { message: 'failed to bind host port 0.0.0.0:10490/tcp' };
+    const run = vi.fn().mockRejectedValueOnce(upError).mockResolvedValue({ stdout: '', stderr: '' });
+    await expect(composeUpOrClearFailedStart(base, true, { TZ: 'UTC' }, run)).rejects.toBe(upError);
+    expect(run.mock.calls.map(([c]) => c)).toEqual([`${base} up -d --force-recreate`, `${base} rm -f`]);
+  });
+
+  it('still reports the up error when the cleanup fails too', async () => {
+    const upError = { message: 'boom' };
+    const run = vi.fn().mockRejectedValueOnce(upError).mockRejectedValueOnce(new Error('rm failed'));
+    await expect(composeUpOrClearFailedStart(base, false, {}, run)).rejects.toBe(upError);
   });
 });
