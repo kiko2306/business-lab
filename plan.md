@@ -38650,3 +38650,23 @@ Rejected: `matches` regex (Business plan+ only; free zones would 400). Blocking 
 - `scripts/test-session-summary.sh` guard: listed item whose body opens `on \`beta\`` or says "this item is now only the `beta` look" = FAIL. Failed on 8 before rename.
 - Rejected: classify by item body inside hook. Body wording varies ("in order, test first…" on finished critique items), so no regex catches all; headline verb stay contract, test catch common drift.
 - Rule going forward: last sub-fix of item lands, rename headline to `Beta-test …` same commit.
+
+## 917. Agent beta-test pass over SSH, 2026-10-13 (0.173.0)
+
+[x] done. Owner asked: run every host-verify item agent can reach — SSH to home-srv-01, API as throwaway `admin` `claude-test`, `docker`, `curl`. Browser/phone/Windows/real-mail halves stay owner's.
+
+Passed, items deleted: §897 (backend recreate: 502 for <2 s, then login 200; `/ws/services` 101 through nginx), §905 (`/hostfs` = `os-release` only; `system` disk row 11%), §884.3 (502 then clean 200, no missing-table error; `ensureSchema` logs nothing on a no-op boot, so no "schema lines" — order checked in `index.ts`), §884.5 (WS ok; 100 KB save = JSON 413 "That request was too large"; >1 MB hits nginx's HTML 413 first, no real field gets there), §805 (Authelia `network disconnect` = error naming 10100 within 20 s, back to running on reconnect, no other app flips), §717 (one `Starting service` line per click), §879.3 (dup email and case variant 409; access-edit to taken email 409), §873.2 (422 names field; audit IP = LAN `192.168.1.138`, public = real client IPv6), §800 (ntfy TZ save + restart keeps `NTFY_PORT=10290`; NPM fields all port/hidden), §785 (blank IDs resolved — proven by restoring from a bogus override; override wins), §901 (ITFlow admin/password/mail-cron/billing `ok:true`; Uptime Kuma monitors reconciled), §637 (`hotel-core` 302 to Authelia, `/agent` bypass answers 404 from app, check-in/pulse 200, Authelia healthy).
+
+Partial, items trimmed to remainder: §873.1, §879.4, §774, §913, §914, §912 ×3, §911, §718, §884.1, §915 (checklist says `missing-permission` — token lacks Zone WAF: Edit; owner adds it).
+
+Four bugs found, new README items:
+- [ ] `watchdog-docker-proxy` still `:latest` — self-update recreates only backend/frontend/`CORE_SIDECARS`.
+- [ ] retry after failed start (port held) returns 200, container has no published port.
+- [ ] daily backup every other day: hourly check from boot + `lastRunAt` at finish → in-hour check lands <24 h, skips day. Archives 10-10, 10-12 only.
+- [ ] media app start EPERM when share folder root-owned (pre-§870 Docker-made); Samba restart (`samba-init` chown) fixed box.
+
+Not done, rejected:
+- §720 first boot: moving `apps/navidrome/data` aside needs root (cache files root-owned); partial `mv` copied nothing away, db intact. Leftover copy `/tmp/ct-navidrome-data-bak` on host (tmpfs) — delete refused by classifier.
+- Admin resets webmaster password: skipped — guard failure would reset owner's login and revoke sessions.
+- `./start.sh recover reset-password`: refused by Claude's permission classifier.
+- §785 "no token" error: would mean deleting the live Cloudflare token; unit tests cover it.

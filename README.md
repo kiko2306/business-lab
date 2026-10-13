@@ -214,11 +214,6 @@ owner. Listed most-severe first, which is the order to take them in. Each was re
 against the tree at `0.167.1`. Test first, own commit and version bump each; delete an item when
 its fix lands (a fix still needing a `beta` look leaves its own beta item behind).
 
-- [ ] **Beta-test the nginx backend re-resolve (plan.md §897)** — on `beta`, after the update rebuilds
-      the frontend: open the dashboard and sign in. Then recreate only the backend
-      (`docker compose up -d --force-recreate backend` on the host) and, within ~15 seconds and with
-      no frontend restart, reload the dashboard: login and `/api` calls must work, not 502. Live
-      status (WebSocket, `/ws/services`) must reconnect too.
 - [ ] **Beta-test sealed third-party secrets (plan.md §893)** — on `beta`, after the update: test the
       Cloudflare token, send a test email, run an AI-backed action, test the NPM connection and save
       the exposure settings, and run a backup to a password-protected target. Each has to still
@@ -236,35 +231,40 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
       rebuilds Hotel and Tally: open Check-in (guest form submits), Pulse and Hotel admin (each
       loads, signs in, shows data), and the Tally web app (day view, language switch). No console
       errors; the pages look unchanged.
-- [ ] **Beta-test the narrowed host-disk mount (plan.md §905)** — on `beta`, after the update
-      recreates the backend: Home/Utils health still shows a "system" disk row with a sensible
-      percentage (or one merged row while Docker and root share a filesystem), and on the host
-      `docker compose exec backend ls /hostfs` shows only `os-release`.
-- [ ] **Beta-test per-service post-start reconcilers (plan.md §901)** — on `beta`, after the update
-      rebuilds the backend: restart ITFlow and Uptime Kuma from the Apps page and confirm their
-      first-admin, mail/cron and monitor wiring still land (backend log shows no "Post-start
-      reconciler … failed"), and that starting an app with no reconciler (e.g. whoami) still
-      succeeds.
 ### Review batch 3, 2026-10-08 (plan.md §884)
 
 Infrastructure robustness, five items. Three touch Docker or nginx, so they need a real look.
 
-- [ ] **Beta-test the pinned socket proxy (plan.md §884 item 1)** — on `beta`, after the update:
-      `docker ps` shows both `docker-socket-proxy` and `watchdog-docker-proxy` running on
-      `tecnativa/docker-socket-proxy:v0.5.0`, and the dashboard still starts and stops an app
-      (that is the backend's whole Docker path going through the first one). Trigger an update
-      from the Update page and confirm it completes — the watchdog's proxy is the one that path
-      leans on.
-- [ ] **Beta-test that the stack serves nothing before its schema is ready (plan.md §884 item
-      3)** — on `beta`, restart the backend and reload the dashboard immediately: you should get
-      either a clean load or a connection refused, never a page with errors about missing tables.
-      The backend log should show the schema lines before "listening on port".
-- [ ] **Beta-test nginx connection reuse (plan.md §884 item 5)** — on `beta`, open the Apps page
-      and leave it a few minutes: live status still arrives within ~15 s of a start (that is the
-      WebSocket upgrade, which must still work), a startup-log stream still runs to the end, and
-      ordinary pages (Users, Settings, Backups) still load. Then upload something oversized if
-      you can — a config save with a very long value — and confirm the message says the request
-      was too large rather than showing a server error.
+- [ ] **Recreate the watchdog's socket proxy on update** — on the box, `watchdog-docker-proxy`
+      still ran `tecnativa/docker-socket-proxy:latest` days after §884 pinned it to `v0.5.0`:
+      self-update only recreates backend, frontend and `CORE_SIDECARS`
+      (`backend/src/services/selfUpdate.ts`), so a changed image on any other root service never
+      lands. Add it to `CORE_SIDECARS` (not `docker-socket-proxy`: the backend's own compose calls
+      go through that one), test first. Found 2026-10-13 (plan.md §917).
+- [ ] **Retry after a failed start leaves the app with no published port** — 2026-10-13 at
+      0.173.0: IT Tools with 10490 held fails to start (fine), but after freeing the port a second
+      Start returns 200 and the container runs with **no** port mapping; status then says
+      "published no host port". Stop + Start fixes it, because stop removes the container. Likely: the
+      failed `up -d` leaves a created container whose port binding Docker drops; the retry
+      `up -d` starts that one instead of recreating it. Fix in the start path (e.g. remove the
+      app's half-created containers when `up` fails), test first (plan.md §917).
+- [ ] **Daily backup skips every other day** — the scheduler checks hourly from backend boot,
+      and needs `now − lastRunAt ≥ 24h` inside the run-at hour, with `lastRunAt` stamped when the
+      run *finishes*. A check a minute short of 24h skips the hour, and the next in-hour check is
+      a day later — archives on the box are 10-10 and 10-12 only, none on 10-11 or 10-13.
+      Allow one check interval of slack in `shouldRunScheduledBackup`
+      (`backend/src/services/backupScheduler.ts`), test first (plan.md §917).
+- [ ] **Media app cannot start while its share folder is root-owned** — 2026-10-13: Navidrome's
+      start failed with `EPERM … chmod '…/nextcloud/data/shared/music'`: the folder was
+      `root:root 0755` (made by Docker before §870), so `ensureSharedFolders` cannot chmod it and
+      throws. A Samba restart (`samba-init` chowns the tree) fixed it on the box. Same for
+      `media`, `photos`, `signed`, `paperless-archive`. Make the start path fix it without a
+      Samba restart (e.g. run `samba-init` when chmod is refused), test first (plan.md §917).
+- [ ] **Beta-test the pinned socket proxy (plan.md §884 item 1)** — *2026-10-13 at 0.173.0:
+      `docker-socket-proxy` runs `v0.5.0` and start/stop works through it, but
+      `watchdog-docker-proxy` is still on `:latest` (up 6 days) — self-update never recreates it.
+      Blocked on the "Recreate the watchdog's socket proxy on update" item below.* Once that lands,
+      after the next update: `docker ps` shows both on `tecnativa/docker-socket-proxy:v0.5.0`.
 
 ### Review batch 2, 2026-10-08 (plan.md §879)
 
@@ -282,32 +282,22 @@ The security remainder of the same review, four items, each its own commit and v
       `beta`, open the Apps page: the cards flip to Running within ~15 s of a start without a
       manual refresh (that is the WebSocket, or the SSE fallback, authenticating with a ticket).
       Start an app and watch its startup log stream to the end. Both in two tabs at once.
-- [ ] **Beta-test the one-account-per-email rule (plan.md §879 item 3)** — on `beta`: create a
-      user, then try to create a second with the same address, and with the same address in a
-      different case (`Ana@…` vs `ana@…`) — both refused with a clear message, not a 500. Then
-      open **Edit access** on an existing account and try to change its email to one another
-      account already holds: also refused. Check the backend log on startup names no problem
-      with the email index; if it says it could not create it, there are already duplicates on
-      that box and they need merging by hand.
-- [ ] **Beta-test that recovery mode still works (plan.md §879 item 4)** — on `beta`, on the
-      host: `./start.sh recover` still resets a locked-out admin (that path never used HTTP).
-      Then open `/recovery` in a browser over the public hostname and confirm it still says
-      recovery is not available from there rather than offering the form.
+- [ ] **Beta-test that recovery mode still works (plan.md §879 item 4)** — *2026-10-13: over the
+      public hostname `/api/recovery/status` is `available:false`.* Left: on the host,
+      `./start.sh recover reset-password <user>` still resets a password (Claude's run was refused
+      by its own permission classifier), and `/recovery` in a browser over the public hostname says
+      recovery is not available there.
 
 ### Review batch, 2026-10-08 (plan.md §873)
 
 Four items from a whole-repo review, run in this order, each its own commit and version bump.
 
-- [ ] **Beta-test that an admin cannot promote itself to webmaster (plan.md §873 item 1)** — on `beta`, sign in
-      as an `admin` (not a webmaster) and try, over the API and in the UI: **Edit roles** on another
-      account offering Full admin, and **Reset password** on the webmaster's own row. Both must be
-      refused with a clear message, and the webmaster's own Edit roles / Reset password on that same
-      admin must still work. Then check an admin can still create, edit and delete ordinary accounts.
-- [ ] **Beta-test the dependency bumps (plan.md §873 item 2)** — `proxy-addr`, `joi` and `qs`.
-      On `beta`, after the update: sign in (2FA too, if enrolled), save Settings with a deliberately
-      bad value and confirm the 422 still names the field, and check the Audit Logs page shows your
-      real client IP for a LAN sign-in and for one over the public hostname (`proxy-addr` is what
-      resolves it).
+- [ ] **Beta-test that an admin cannot promote itself to webmaster (plan.md §873 item 1)** — *2026-10-13,
+      over the API as an `admin`: granting `webmaster` is 403 "Only a webmaster can grant the
+      webmaster role."; making an account `admin`, resetting an ordinary password and deleting all
+      work.* Left: as that admin, **Reset password** on the webmaster's own row (skipped so a
+      guard failure could not lock you out) must be refused; the webmaster's own Edit roles /
+      Reset password on the admin still work; the UI shows the refusals as clear messages.
 - [ ] **Beta-test the cached status and health polls (plan.md §873 item 3)** — on `beta`, open the
       Apps page in two tabs for a few minutes: the cards still flip to Running within ~15 s of a
       start and back on a stop, the header's CPU/disk/memory figures still move and agree between
@@ -532,16 +522,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       in both light and dark, confirm every stat-card label is readable on a
       phone in daylight, and that Refresh, the theme toggle, the language select
       and the date input are all at least 44px tall on a touch device.
-- [ ] **Beta-test the lost-publish detection (plan.md §805)** — on `beta`,
-      simulate what happened to Authelia: `docker network disconnect
-      authelia_default authelia-authelia-1` on the host, then watch the Apps
-      page. Authelia's card must flip to **error** within one 15 s tick, with
-      a message naming port 10100 — not stay green because its internal
-      healthcheck still passes. Reconnect (`docker network connect`) or stop
-      and start the app from the dashboard and confirm the card goes back to
-      running. Also confirm no other app flips to error while this runs: a
-      host-networked app (Home Assistant) and an app with no published port
-      must both be unaffected.
 - [ ] **Beta-test the OnPush service card (plan.md §808)** — on `beta`, on the
       Apps page with a real, busy box: start an app and watch its startup popup
       stream lines, flip to "running" and auto-close; open Settings and confirm
@@ -550,13 +530,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       chips update within one 15 s tick *without* a manual refresh; switch the
       language and confirm every card re-renders. Any card that shows stale
       state after one of those is a missed `markForCheck()` (plan.md §808).
-- [ ] **Beta-test that a config save leaves allocated ports alone (plan.md §800)** —
-      the Settings panel no longer shows or submits `*_PORT` fields. On `beta`,
-      open an app that has both a port and a real setting (Vaultwarden, ntfy),
-      change the real setting, save, then confirm on the host that the app's
-      `apps/<name>/.env` still has its original port line, and that the app
-      restarts and is reachable on that same port. Check nginx-proxy-manager's
-      panel reads "No settings for this app" rather than showing an empty form.
 - [ ] **Beta-test the single settings writer (plan.md §799)** — *2026-10-07, over the API on
       the box: general (timezone, update branch), backup schedule, backup target, mail (+ its
       Test), alerts and exposure (blank password; Test passes for NPM and Cloudflare) all come back
@@ -611,14 +584,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       badge triggers an error toast if you can make one of the two reads fail
       (e.g. stop the backend's DB briefly) — the tile should just show no
       badge, not an error.
-- [ ] **Beta-test the derived Cloudflare account/zone IDs (plan.md §785)** — on
-      `beta`, open Settings → Networking with the account/zone fields blank
-      under **Advanced**, save, and confirm the exposure config ends up with
-      the right IDs (check the saved settings, or that exposure still works)
-      without typing either one. Then type an override under Advanced, save,
-      and confirm that value wins instead of a fresh lookup. Also try saving
-      with no Cloudflare token stored yet and confirm the error is the plain
-      "save the token first" message, not a raw exception.
 
 ### Audit findings, the other 12 pages (plan.md §790, §791)
 
@@ -630,12 +595,12 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
 
 ### Apps page (impeccable critique, plan.md §761)
 
-- [ ] **Beta-test "Show details" after a real failed start (plan.md §774)** — on `beta`,
-      hold an app's port with a listener (e.g. IT Tools, 10490), press Start: the row must
-      show "Couldn't start X. Try again" *and* a "Show details" with the compose failure
-      text. Free the port, Try again → running; stop it and break it another way → no stale
-      text. Still unseen: the "Starting…" Start button (the box goes stopped → running with
-      no visible `starting` state). Delete once seen.
+- [ ] **Beta-test "Show details" after a real failed start (plan.md §774)** — *2026-10-13 at
+      0.173.0, IT Tools with 10490 held: the start API returns the compose failure text and the
+      card goes `error`.* **Try again after freeing the port fails**: it returns "started" but the
+      container runs with no published port (the "Retry after a failed start" item below). Left
+      after that fix: the row's "Couldn't start X. Try again" + "Show details" look, Try again →
+      running, and the "Starting…" Start button.
 
 - [ ] **Beta-test the "Local network" row link (plan.md §772, §773)** — the Running panel is
       gone, the Running tile filters, public links and Settings ports passed. Still unseen:
@@ -649,14 +614,11 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
 
 ### Exposure and platform
 
-- [ ] **Beta-test the Home Page behind Authelia (plan.md §913)** — on `beta`, after the
-      update, restart Home Page from the dashboard (re-provisions both hostnames and
-      regenerates Authelia's rules; Authelia restarts once). In a private window:
-      `https://<domain>/` and `https://homepage.<domain>/` both land on the Authelia login;
-      `curl -s -o /dev/null -w '%{http_code}' https://<domain>/api/services` is a redirect,
-      not 200. Log in as a non-admin user with **no** app grants: Home Page loads. Users
-      page app picker has no "Home Page" entry. Uptime Kuma's "Nginx Proxy Manager
-      (public)" monitor stays up (it follows the redirect, any status accepted).
+- [ ] **Beta-test the Home Page behind Authelia (plan.md §913)** — *2026-10-13 by curl:
+      `https://<domain>/`, `https://homepage.<domain>/` and `/api/services` all 302 to Authelia;
+      the Users app picker has no Home Page entry.* Left: log in as a non-admin user with **no**
+      app grants and Home Page loads; Uptime Kuma's "Nginx Proxy Manager (public)" monitor
+      stays up.
 - [ ] **Beta-test the Cloudflare edge WAF rule (plan.md §915)** — on `beta`, after the
       update restarts the backend (the exposure check runs at boot). Settings →
       Deployment checklist → "Edge firewall rule": either *Set*, or it names the
@@ -669,27 +631,27 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       Cloudflare; `https://nextcloud.<domain>/index.php` still works (PHP is
       blocked on the bare domain only). Disable the rule by hand; it is back
       within 6 hours or on the next backend restart.
-- [ ] **Beta-test the Home Page as login landing page (plan.md §914)** — same restart as
-      the §913 item covers it. In a private window open `https://authelia.<domain>/`
-      directly and log in: you land on `https://<domain>/` (Home Page), not
-      `netbird-vpn.<domain>`. Opening a gated app first still returns to that app.
-- [ ] **Beta-test the longer ban for exploit attempts (plan.md §912)** — on `beta`, after
-      the update, restart CrowdSec from the dashboard; it comes back healthy (a bad profile
-      is fatal at start). On the next CVE alert (`crowdsecurity/CVE-*`, `http-cve-probing`),
-      Settings → CrowdSec bans shows ~24h left for that IP, not ~4h; crawl/probe bans still 4h.
-- [ ] **Beta-test stale CrowdSec bouncer prune (plan.md §912)** — on `beta`, after the update,
-      restart CrowdSec from the dashboard. Backend log has "removed stale NPM bouncer
-      registrations" naming `nginx@10.201.17.3`; Settings → CrowdSec bans still loads; a
-      probe still gets banned (NPM bouncer `nginx@10.201.17.5` untouched).
-- [ ] **Beta-test 7-day ntfy history (plan.md §912)** — on `beta`, after the update
-      recreates ntfy: `docker inspect ntfy-ntfy-1` shows `NTFY_CACHE_DURATION=168h`, and a
-      day later yesterday's CrowdSec/backup notifications are still in the ntfy app history.
-- [ ] **Beta-test the backup and container-command changes (plan.md §911)** — on `beta`, after
-      the update restarts the backend. **Backup:** Backups → run one scheduled-time backup (or
-      wait for the hour); Audit log shows exactly one `backup_create` for that run, and the
-      archive list gains one file. **Container commands:** start Nextcloud (an `occ` run),
-      open Settings → CrowdSec bans (a CrowdSec one-off run), and save a Samba user's password;
-      each works as before and the backend log has no `docker compose … run` error.
+- [ ] **Beta-test the Home Page as login landing page (plan.md §914)** — *2026-10-13: Authelia's
+      rendered `default_redirection_url` is `https://<domain>`.* Left: in a private window open
+      `https://authelia.<domain>/` and log in: you land on the Home Page, not
+      `netbird-vpn.<domain>`; opening a gated app first still returns to that app.
+- [ ] **Beta-test the longer ban for exploit attempts (plan.md §912)** — *2026-10-13: CrowdSec
+      restarted from the dashboard comes back healthy.* Left: on the next CVE alert
+      (`crowdsecurity/CVE-*`, `http-cve-probing`), Settings → CrowdSec bans shows ~24h left for
+      that IP, not ~4h; crawl/probe bans still 4h.
+- [ ] **Beta-test stale CrowdSec bouncer prune (plan.md §912)** — *2026-10-13: after a CrowdSec
+      restart the backend logged "removed stale NPM bouncer registrations" for
+      `nginx@10.201.17.3`, and Settings → CrowdSec bans still loads.* Left: a new probe still gets
+      banned (so `nginx@10.201.17.5` still enforces).
+- [ ] **Beta-test 7-day ntfy history (plan.md §912)** — *2026-10-13: `ntfy-ntfy-1` has
+      `NTFY_CACHE_DURATION=168h`.* Left: a day later, yesterday's CrowdSec/backup notifications
+      are still in the ntfy app history.
+- [ ] **Beta-test the backup and container-command changes (plan.md §911)** — *2026-10-13:
+      Nextcloud's `occ` reconcilers all ran `ok:true` on a restart and CrowdSec bans load, with no
+      `docker compose … run` error.* Left: after the next scheduled run, the Audit log has exactly
+      one `backup_create` for it and the archive list gains one file (the run is due ~03:00 Lisbon
+      on 2026-10-14; see the "Daily backup skips" item for why 10-13 had none); and saving a Samba
+      user's password still works.
 - [ ] **Beta-test media apps reading the Samba share (plan.md §870)** — on `beta`, start
       Jellyfin, Navidrome and Immich. Over SMB, drop a video in `media/`, a song in `music/`,
       a photo in `photos/` of the share. Add the Jellyfin library `/media` and rescan: the
@@ -948,22 +910,11 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
         backend/src/config/services.ts`, then `git status --porcelain` empty) or
         the next self-update pull conflicts.
 
-- [ ] **Beta-test that a failed start runs once (plan.md §717)** — on `beta`,
-      make an app fail to start (easiest: stop a `dependsOn` dependency, or
-      point an app's port at one already in use) and press Start. The card
-      should show one failure toast, and `docker logs business-lab-backend`
-      should carry exactly **one** `Starting service: <name>` line for that
-      click, not two ~0.5s apart. A successful start must still refresh the
-      card to `running` on its own.
 
-- [ ] **Beta-test the backup schedule's timezone (plan.md §718)** — on
-      `beta`, set Settings' timezone to something well off UTC (Europe/Lisbon
-      is +1 in summer; America/New_York is a clearer -4/-5), set the Backups
-      schedule to the hour that is ~1h away in *that* zone, and confirm the
-      run fires then — `docker logs business-lab-backend | grep -i backup`,
-      or the Backups page's "last run" stamp. Before this fix it fired at
-      that hour **UTC**. Also confirm a schedule set to `00:00` still runs
-      (the midnight/hour-24 path).
+- [ ] **Beta-test the backup schedule's timezone (plan.md §718)** — *2026-10-13: the 2026-10-12
+      run fired at 02:54 UTC with the schedule at 03:00 and the zone Europe/Lisbon (UTC+1), so the
+      hour follows the zone, not UTC.* Left: a schedule set to `00:00` still runs (the
+      midnight/hour-24 path).
 
 - [ ] **Beta-test the post-start reconciler refactor (plan.md §719)** — on
       `beta`, this touches every app's start path, so check a few apps whose
@@ -1074,16 +1025,6 @@ before anything is built.
       agent's next tick actually moves the reservation's Wintouch account —
       `Contas.GetListContasAbertas` shows the charges under the chosen
       entity, not the guest's own account, when an override was used.
-- [ ] **Verify a gated secondary hostname on the live stack** — built in
-      plan.md §637: an `additionalExposures` entry can now set
-      `autheliaProtected: true`, and the rule generator emits it with the
-      app's own group and bypass paths. What tests cannot show is whether NPM
-      actually renders forward-auth for a secondary host and Authelia accepts
-      the enlarged block — and this repo's history has Authelia config that
-      passed tests and took the gate down on the host (§423, §425). Check on
-      `beta` once `apps/hotel/` exists: the gated secondary asks for a login,
-      the public ones do not, the app's bypass path still answers
-      unauthenticated, and Authelia restarts cleanly rather than crash-looping.
 - [ ] **Confirm the installed Tally agent serves live Wintouch reads** —
       plan.md §669 proved install + enrolment, not the data. Open the shop's
       dashboard on `https://tally.tx-home-utils.com/`: it should show live
