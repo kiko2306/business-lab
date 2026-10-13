@@ -18,7 +18,6 @@ import { FormsModule } from '@angular/forms';
 import { Observable, Subscription, filter, finalize, tap } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import {
-  AppBackupEntry,
   AutheliaAdminUser,
   ServiceEnvField,
   ServiceEnvStatus,
@@ -32,6 +31,7 @@ import { ServiceStateService } from '../../core/service-state.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
+import { AppBackupsPanelComponent } from '../app-backups-panel/app-backups-panel.component';
 
 // SIGNUPS_ALLOWED -> "Signups allowed": the registry has no per-key labels, and
 // a derived one beats a raw env key for a non-technical owner (plan.md §761).
@@ -66,7 +66,7 @@ interface DependencyState {
 
 @Component({
     selector: 'app-service-card',
-    imports: [CommonModule, FormsModule, TranslatePipe],
+    imports: [CommonModule, FormsModule, TranslatePipe, AppBackupsPanelComponent],
     templateUrl: './service-card.component.html',
     styleUrls: ['./service-card.component.css', './startup-logs.css'],
     // ~50 of these sit on the Apps page, and under the default strategy every
@@ -90,7 +90,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   /**
    * Redraw this card when the wrapped request produces, fails or finishes. Every
-   * flag the template reads (`envLoading`, `backupsCreating`, …) is flipped from
+   * flag the template reads (`envLoading`, `adminUserSaving`, …) is flipped from
    * these callbacks, so they are exactly the points an OnPush view would miss.
    */
   private marking<T>(source: Observable<T>): Observable<T> {
@@ -128,14 +128,6 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   protected adminUserSaving = false;
   protected adminUser: AutheliaAdminUser | null = null;
   protected adminUserForm = { username: '', displayName: '', email: '', password: '' };
-
-  // Per-app backup archives (plan.md §185). A local rollback point, distinct
-  // from the scheduled off-site backup.
-  protected backupsLoading = false;
-  protected backupsCreating = false;
-  protected appBackups: AppBackupEntry[] = [];
-  /** The file currently being restored / deleted, so its row can show a spinner. */
-  protected backupBusyFile: string | null = null;
 
   protected startupLogsOpen = false;
   protected startupLogLines: string[] = [];
@@ -297,7 +289,6 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     if (this.service.adminUserManagementSupported && !this.adminUser) {
       this.loadAdminUser();
     }
-    this.loadAppBackups();
   }
 
   closeSettings(): void {
@@ -688,123 +679,6 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
         },
         error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.saveAdminAccount'))),
       });
-  }
-
-  loadAppBackups(): void {
-    this.backupsLoading = true;
-    this.marking(this.operations.listAppBackups(this.service.name))
-      .pipe(finalize(() => (this.backupsLoading = false)))
-      .subscribe({
-        next: (response) => (this.appBackups = response.items),
-        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.loadBackups'))),
-      });
-  }
-
-  createAppBackup(): void {
-    this.backupsCreating = true;
-    this.marking(this.operations.createAppBackup(this.service.name))
-      .pipe(finalize(() => (this.backupsCreating = false)))
-      .subscribe({
-        next: (response) => {
-          if (response.dumpFailures.length) {
-            this.toast.error(response.message);
-          } else {
-            this.toast.success(response.message);
-          }
-          this.loadAppBackups();
-        },
-        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.backupFailed', { label: this.service.label }))),
-      });
-  }
-
-  async restoreAppBackup(entry: AppBackupEntry): Promise<void> {
-    const when = new Date(entry.createdAt).toLocaleString();
-    const confirmed = await this.confirm.ask({
-      title: this.translate.t('serviceCard.confirmRestore.title', { label: this.service.label }),
-      message: this.translate.t('serviceCard.confirmRestore.message', { when, label: this.service.label }),
-      confirmText: this.translate.t('serviceCard.confirmRestore.confirmText'),
-      danger: true,
-    });
-    if (!confirmed) {
-      return;
-    }
-    this.backupBusyFile = entry.file;
-    this.marking(this.operations.restoreAppBackup(this.service.name, entry.file))
-      .pipe(finalize(() => (this.backupBusyFile = null)))
-      .subscribe({
-        next: (response) => {
-          if (response.warnings.length) {
-            this.toast.error(`${response.message} ${response.warnings.join(' ')}`);
-          } else {
-            this.toast.success(response.message);
-          }
-          // The app was stopped and restarted by the restore — refresh the
-          // card, and reload the list (a restore doesn't add a snapshot but
-          // its mtimes/manifests are worth re-reading).
-          this.serviceState.refresh();
-          this.loadAppBackups();
-        },
-        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.restoreFailed', { label: this.service.label }))),
-      });
-  }
-
-  async deleteAppBackup(entry: AppBackupEntry): Promise<void> {
-    const when = new Date(entry.createdAt).toLocaleString();
-    const confirmed = await this.confirm.ask({
-      title: this.translate.t('serviceCard.confirmDeleteSnapshot.title'),
-      message: this.translate.t('serviceCard.confirmDeleteSnapshot.message', { label: this.service.label, when }),
-      confirmText: this.translate.t('serviceCard.confirmDeleteSnapshot.confirmText'),
-      danger: true,
-    });
-    if (!confirmed) {
-      return;
-    }
-    this.backupBusyFile = entry.file;
-    this.marking(this.operations.deleteAppBackup(this.service.name, entry.file))
-      .pipe(finalize(() => (this.backupBusyFile = null)))
-      .subscribe({
-        next: (response) => {
-          this.toast.success(response.message);
-          this.loadAppBackups();
-        },
-        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.deleteSnapshot'))),
-      });
-  }
-
-  downloadAppBackup(entry: AppBackupEntry): void {
-    this.operations.downloadAppBackup(this.service.name, entry.file).subscribe({
-      next: (blob) => {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = entry.file;
-        link.click();
-        URL.revokeObjectURL(url);
-      },
-      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.downloadSnapshot'))),
-    });
-  }
-
-  /** Short "· postgres · 2 dumps · 1 failed" line under a snapshot's timestamp. */
-  protected appBackupDetail(entry: AppBackupEntry): string {
-    const parts = [`${(entry.bytes / 1024).toFixed(0)} KB`];
-    const m = entry.manifest;
-    if (!m) {
-      parts.push(this.translate.t('serviceCard.backups.detailsUnavailable'));
-      return parts.join(' · ');
-    }
-    if (m.engine) {
-      parts.push(m.engine);
-    }
-    if (m.dumpFailures.length) {
-      parts.push(
-        this.translate.t(
-          m.dumpFailures.length === 1 ? 'serviceCard.backups.dumpFailed.one' : 'serviceCard.backups.dumpFailed.other',
-          { count: m.dumpFailures.length }
-        )
-      );
-    }
-    return parts.join(' · ');
   }
 
   stateBadge(state: ServiceStatus['state']): string {

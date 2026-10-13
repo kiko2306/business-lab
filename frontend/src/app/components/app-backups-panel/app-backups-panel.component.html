@@ -1,0 +1,68 @@
+<button
+  type="button"
+  class="btn btn-outline-primary btn-sm mb-2"
+  [disabled]="creating || busyFile !== null"
+  (click)="create()"
+  >
+  @if (creating) {
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+  }
+  {{ 'serviceCard.backups.backUpNowButton' | t }}
+</button>
+@if (loading) {
+  <div class="d-flex align-items-center gap-2 text-body-secondary small">
+    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+    {{ 'common.loading' | t }}
+  </div>
+}
+@if (!loading) {
+  @if (!backups.length) {
+    <div class="small text-body-secondary">{{ 'serviceCard.backups.noSnapshots' | t }}</div>
+  }
+  @if (backups.length) {
+    <ul class="list-unstyled d-flex flex-column gap-2 mb-0">
+      @for (b of backups; track b) {
+        <li
+          class="d-flex flex-wrap align-items-center gap-2 p-2 border rounded bg-body-tertiary"
+          >
+          <div class="app-backup-meta d-flex flex-column">
+            <span class="fw-semibold small">{{ b.createdAt | date: 'medium':undefined:translate.locale() }}</span>
+            <span class="small text-body-secondary">{{ detail(b) }}</span>
+          </div>
+          <div class="d-flex flex-wrap align-items-center gap-1 ms-auto">
+            @if (busyFile === b.file) {
+              <span
+                class="spinner-border spinner-border-sm text-body-secondary"
+                aria-hidden="true"
+              ></span>
+            }
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm"
+              [disabled]="busyFile !== null"
+              (click)="download(b)"
+              >
+              {{ 'serviceCard.backups.downloadButton' | t }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline-primary btn-sm"
+              [disabled]="busyFile !== null || creating"
+              (click)="restore(b)"
+              >
+              {{ 'serviceCard.backups.restoreButton' | t }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline-danger btn-sm"
+              [disabled]="busyFile !== null"
+              (click)="remove(b)"
+              >
+              {{ 'serviceCard.backups.deleteButton' | t }}
+            </button>
+          </div>
+        </li>
+      }
+    </ul>
+  }
+}

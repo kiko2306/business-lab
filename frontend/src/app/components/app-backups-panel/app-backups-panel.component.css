@@ -1,0 +1,6 @@
+/* Per-app backup rows: layout is utility classes; this just lets the meta
+   column shrink and wrap instead of pushing the buttons off the row. */
+.app-backup-meta {
+  min-width: 0;
+  flex: 1 1 12rem;
+}

@@ -20,6 +20,12 @@ const service = (name: string, state: ServiceStatus['state'], extra: Partial<Ser
   ...extra,
 });
 
+// The settings dialog mounts the backups panel, which lists snapshots on sight.
+const withBackupList = (operations: jasmine.SpyObj<OperationsService>) => {
+  operations.listAppBackups.and.returnValue(of({ items: [] }));
+  return operations;
+};
+
 describe('ServiceCardComponent dependencies', () => {
   let fixture: ComponentFixture<ServiceCardComponent>;
   let component: ServiceCardComponent;
@@ -115,75 +121,28 @@ describe('ServiceCardComponent dependencies', () => {
   });
 });
 
+// The panel's own behaviour is in app-backups-panel.component.spec.ts; this
+// only proves the card mounts it when the settings dialog opens.
 describe('ServiceCardComponent per-app backups', () => {
-  let component: ServiceCardComponent;
-  let operations: jasmine.SpyObj<OperationsService>;
-  let confirm: jasmine.SpyObj<ConfirmService>;
-
-  const entry = (over: Partial<AppBackupEntry> = {}): AppBackupEntry => ({
-    file: 'paperless-2026-01-01T00-00-00-000Z.tar.gz',
-    bytes: 422_912,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    manifest: { app: 'paperless', createdAt: '2026-01-01T00:00:00.000Z', dashboardVersion: '0.18.0', engine: 'postgres', archiveBytes: 422_912, dumps: [], dumpFailures: [] },
-    ...over,
-  });
-
-  beforeEach(async () => {
-    operations = jasmine.createSpyObj('OperationsService', [
-      'getServiceEnv',
-      'listAppBackups',
-      'createAppBackup',
-      'restoreAppBackup',
-      'deleteAppBackup',
-      'downloadAppBackup',
-    ]);
+  it('loads the app\'s backups when the settings modal opens', async () => {
+    const operations = jasmine.createSpyObj('OperationsService', ['getServiceEnv', 'listAppBackups']);
     operations.listAppBackups.and.returnValue(of({ items: [] }));
     operations.getServiceEnv.and.returnValue(of({ fields: [] } as unknown as ServiceEnvStatus));
-    confirm = jasmine.createSpyObj('ConfirmService', ['ask']);
-
     await TestBed.configureTestingModule({
       imports: [ServiceCardComponent],
       providers: [
         { provide: OperationsService, useValue: operations },
         { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
         { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
-        { provide: ConfirmService, useValue: confirm },
       ],
     }).compileComponents();
+    const fixture = TestBed.createComponent(ServiceCardComponent);
+    fixture.componentRef.setInput('service', service('paperless', 'running'));
+    fixture.detectChanges();
 
-    component = TestBed.createComponent(ServiceCardComponent).componentInstance;
-    component.service = service('paperless', 'running');
-  });
-
-  it('summarises a snapshot as size · engine, and flags failed dumps', () => {
-    expect(component['appBackupDetail'](entry())).toBe('413 KB · postgres');
-    expect(
-      component['appBackupDetail'](
-        entry({ manifest: { ...entry().manifest!, dumpFailures: [{ target: '', kind: 'postgres', bytes: null, detail: 'x' }] } })
-      )
-    ).toBe('413 KB · postgres · 1 dump failed');
-    expect(component['appBackupDetail'](entry({ manifest: null }))).toBe('413 KB · details unavailable');
-  });
-
-  it('restores only after the user confirms', async () => {
-    confirm.ask.and.resolveTo(false);
-    await component.restoreAppBackup(entry());
-    expect(operations.restoreAppBackup).not.toHaveBeenCalled();
-
-    confirm.ask.and.resolveTo(true);
-    operations.restoreAppBackup.and.returnValue(of({ success: true, service: 'paperless', file: entry().file, fileRestore: '', databaseRestore: null, warnings: [], message: 'ok' }));
-    await component.restoreAppBackup(entry());
-    expect(operations.restoreAppBackup).toHaveBeenCalledWith('paperless', entry().file);
-  });
-
-  it('deletes only after the user confirms', async () => {
-    confirm.ask.and.resolveTo(false);
-    await component.deleteAppBackup(entry());
-    expect(operations.deleteAppBackup).not.toHaveBeenCalled();
-  });
-
-  it('loads the app\'s backups when the settings modal opens', () => {
-    component.openSettings();
+    expect(operations.listAppBackups).not.toHaveBeenCalled();
+    fixture.componentInstance.openSettings();
+    fixture.detectChanges();
     expect(operations.listAppBackups).toHaveBeenCalledWith('paperless');
   });
 });
@@ -239,7 +198,7 @@ describe('ServiceCardComponent installedVersion', () => {
     await TestBed.configureTestingModule({
       imports: [ServiceCardComponent],
       providers: [
-        { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
+        { provide: OperationsService, useValue: withBackupList(jasmine.createSpyObj('OperationsService', ['getServiceEnv', 'listAppBackups'])) },
         { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
         { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
         { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
@@ -390,7 +349,7 @@ describe('ServiceCardComponent polish', () => {
     await TestBed.configureTestingModule({
       imports: [ServiceCardComponent],
       providers: [
-        { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
+        { provide: OperationsService, useValue: withBackupList(jasmine.createSpyObj('OperationsService', ['getServiceEnv', 'listAppBackups'])) },
         { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
         { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
         { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },

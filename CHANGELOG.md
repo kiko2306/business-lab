@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.171.6] — 2026-10-13
+
+### Changed
+
+- Internal: per-app backups are their own panel component, out of the 840-line app card
+
 ## [0.171.5] — 2026-10-13
 
 ### Changed
