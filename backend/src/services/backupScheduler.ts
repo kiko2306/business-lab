@@ -102,7 +102,22 @@ export function shouldRunScheduledBackup(
   return now.getTime() - lastRunMs >= (retrying ? CHECK_INTERVAL_MS : FREQUENCY_MS[frequency]);
 }
 
+// The run below is claimed as `failed` before it starts, so a check landing
+// while a long run (a big Kopia upload) is still going would read that claim
+// as a due fast retry and start a second archive beside the first.
+let scheduledRunInProgress = false;
+
 export async function runScheduledBackupCheck(): Promise<void> {
+  if (scheduledRunInProgress) return;
+  scheduledRunInProgress = true;
+  try {
+    await runScheduledBackupCheckOnce();
+  } finally {
+    scheduledRunInProgress = false;
+  }
+}
+
+async function runScheduledBackupCheckOnce(): Promise<void> {
   const config = await getBackupScheduleConfig();
   if (!config.enabled) {
     return;

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.171.2] — 2026-10-13
+
+### Fixed
+
+- Backups: a scheduled run lasting over an hour no longer starts a second run beside itself
+
 ## [0.171.1] — 2026-10-09
 
 ### Fixed

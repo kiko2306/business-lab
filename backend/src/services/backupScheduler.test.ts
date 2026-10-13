@@ -204,6 +204,33 @@ describe('runScheduledBackupCheck', () => {
 
     await expect(runScheduledBackupCheck()).resolves.toBeUndefined();
   });
+
+  // Regression: the run is claimed as `failed` up front, so an hourly check
+  // landing while a long run is still going read it as a due fast retry and
+  // started a second archive alongside the first.
+  it('does not start a second run while one is still in progress', async () => {
+    backup.getBackupScheduleConfig.mockResolvedValue({
+      enabled: true,
+      frequency: 'daily',
+      retentionCount: 3,
+      lastRunAt: null,
+      lastOutcome: null,
+      lastSuccessAt: null,
+      consecutiveFailures: 0,
+    });
+    let finishArchive: (name: string) => void = () => {};
+    backup.createBackupArchive.mockImplementationOnce(
+      () => new Promise<string>((resolve) => (finishArchive = resolve))
+    );
+
+    const first = runScheduledBackupCheck();
+    await vi.waitFor(() => expect(backup.createBackupArchive).toHaveBeenCalledTimes(1));
+    await runScheduledBackupCheck();
+    finishArchive('backup-slow.tar.gz');
+    await first;
+
+    expect(backup.createBackupArchive).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('runAppDataBackup failure reporting', () => {

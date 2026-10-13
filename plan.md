@@ -38576,3 +38576,14 @@ Two findings worth keeping:
 Also applied: default model `claude-opus-5` → `claude-sonnet-5-5` at high effort, user's
 call after being shown the measured per-session cost. Opus stays one `/model` away for a
 real hunt.
+
+## 911. Audit sweep: bugs, perf, refactor, vulns (2026-10-13)
+
+Targeted pass (auth, shell calls, timers, deps, biggest files). Clean: login limits, bcrypt dummy compare, MFA key split, capability gates, base64 script transport, no string-built SQL, helmet/CORS/body limits, timers catch own errors. Backend `npm audit --omit=dev` 0. User approved all six as batch.
+
+1. [x] Stray root `package.json`/`package-lock.json`/`node_modules` (untracked, 2026-10-09, only `terminal-browser`, nothing referenced it). Deleted; supply-chain risk in public repo.
+2. [x] Scheduled backup double run. Run claimed `failed` + `lastRunAt=now` up front (§508); hourly check during run >1h read claim as due fast retry, started second `createBackupArchive` beside first (app-data half queued on maintenance lock, then ran again). Fix: in-process `scheduledRunInProgress` flag around check. Rejected: DB-stored `running` state — crash leaves it stuck, which is exactly what §508 claim avoids; single process so memory flag enough.
+3. [ ] Pin `algorithms: ['HS256']` on every `jwt.verify`.
+4. [ ] Frontend dev-dep vulns (`braces`, `js-yaml`, `engine.io`, `fast-uri`, `extract-zip`, `basic-ftp`, `source-map-js`).
+5. [ ] One helper for 11 copies of `docker compose -p … run --rm --no-deps -T … | base64 -d | X`.
+6. [ ] Split `executor.ts` (1304) and `service-card.component.ts` (836).
