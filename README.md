@@ -219,13 +219,15 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
       the exposure settings, and run a backup to a password-protected target. Each has to still
       authenticate, and the Settings page must still show the masked value, not ciphertext. Backend logs must
       show no "Unable to seal stored third-party secrets" line at boot.
-- [ ] **Beta-test nodemailer 10 (plan.md §892)** — on `beta`, after the update rebuilds the backend:
+- [ ] **Beta-test nodemailer 10 (plan.md §892)** — *2026-10-13 at 0.173.4: an invite reached
+      Gmail with its set-password link, and the link worked. Left: Settings test email, backup/alert
+      mails.* On `beta`, after the update rebuilds the backend:
       send a test email from Settings, invite a user and confirm the set-password link arrives,
       and check the backup/alert mails still send.
 - [ ] **Beta-test Angular 21 (plan.md §898)** — *2026-10-13 at 0.173.4, Chrome on the LAN URL:
       all 10 pages load, login without 2FA works, no CSP violation or `NG0*` in the console, live
-      status updates. Left: forms, login with 2FA, and the service worker (none registers on plain
-      http — check on the public https URL).* On `beta`, after the update rebuilds the frontend: every
+      status updates. On the public URL the service worker is active and, after two hard reloads,
+      serves the same `main-*.js` as the server's `index.html`. Left: forms, login with 2FA.* On `beta`, after the update rebuilds the frontend: every
       page loads and its forms work (Home, Apps, Backups, Users, Settings, Update, Account, Audit log,
       login with and without 2FA); the service worker updates rather than serving a stale shell (hard
       reload twice, check the new bundle hash loads); the browser console reports no CSP violation
@@ -276,7 +278,8 @@ Four items from a whole-repo review, run in this order, each its own commit and 
       Reset password on the admin still work; the UI shows the refusals as clear messages.
 - [ ] **Beta-test the cached status and health polls (plan.md §873 item 3)** — *2026-10-13 at
       0.173.4, two Chrome tabs: a Samba stop showed in 2.5 s and 14.1 s, a start in ~3 s, CPU moves
-      in both. Left: disk alert, port change after restart.* On `beta`, open the
+      in both. Left: disk alert. The port-change step no longer applies — `*_PORT` keys are hidden
+      from the settings form (`service-card.component.ts` `visibleEnvFields`).* On `beta`, open the
       Apps page in two tabs for a few minutes: the cards still flip to Running within ~15 s of a
       start and back on a stop, the header's CPU/disk/memory figures still move and agree between
       tabs, and a disk alert still appears when a threshold is crossed. Change an app's port in its
@@ -309,10 +312,19 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       edge. Open a Tally shop view and check the same there.
 - [ ] **Beta-test touch targets on a phone (plan.md §824)** — *2026-10-13 at 0.173.4, 390px in
       Chrome: Users, Backups, Settings, Apps, Home, Updates have no button under 44px and no
-      sideways scroll. Left: checkbox-row taps, a Tally shop view, the 1280px look.* On `beta`, at 390px wide (browser
+      sideways scroll. Role and feature checkbox rows toggle from anywhere on the row; the app-access
+      rows do not (item below). Left: a Tally shop view (`claude-test` has no shops), the 1280px
+      look.* On `beta`, at 390px wide (browser
       device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
       label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
       no row of buttons overflows. At 1280px nothing looks different from before.
+- [ ] **Make the whole app-access row toggle its checkbox (plan.md §924)** — Users → Add user /
+      Edit access at 390px: an `.app-access-chip` row (332×87) toggles only when the label text is
+      tapped; its empty right side and bottom do nothing. The role and feature rows already toggle
+      from anywhere. Fix: make the label fill the chip.
+- [ ] **Make the "Installed:" chip readable (plan.md §924)** — the app settings dialog's
+      `badge bg-body-tertiary border` chip (`service-card.component.html:138`) has Bootstrap's white
+      badge text on a light background, so "Installed: <image>" cannot be read in light mode.
 - [ ] **Beta-test the Utils critique fixes (plan.md §841)** — 20/40. In order, test first, one
       commit and version bump each. Decided 2026-10-06: **fold** `/utils` away — health moves onto
       Home, the scan into a Settings panel, then the route, nav item and tile go and `/utils`
@@ -360,8 +372,12 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       a laptop, EN and pt-PT.
 - [ ] **Beta-test the small pages' fixes (plan.md §855-§862)** — *2026-10-13 at 0.173.4, Audit
       logs in Chrome: Result first, actions as sentences with the code on hover, "21–40 of 9735",
-      the 30-day/Europe/Lisbon line, Enter on a no-match filter gives Clear filters. Left: everything
-      else.* All seven §854 findings are in; on
+      the 30-day/Europe/Lisbon line, Enter on a no-match filter gives Clear filters, a long probe
+      resource wraps, Export CSV keeps raw codes, a "from" time filters in Lisbon time, backend
+      stopped gives the Retry alert (below the stale rows, off-screen on a full page). (6) passed
+      as `claude-noaccess`: "signed in as", empty Request access names the missing email, focus
+      lands on "Request sent", "Sign in with a different account" signs out and Authelia's
+      session stays. (5) fails, item below. Left: (1-2) unsubscribe from a real advert email.* All seven §854 findings are in; on
       `beta`, EN and pt-PT, phone and laptop: (1-2) open an unsubscribe link from a real advert
       email: one button, nothing happens until the tap, reload does not unsubscribe, a second tap is
       harmless; the email ends "You are receiving this because you subscribed to <dashboard host>."
@@ -377,6 +393,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       "signed in as", Request access pressable when empty and names what is missing, focus on the
       confirmation after sending, "Sign in with a different account" signs out (Authelia's own
       session stays).
+- [ ] **Unsubscribe page: say "could not reach the server" when the backend is down (plan.md §924)**
+      — with `business-lab-backend-1` stopped, the frontend's nginx answers 502, and
+      `unsubscribe.component.ts:77` only picks `offline` when `err.status` is 0, so the page shows
+      the generic "Could not process this request." Treat 502/503/504 as offline too.
 - [ ] **Beta-test the Account critique fixes (plan.md §819)** — all five done; this item is now
       only the `beta` look. (1) §820 — on `beta`, Turn it off asks for a code or recovery code (no
       password field), then a confirm; a wrong code is refused and 2FA stays on; (2) §821 — a wrong
@@ -551,6 +571,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       after the pin is cleared from the Updates page (the compose YAML is now
       memoised on mtime, so a stale badge would be the bug).
 - [ ] **Beta-test the WebSocket/SSE fix for live service status (plan.md §792)** —
+      *2026-10-13 at 0.173.4, public URL in Chrome: Apps shows **Connected**, and
+      `wss://<host>/ws/services` answered `101`. Left: Home's headline flipping live.*
       on `beta`, open Apps and expand "All apps": confirm it shows real rows (not
       a permanent "Loading services…") and a **Connected** badge, not **sse** or
       **polling**, within a second or two of opening the page. Open the browser's
@@ -600,11 +622,6 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
 
 ### Exposure and platform
 
-- [ ] **Beta-test the Home Page behind Authelia (plan.md §913)** — *2026-10-13 by curl:
-      `https://<domain>/`, `https://homepage.<domain>/` and `/api/services` all 302 to Authelia;
-      the Users app picker has no Home Page entry.* Left: log in as a non-admin user with **no**
-      app grants and Home Page loads; Uptime Kuma's "Nginx Proxy Manager (public)" monitor
-      stays up.
 - [ ] **Beta-test the Cloudflare edge WAF rule (plan.md §915)** — on `beta`, after the
       update restarts the backend (the exposure check runs at boot). Settings →
       Deployment checklist → "Edge firewall rule": either *Set*, or it names the

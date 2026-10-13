@@ -38721,3 +38721,16 @@ Not done, rejected:
 - Not possible this run: §913 (claude-test is admin, needs no-grant user); update confirm (box not behind); SW (LAN URL is http).
 - Tried: `chrome-devtools-mcp` as an MCP server — needs Node ≥20.19, WSL has 18; runs via `docker run --network host node:22`, but MCP loads only in a new session. Direct CDP script from Bash worked in-session, so used that.
 - Mistake: script's confirm locator matched "Parar" in Samba's start-log dialog and stopped it again; restarted from the UI, running.
+
+## 924. Remaining browser beta checks in Chrome, 2026-10-13 (0.173.4)
+
+[x] done. Same CDP-driven Chrome as §923. Owner OK'd a non-admin test user.
+- §913 pass, item deleted: `claude-noaccess` (App user, zero grants) opens `https://<domain>/` → Home Page; Uptime Kuma "Nginx Proxy Manager (public)" 0 down beats in 24 h (read from `kuma.db`).
+- §854 (6) pass, (3-4, 7) pass. (5) fail: backend stopped → nginx 502 → `!err.status` false → generic "failed" text, not "offline". New README item.
+- §824: app-access chips toggle only on label text. New README item.
+- Found in passing: settings dialog "Installed:" chip white-on-light. New README item.
+- §898 SW pass on public URL; §792 Connected + `101` pass; §892 invite delivered.
+- §873 port-change step obsolete: `*_PORT` hidden from settings form.
+- Blocked: Tally shop view (no shops for test user); update confirm (box not behind); 2FA login (no TOTP secret).
+- Tried and rejected: pending-invite user has no Reset password and invite tokens are stored as SHA-256 — recreated `claude-noaccess` on a Gmail plus-address and read the invite via the Gmail connector. Its password lives only in the session scratchpad; reset it from Users to reuse.
+- Backend stopped twice (~30 s each) for (5); came back healthy.
