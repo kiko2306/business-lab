@@ -818,7 +818,7 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       repo's config. Check that issue periodically; delete this item once it's
       closed upstream (or once an app update fixes it for us, whichever comes
       first). Last checked 2026-10-09: still open (no upstream activity since
-      2025-11-05).
+      2025-11-05). Rechecked 2026-10-13: unchanged.
 - [ ] **Re-enable the CrowdSec Cloudflare Worker bouncer once its token bug is
       fixed** — the edge-level bouncer (`cloudflare-worker-bouncer` in
       `apps/crowdsec/docker-compose.yml`, behind the `edge-bouncer` compose
@@ -833,7 +833,7 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       works or upstream fixes the auth path. Check periodically; delete this
       item once it's fixed and the bouncer is confirmed enforcing live. Last
       checked 2026-10-09: latest release is still v0.0.18 (2026-06-02), and no
-      upstream issue names the 10000 auth error.
+      upstream issue names the 10000 auth error. Rechecked 2026-10-13: unchanged.
 - [ ] **Prove MeshCentral agent enrolment through the public tunnel**
       — the app is up, reachable at its own hostname with no Authelia gate,
       and its own login page confirmed live (§505/§506), but the actual
