@@ -784,6 +784,37 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       closed upstream (or once an app update fixes it for us, whichever comes
       first). Last checked 2026-10-09: still open (no upstream activity since
       2025-11-05).
+- [ ] **Decide: should the public Home Page list every app? (plan.md §912)** — your call,
+      not an agent's. `https://<domain>/api/services` answers without login and lists
+      every exposed app's hostname (31 on the test box, incl. `code-server`). Each app
+      is still gated, but the list is a free recon map. Options: (a) put the Home Page
+      behind Authelia, (b) keep the page public but block `/api/services*` at NPM,
+      (c) keep as is (§111). Production per-client deployments are the case that matters.
+- [ ] **Keep ntfy notifications for 7 days, not 12 hours (plan.md §912)** — set
+      `NTFY_CACHE_DURATION: 168h` in `apps/ntfy/docker-compose.yml` with a why-comment
+      (a 5-day CrowdSec report found only one message left). Compose-only; beta test:
+      after the update recreates ntfy, a notification from yesterday is still listed
+      in the ntfy web app / phone app history.
+- [ ] **Prune stale CrowdSec bouncer registrations automatically (plan.md §912)** —
+      each NPM recreate registers a new `nginx@<ip>` bouncer and the old row stays
+      (test box: `nginx`, last pull 09-23; `nginx@10.201.17.3`, 10-07). On CrowdSec
+      config apply, delete `nginx*` bouncers whose last pull is older than a few days
+      and whose IP is not NPM's current one. Never touch `cloudflare` (registered by
+      env, never pulls while the edge bouncer is parked). Unit-test the pick logic;
+      beta test: `cscli bouncers list` shows only the live NPM bouncer.
+- [ ] **Longer first ban for exploit attempts (plan.md §912)** — a CVE scenario
+      (`crowdsecurity/CVE-*`, `http-cve-probing`) currently gets the same 4h first ban
+      as a crawl. Add a profile ahead of `default_ip_remediation` in `buildProfilesYaml`
+      giving those e.g. 24h base, keeping the repeat-offender escalation and the
+      168h cap. Test the rendered YAML; beta test: next CVE alert's decision shows the
+      longer duration.
+- [ ] **Edge WAF rule for secret/PHP probes via Cloudflare API (plan.md §912)** — every
+      scan hit the bare domain asking for `/.env*`, `/.git/*`, `/vendor/phpunit/*`,
+      `*.php`. Create/maintain a zone custom rule (block) from the dashboard using the
+      existing Cloudflare credentials; if the token lacks Zone WAF edit, ask for it once
+      in the UI. Check no managed app legitimately serves those paths first. Beta test:
+      `curl -I https://<domain>/.git/index` returns Cloudflare's 403, and CrowdSec stops
+      seeing those probes.
 - [ ] **Re-enable the CrowdSec Cloudflare Worker bouncer once its token bug is
       fixed** — the edge-level bouncer (`cloudflare-worker-bouncer` in
       `apps/crowdsec/docker-compose.yml`, behind the `edge-bouncer` compose
