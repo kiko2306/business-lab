@@ -655,6 +655,12 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
 
 ### Exposure and platform
 
+- [ ] **Beta-test the backup and container-command changes (plan.md §911)** — on `beta`, after
+      the update restarts the backend. **Backup:** Backups → run one scheduled-time backup (or
+      wait for the hour); Audit log shows exactly one `backup_create` for that run, and the
+      archive list gains one file. **Container commands:** start Nextcloud (an `occ` run),
+      open Settings → CrowdSec bans (a CrowdSec one-off run), and save a Samba user's password;
+      each works as before and the backend log has no `docker compose … run` error.
 - [ ] **Beta-test media apps reading the Samba share (plan.md §870)** — on `beta`, start
       Jellyfin, Navidrome and Immich. Over SMB, drop a video in `media/`, a song in `music/`,
       a photo in `photos/` of the share. Add the Jellyfin library `/media` and rescan: the
