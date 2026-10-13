@@ -38600,7 +38600,7 @@ Read-only pass on home-srv-01: `cscli alerts list --since 120h`, `cscli decision
 
 **Gaps.**
 - [x] ntfy keeps 12h (default `cache-duration`), so no 5-day notification history. `NTFY_CACHE_DURATION: 168h` in compose; compose-only, beta item is the test.
-- [ ] Stale bouncer rows `nginx` (last pull 09-23) and `nginx@10.201.17.3` (10-07) left by replaced NPM containers. Prune from code; `cloudflare` row (never pulls — edge bouncer parked, README) must survive.
+- [x] Stale bouncer rows. Only `nginx@<ip>` copies are dead weight: CrowdSec mints one when the `nginx` key arrives from a new IP (every NPM recreate). Bare `nginx`/`cloudflare` come from `BOUNCER_KEY_*` and are re-created each start, so pruning them is pointless and kept out. `pickStaleBouncers`: `nginx@` + digits/dots/colons only (also makes the name shell-safe), last pull >3d, never the newest copy (NPM down for days keeps its row), never a never-pulled one. `pruneStaleCrowdsecBouncers` post-up on crowdsec via throwaway `cscli -c /staging/...` (same path as the dashboard machine, now shared `cscliRun`). Read half run live: lists the 4 rows. Rejected: deleting via LAPI — no bouncer endpoint for machines.
 - [ ] Exploit attempts (CVE scenarios) get same 4h first ban as a crawl. Longer first ban for them.
 - [ ] Edge WAF rule via Cloudflare API dropping `/.env*`, `/.git/*`, `/vendor/phpunit/*`, `*.php` on bare domain — cuts noise before tunnel; no app serves PHP there.
 - [ ] Decision (user): Home Page public by design (§111), but `/api/services` lists 31 app hostnames unauthenticated (incl. `code-server`). Gate Home Page behind Authelia, block only `/api/services`, or keep.

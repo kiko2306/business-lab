@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.171.7** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.171.8** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -649,6 +649,10 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
 
 ### Exposure and platform
 
+- [ ] **Beta-test stale CrowdSec bouncer prune (plan.md §912)** — on `beta`, after the update,
+      restart CrowdSec from the dashboard. Backend log has "removed stale NPM bouncer
+      registrations" naming `nginx@10.201.17.3`; Settings → CrowdSec bans still loads; a
+      probe still gets banned (NPM bouncer `nginx@10.201.17.5` untouched).
 - [ ] **Beta-test 7-day ntfy history (plan.md §912)** — on `beta`, after the update
       recreates ntfy: `docker inspect ntfy-ntfy-1` shows `NTFY_CACHE_DURATION=168h`, and a
       day later yesterday's CrowdSec/backup notifications are still in the ntfy app history.
@@ -793,13 +797,6 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       is still gated, but the list is a free recon map. Options: (a) put the Home Page
       behind Authelia, (b) keep the page public but block `/api/services*` at NPM,
       (c) keep as is (§111). Production per-client deployments are the case that matters.
-- [ ] **Prune stale CrowdSec bouncer registrations automatically (plan.md §912)** —
-      each NPM recreate registers a new `nginx@<ip>` bouncer and the old row stays
-      (test box: `nginx`, last pull 09-23; `nginx@10.201.17.3`, 10-07). On CrowdSec
-      config apply, delete `nginx*` bouncers whose last pull is older than a few days
-      and whose IP is not NPM's current one. Never touch `cloudflare` (registered by
-      env, never pulls while the edge bouncer is parked). Unit-test the pick logic;
-      beta test: `cscli bouncers list` shows only the live NPM bouncer.
 - [ ] **Longer first ban for exploit attempts (plan.md §912)** — a CVE scenario
       (`crowdsecurity/CVE-*`, `http-cve-probing`) currently gets the same 4h first ban
       as a crawl. Add a profile ahead of `default_ip_remediation` in `buildProfilesYaml`
