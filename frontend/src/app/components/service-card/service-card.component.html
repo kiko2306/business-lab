@@ -135,15 +135,15 @@
       <div class="settings-body">
         <!-- About: what used to crowd the row heading (plan.md §761) -->
         <section class="settings-section settings-about small d-flex flex-wrap gap-2 align-items-center">
-          <span class="badge bg-body-tertiary border">{{ 'serviceCard.installedLabel' | t:{ version: installedVersion() } }}</span>
+          <span class="badge bg-body-tertiary text-body border">{{ 'serviceCard.installedLabel' | t:{ version: installedVersion() } }}</span>
           @for (port of service.ports; track port.hostPort + '/' + port.protocol) {
             <span class="badge text-bg-secondary border" [title]="'serviceCard.portTitle' | t">{{ 'serviceCard.portLabel' | t:{ port: port.hostPort } }}</span>
           }
           @if (service.mobileApps?.android) {
-            <span class="badge bg-body-tertiary border">{{ 'serviceCard.androidAppTitle' | t }}</span>
+            <span class="badge bg-body-tertiary text-body border">{{ 'serviceCard.androidAppTitle' | t }}</span>
           }
           @if (service.mobileApps?.ios) {
-            <span class="badge bg-body-tertiary border">{{ 'serviceCard.iosAppTitle' | t }}</span>
+            <span class="badge bg-body-tertiary text-body border">{{ 'serviceCard.iosAppTitle' | t }}</span>
           }
           @if (service.exposedHostname && service.clientApiPath) {
             <a

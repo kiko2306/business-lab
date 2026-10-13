@@ -252,6 +252,31 @@ describe('ServiceCardComponent installedVersion', () => {
     expect(root.textContent).not.toContain('version pinned');
     expect(Array.from(root.querySelectorAll('button')).some((b) => b.textContent?.trim() === 'Unpin')).toBe(false);
   });
+
+  // Bootstrap's `.badge` paints white text; on `bg-body-tertiary` that left "Installed:" and the app-store chips near-invisible in light mode (plan.md §927).
+  for (const theme of ['light', 'dark'] as const) {
+    it(`keeps the settings dialog's badges readable in ${theme} mode`, () => {
+      document.documentElement.setAttribute('data-bs-theme', theme);
+      try {
+        component.service = service('netbird-vpn', 'running', { pinnedImages: [], versionPinned: ['1.6.0'], mobileApps: { android: true, ios: true } });
+        component.allServices = [component.service];
+        component['settingsModalOpen'] = true;
+        fixture.detectChanges();
+        const badges = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('.settings-about .badge'));
+        expect(badges.length).toBeGreaterThanOrEqual(3);
+        const lum = (c: string) => {
+          const [r, g, b] = c.match(/\d+(\.\d+)?/g)!.slice(0, 3).map((v) => Number(v) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        };
+        for (const badge of badges) {
+          const [fg, bg] = [lum(getComputedStyle(badge).color), lum(getComputedStyle(badge).backgroundColor)].sort((x, y) => y - x);
+          expect((fg + 0.05) / (bg + 0.05)).withContext(badge.textContent!.trim()).toBeGreaterThanOrEqual(4.5);
+        }
+      } finally {
+        document.documentElement.removeAttribute('data-bs-theme');
+      }
+    });
+  }
 });
 
 describe('ServiceCardComponent lanAccessUrl', () => {

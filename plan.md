@@ -38742,3 +38742,7 @@ Not done, rejected:
 ## 926. App-access chips toggle from anywhere on the chip
 
 [x] done. Found §924: `.app-access-chip` (component CSS, `display: block`) beats the global phone `.form-check` flex row, and the grid's equal-height rows make chips taller than their label — a tap on the empty corner hit the div. Fix: chip `position: relative`, label `::after { inset: 0 }` overlay; a click on a label's pseudo-element toggles its box. Both widths. Test in `users-layout.spec.ts` hit-tests the chip's bottom-right corner at 1280 and 390. Tried: scrolling the test iframe to the chip — no-doctype frame is quirks mode, the root does not scroll; grew the frame to the body's height instead.
+
+## 927. Settings-dialog chips readable in light mode
+
+[x] done. Found §924. `badge bg-body-tertiary border` keeps Bootstrap's white `.badge` text → 1.05:1 on the pale chip in light mode. Swept the codebase for the pattern: also the Android and iPhone/iPad chips in the same dialog; the health badge sets its own `text-*`. Fix: `text-body` on all three. Spec measures every `.settings-about .badge` ≥ 4.5:1 in light and dark.

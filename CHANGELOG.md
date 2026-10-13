@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.7] — 2026-10-13
+
+### Fixed
+
+- The Installed and app-store chips in an app's settings window are readable in light mode
+
 ## [0.173.6] — 2026-10-13
 
 ### Fixed
