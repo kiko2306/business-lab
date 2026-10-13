@@ -448,7 +448,11 @@ async function classifyDeploy(repoRoot: string, fromCommit: string | null, toCom
 // same reason as backend/frontend: never bounce Postgres as a side effect.
 // ponytail: explicit list, so a new core sidecar must be added here — derive it
 // from `compose config --services` if that turns into a habit.
-const CORE_SIDECARS = ['host-timezone-sync'];
+// The watchdog pair is here for the other half of the same gap: a changed image
+// or pin on an *existing* sidecar never landed either (§917: the watchdog's
+// proxy still on `:latest` days after §884 pinned it). Never `docker-socket-proxy`
+// — this very `compose up` reaches the daemon through it.
+const CORE_SIDECARS = ['host-timezone-sync', 'watchdog-docker-proxy', 'self-update-watchdog'];
 
 export async function ensureCoreSidecars(): Promise<void> {
   await runCommand(

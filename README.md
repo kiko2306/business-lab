@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -235,12 +235,6 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
 
 Infrastructure robustness, five items. Three touch Docker or nginx, so they need a real look.
 
-- [ ] **Recreate the watchdog's socket proxy on update** — on the box, `watchdog-docker-proxy`
-      still ran `tecnativa/docker-socket-proxy:latest` days after §884 pinned it to `v0.5.0`:
-      self-update only recreates backend, frontend and `CORE_SIDECARS`
-      (`backend/src/services/selfUpdate.ts`), so a changed image on any other root service never
-      lands. Add it to `CORE_SIDECARS` (not `docker-socket-proxy`: the backend's own compose calls
-      go through that one), test first. Found 2026-10-13 (plan.md §917).
 - [ ] **Retry after a failed start leaves the app with no published port** — 2026-10-13 at
       0.173.0: IT Tools with 10490 held fails to start (fine), but after freeing the port a second
       Start returns 200 and the container runs with **no** port mapping; status then says
@@ -257,11 +251,11 @@ Infrastructure robustness, five items. Three touch Docker or nginx, so they need
       throws. A Samba restart (`samba-init` chowns the tree) fixed it on the box. Same for
       `media`, `photos`, `signed`, `paperless-archive`. Make the start path fix it without a
       Samba restart (e.g. run `samba-init` when chmod is refused), test first (plan.md §917).
-- [ ] **Beta-test the pinned socket proxy (plan.md §884 item 1)** — *2026-10-13 at 0.173.0:
-      `docker-socket-proxy` runs `v0.5.0` and start/stop works through it, but
-      `watchdog-docker-proxy` is still on `:latest` (up 6 days) — self-update never recreates it.
-      Blocked on the "Recreate the watchdog's socket proxy on update" item below.* Once that lands,
-      after the next update: `docker ps` shows both on `tecnativa/docker-socket-proxy:v0.5.0`.
+- [ ] **Beta-test the pinned socket proxy (plan.md §884 item 1, §919)** — *2026-10-13: the backend's
+      proxy ran `v0.5.0` and start/stop worked through it; the watchdog's was still `:latest`.* After
+      the update that ships §919: `docker ps` shows `watchdog-docker-proxy` on
+      `tecnativa/docker-socket-proxy:v0.5.0` and `self-update-watchdog` recreated (fresh uptime), and
+      the update itself completed.
 
 ### Review batch 2, 2026-10-08 (plan.md §879)
 

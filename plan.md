@@ -38679,3 +38679,11 @@ Not done, rejected:
 - No run-at hour: unchanged (full period) — no hour gate, so slack would let it drift earlier each day.
 - Rejected: stamp `lastRunAt` at run start — still fails when the poll phase sits before the previous start minute.
 - Tests: the 10-12 → 10-13 case from the box (daily + weekly), and no second run inside same hour.
+
+## 919. Update recreates the watchdog pair
+
+[x] done. Bug from §917: `watchdog-docker-proxy` on `:latest` 6 days after §884 pinned `v0.5.0`; `self-update-watchdog` on week-old image. Self-update `up -d` only backend, frontend, `CORE_SIDECARS` (`host-timezone-sync`).
+
+- Fix: both watchdog services into `CORE_SIDECARS`. `up -d --no-deps --no-build` = no-op when current, recreate when image/config moved.
+- `docker-socket-proxy` stays out: backend's own compose call goes through it, recreating it mid-call cuts the call.
+- Rejected: derive list from `compose config --services` — would sweep in `database` and the backend proxy; explicit list stays (ponytail note already there).

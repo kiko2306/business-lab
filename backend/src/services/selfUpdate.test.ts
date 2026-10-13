@@ -280,6 +280,21 @@ describe('triggerSelfUpdate', () => {
     expect((await getSelfUpdateStatus()).latestRun?.state).toBe('restarting_backend');
   });
 
+  // Found live (plan.md §917): §884 pinned the watchdog's socket proxy to
+  // v0.5.0, yet the box still ran `:latest` days later — nothing in an update
+  // ever recreated it, nor the watchdog itself (still on a week-old image).
+  // `docker-socket-proxy` stays out: the backend's own compose calls go through it.
+  it('recreates the watchdog and its socket proxy with the other sidecars, never the backend proxy', async () => {
+    mockAnUpdateFrom('old111', 'new222', 1);
+
+    await triggerSelfUpdate(7);
+    await flush();
+
+    const sidecarUp = backup.runCommand.mock.calls.find(([, a]) => (a as string[]).includes('host-timezone-sync'));
+    expect(sidecarUp?.[1]).toEqual(expect.arrayContaining(['watchdog-docker-proxy', 'self-update-watchdog']));
+    expect(sidecarUp?.[1]).not.toContain('docker-socket-proxy');
+  });
+
   it('refreshes status.check to "up to date" right after the pull, not just latestRun (§551)', async () => {
     mockAnUpdateFrom('old111', 'new222', 1);
 
