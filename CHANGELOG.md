@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.5] — 2026-10-13
+
+### Fixed
+
+- The unsubscribe page says it could not reach the server when the backend is down, instead of a generic failure
+
 ## [0.173.4] — 2026-10-13
 
 ### Fixed

@@ -149,8 +149,19 @@ describe('UnsubscribeComponent', () => {
       setUp();
       TestBed.inject(TranslateService).setLocale('pt-PT');
       fail(new HttpErrorResponse({ status: 502, error: '<html>Bad Gateway</html>' }));
-      expect(el.querySelector('[role="alert"]')?.textContent).toContain(ptPT['unsubscribe.errors.failed']);
+      expect(el.querySelector('[role="alert"]')?.textContent).toContain(ptPT['unsubscribe.errors.offline']);
       expect(text()).not.toContain('Bad Gateway');
+    });
+
+    // The frontend's nginx answers 502/503/504 when the backend is down, so status is never 0 then (plan.md §925).
+    it('reads a gateway error as an unreachable server, and a 500 as a failed request', () => {
+      setUp();
+      for (const status of [502, 503, 504]) {
+        fail(new HttpErrorResponse({ status }));
+        expect(el.querySelector('[role="alert"]')?.textContent).toContain(en['unsubscribe.errors.offline']);
+      }
+      fail(new HttpErrorResponse({ status: 500 }));
+      expect(el.querySelector('[role="alert"]')?.textContent).toContain(en['unsubscribe.errors.failed']);
     });
 
     it('says a 429 is too many tries, and a lost connection is the connection', () => {

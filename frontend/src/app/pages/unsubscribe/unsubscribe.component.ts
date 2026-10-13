@@ -74,7 +74,9 @@ export class UnsubscribeComponent implements OnInit {
 
   /** Own words per cause, never the server's: it is English, and a gateway can answer with an HTML page (plan.md §854 fix 5). */
   private failure(err: { status?: number }): string {
-    const key = err.status === 429 ? 'rateLimited' : !err.status ? 'offline' : 'failed';
+    // A stopped backend reaches the browser as the frontend nginx's 502/503/504, never as status 0 (plan.md §925).
+    const unreachable = !err.status || [502, 503, 504].includes(err.status);
+    const key = err.status === 429 ? 'rateLimited' : unreachable ? 'offline' : 'failed';
     return this.translate.t(`unsubscribe.errors.${key}`);
   }
 

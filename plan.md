@@ -38734,3 +38734,7 @@ Not done, rejected:
 - Blocked: Tally shop view (no shops for test user); update confirm (box not behind); 2FA login (no TOTP secret).
 - Tried and rejected: pending-invite user has no Reset password and invite tokens are stored as SHA-256 — recreated `claude-noaccess` on a Gmail plus-address and read the invite via the Gmail connector. Its password lives only in the session scratchpad; reset it from Users to reuse.
 - Backend stopped twice (~30 s each) for (5); came back healthy.
+
+## 925. Unsubscribe page: gateway errors read as unreachable
+
+[x] done. Found §924: backend stopped → frontend nginx 502 → `failure()` saw a status, picked `failed` ("Could not process this request") not `offline`. Status 0 never happens behind nginx. Fix: `!status || 502/503/504` → `offline`. Spec that pinned 502 → `failed` (§854 fix 5) now expects `offline`; its point (no server HTML shown) stays. New spec: 502/503/504 offline, 500 failed. Recheck rides the §854 README item.

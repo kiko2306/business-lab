@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.4** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.5** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -377,7 +377,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       stopped gives the Retry alert (below the stale rows, off-screen on a full page). (6) passed
       as `claude-noaccess`: "signed in as", empty Request access names the missing email, focus
       lands on "Request sent", "Sign in with a different account" signs out and Authelia's
-      session stays. (5) fails, item below. Left: (1-2) unsubscribe from a real advert email.* All seven §854 findings are in; on
+      session stays. (5) failed: a 502 showed the generic text, fixed in §925 — recheck with the backend stopped. Left: (1-2) unsubscribe from a real advert email.* All seven §854 findings are in; on
       `beta`, EN and pt-PT, phone and laptop: (1-2) open an unsubscribe link from a real advert
       email: one button, nothing happens until the tap, reload does not unsubscribe, a second tap is
       harmless; the email ends "You are receiving this because you subscribed to <dashboard host>."
@@ -393,10 +393,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       "signed in as", Request access pressable when empty and names what is missing, focus on the
       confirmation after sending, "Sign in with a different account" signs out (Authelia's own
       session stays).
-- [ ] **Unsubscribe page: say "could not reach the server" when the backend is down (plan.md §924)**
-      — with `business-lab-backend-1` stopped, the frontend's nginx answers 502, and
-      `unsubscribe.component.ts:77` only picks `offline` when `err.status` is 0, so the page shows
-      the generic "Could not process this request." Treat 502/503/504 as offline too.
 - [ ] **Beta-test the Account critique fixes (plan.md §819)** — all five done; this item is now
       only the `beta` look. (1) §820 — on `beta`, Turn it off asks for a code or recovery code (no
       password field), then a confirm; a wrong code is refused and 2FA stays on; (2) §821 — a wrong
