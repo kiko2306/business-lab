@@ -38712,3 +38712,12 @@ Not done, rejected:
 - §921 pass (API): held 10490 → start 500, no leftover container; free → Start = running, healthy, `0.0.0.0:10490->80/tcp`, HTTP 200. Browser look stays in README.
 - §920 pass: `music/` set `root:root 0755` via root container, Navidrome start 200, folder now `drwxrwxrwx`.
 - §720 pass: `apps/navidrome/data` moved aside by a root container (the §917 attempt failed without root), fresh start → "Navidrome admin account created" for `mat`, no "gave up". Original data moved back, app healthy. Fresh run's data was untracked in the host checkout (`apps/navidrome/data.ct-fresh`, outside gitignored `data/`) — moved to `/home/mat/ct-navidrome-data-fresh`; owner deletes (needs root).
+
+## 923. Browser beta checks in Chrome, 2026-10-13 (0.173.4)
+
+[x] done. Drove owner's Windows Chrome over CDP (`--remote-debugging-port=9222`, own profile) with `e2e/` playwright `connectOverCDP`, as `claude-test` (admin).
+- §914 pass: fresh context → `authelia.<domain>` login lands on `https://<domain>/` (Home Page); IT Tools first → returns to IT Tools. Item deleted.
+- §898, §873, §824, §854 (audit logs), §834, §798: parts passed, notes in README; rest left there.
+- Not possible this run: §913 (claude-test is admin, needs no-grant user); update confirm (box not behind); SW (LAN URL is http).
+- Tried: `chrome-devtools-mcp` as an MCP server — needs Node ≥20.19, WSL has 18; runs via `docker run --network host node:22`, but MCP loads only in a new session. Direct CDP script from Bash worked in-session, so used that.
+- Mistake: script's confirm locator matched "Parar" in Samba's start-log dialog and stopped it again; restarted from the UI, running.

@@ -222,7 +222,10 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
 - [ ] **Beta-test nodemailer 10 (plan.md §892)** — on `beta`, after the update rebuilds the backend:
       send a test email from Settings, invite a user and confirm the set-password link arrives,
       and check the backup/alert mails still send.
-- [ ] **Beta-test Angular 21 (plan.md §898)** — on `beta`, after the update rebuilds the frontend: every
+- [ ] **Beta-test Angular 21 (plan.md §898)** — *2026-10-13 at 0.173.4, Chrome on the LAN URL:
+      all 10 pages load, login without 2FA works, no CSP violation or `NG0*` in the console, live
+      status updates. Left: forms, login with 2FA, and the service worker (none registers on plain
+      http — check on the public https URL).* On `beta`, after the update rebuilds the frontend: every
       page loads and its forms work (Home, Apps, Backups, Users, Settings, Update, Account, Audit log,
       login with and without 2FA); the service worker updates rather than serving a stale shell (hard
       reload twice, check the new bundle hash loads); the browser console reports no CSP violation
@@ -271,7 +274,9 @@ Four items from a whole-repo review, run in this order, each its own commit and 
       work.* Left: as that admin, **Reset password** on the webmaster's own row (skipped so a
       guard failure could not lock you out) must be refused; the webmaster's own Edit roles /
       Reset password on the admin still work; the UI shows the refusals as clear messages.
-- [ ] **Beta-test the cached status and health polls (plan.md §873 item 3)** — on `beta`, open the
+- [ ] **Beta-test the cached status and health polls (plan.md §873 item 3)** — *2026-10-13 at
+      0.173.4, two Chrome tabs: a Samba stop showed in 2.5 s and 14.1 s, a start in ~3 s, CPU moves
+      in both. Left: disk alert, port change after restart.* On `beta`, open the
       Apps page in two tabs for a few minutes: the cards still flip to Running within ~15 s of a
       start and back on a stop, the header's CPU/disk/memory figures still move and agree between
       tabs, and a disk alert still appears when a threshold is crossed. Change an app's port in its
@@ -302,7 +307,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       Tab through Users, Settings and Backups in dark and light: every control shows a solid blue
       ring (no mouse-click ring on buttons), and inputs, selects and unticked boxes have a visible
       edge. Open a Tally shop view and check the same there.
-- [ ] **Beta-test touch targets on a phone (plan.md §824)** — on `beta`, at 390px wide (browser
+- [ ] **Beta-test touch targets on a phone (plan.md §824)** — *2026-10-13 at 0.173.4, 390px in
+      Chrome: Users, Backups, Settings, Apps, Home, Updates have no button under 44px and no
+      sideways scroll. Left: checkbox-row taps, a Tally shop view, the 1280px look.* On `beta`, at 390px wide (browser
       device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
       label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
       no row of buttons overflows. At 1280px nothing looks different from before.
@@ -351,7 +358,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       should the post say?", with Drafts open too once there are drafts, and no "Brief" or "Claude"
       anywhere, in pt-PT too. All six are done (plus two minor findings, §908: trailing-whitespace dirty check, brief counter — on `beta`, paste 3600+ characters into the brief box: a "N / 4000 characters" line appears, typing stops at 4000); this item is now only the `beta` looks. On `beta`, after each: open Content on a phone and
       a laptop, EN and pt-PT.
-- [ ] **Beta-test the small pages' fixes (plan.md §855-§862)** — all seven §854 findings are in; on
+- [ ] **Beta-test the small pages' fixes (plan.md §855-§862)** — *2026-10-13 at 0.173.4, Audit
+      logs in Chrome: Result first, actions as sentences with the code on hover, "21–40 of 9735",
+      the 30-day/Europe/Lisbon line, Enter on a no-match filter gives Clear filters. Left: everything
+      else.* All seven §854 findings are in; on
       `beta`, EN and pt-PT, phone and laptop: (1-2) open an unsubscribe link from a real advert
       email: one button, nothing happens until the tap, reload does not unsubscribe, a second tap is
       harmless; the email ends "You are receiving this because you subscribed to <dashboard host>."
@@ -389,7 +399,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       characters." is under new passwords, the cursor starts in the first field, `/recovery` inputs
       are 44px; (5) §832 — the card is centred (equal space either side at every width) and all four
       pages look like the same card, `/recovery` included.
-- [ ] **Beta-test the Updates page critique fixes (plan.md §834)** — all five done; this item is now
+- [ ] **Beta-test the Updates page critique fixes (plan.md §834)** — *2026-10-13 at 0.173.4, EN
+      and pt-PT laptop: panel open, one "Up to date"/"Atualizado" badge at 13px, Update now blue. The
+      confirm only shows when behind — look at it on the next update.* All five done; this item is now
       only the `beta` look, on a phone and a laptop, EN and pt-PT. (5) §839 — the page opens with the
       panel open and leads with one badge: "Up to date" / "N updates available" / "Updating…" /
       "Last update failed" (red) / "Updated, N apps need attention"; badges are 13px; the confirm's
@@ -521,7 +533,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Beta-test the rebuilt status poll (plan.md §798)** — *2026-10-07, API vs `docker ps`:
       states match for all 44 apps; Pi-hole lists 53/tcp and 53/udp, netbird-vpn its four ports,
       Home Assistant 8123. Still to do: public and secondary URLs on the card, two tabs open at
-      once, the pin badge clearing.* The whole status
+      once, the pin badge clearing.* *2026-10-13 at 0.173.4, Chrome: Pi-hole's Settings lists 53, 53,
+      10320; netbird-vpn's its four ports plus Management API and Relay hostnames; a stop showed in
+      both tabs within one tick. Left: the pin badge clearing.* The whole status
       payload now comes from one `docker ps -a` and one `service_exposure`
       read, so a mistake here shows up as *every* app reading wrong at once.
       On `beta`: open Apps and confirm each app's state matches
@@ -603,10 +617,6 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       Cloudflare; `https://nextcloud.<domain>/index.php` still works (PHP is
       blocked on the bare domain only). Disable the rule by hand; it is back
       within 6 hours or on the next backend restart.
-- [ ] **Beta-test the Home Page as login landing page (plan.md §914)** — *2026-10-13: Authelia's
-      rendered `default_redirection_url` is `https://<domain>`.* Left: in a private window open
-      `https://authelia.<domain>/` and log in: you land on the Home Page, not
-      `netbird-vpn.<domain>`; opening a gated app first still returns to that app.
 - [ ] **Beta-test the longer ban for exploit attempts (plan.md §912)** — *2026-10-13: CrowdSec
       restarted from the dashboard comes back healthy.* Left: on the next CVE alert
       (`crowdsecurity/CVE-*`, `http-cve-probing`), Settings → CrowdSec bans shows ~24h left for
