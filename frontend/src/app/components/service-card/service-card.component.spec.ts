@@ -656,11 +656,17 @@ describe('ServiceCardComponent stop confirmation', () => {
 
   beforeEach(async () => {
     confirm = jasmine.createSpyObj('ConfirmService', ['ask']);
+    // A start opens the startup-log popup, which subscribes to startupEvents$
+    // and asks for a stream ticket; no ticket keeps it from opening an EventSource.
+    const state = jasmine.createSpyObj('ServiceStateService', ['refresh', 'createStartupLogUrl'], {
+      startupEvents$: new Subject(),
+    });
+    state.createStartupLogUrl.and.resolveTo(null);
     await TestBed.configureTestingModule({
       imports: [ServiceCardComponent],
       providers: [
         { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
-        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
+        { provide: ServiceStateService, useValue: state },
         { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
         { provide: ConfirmService, useValue: confirm },
       ],

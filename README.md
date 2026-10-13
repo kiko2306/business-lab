@@ -469,12 +469,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       with `archive: true`, and add a "closed before midnight" fixture. Needs
       `dotnet`, which the dev host does not have; the agent installer ships it to
       every shop, so it is not an edit to make blind.
-- [ ] **Service-card spec: silence the stray `startupEvents$` error (plan.md §911)** —
-      `frontend test:ci` passes but logs `TypeError: Cannot read properties of
-      undefined (reading 'pipe')` twice, from `openStartupLogs` in a spec whose
-      `ServiceStateService` mock has no `startupEvents$`. Give that mock a
-      `Subject` (as the OnPush describe does) so a real error in that path is not
-      lost in known noise.
 - [ ] **Tally agent: do live and archived days agree? (plan.md §810)** — read one
       real day through both paths and compare: average ticket (net numerator over
       a sales-only denominator), discounts / customers / consumptions (defined
