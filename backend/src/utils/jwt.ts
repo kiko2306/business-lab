@@ -70,6 +70,10 @@ export interface MfaTokenPayload {
  */
 const ACCESS_PURPOSE = 'access';
 
+// Every token here is signed HS256 (jwt.sign's default). jsonwebtoken still
+// accepts HS384/HS512 for a string secret unless told otherwise.
+const VERIFY_OPTIONS: jwt.VerifyOptions = { algorithms: ['HS256'] };
+
 export function signAccessToken(payload: AuthAccessPayload): string {
   return jwt.sign({ ...payload, purpose: ACCESS_PURPOSE }, getAccessSecret(), {
     expiresIn: ACCESS_EXPIRES as jwt.SignOptions['expiresIn'],
@@ -96,7 +100,7 @@ export function signRefreshToken(payload: AuthRefreshPayload): string {
  * actually vouch for.
  */
 export function verifyAccessToken(token: string): AuthAccessPayload {
-  const decoded = jwt.verify(token, getAccessSecret()) as AuthAccessPayload & { purpose?: string };
+  const decoded = jwt.verify(token, getAccessSecret(), VERIFY_OPTIONS) as AuthAccessPayload & { purpose?: string };
   if (decoded.purpose !== ACCESS_PURPOSE) {
     throw new Error('Not an access token');
   }
@@ -116,7 +120,7 @@ export function signMfaToken(userId: number): string {
 
 /** Verify an MFA hand-off token. Throws if invalid, expired or the wrong kind. */
 export function verifyMfaToken(token: string): MfaTokenPayload {
-  const decoded = jwt.verify(token, getMfaSecret()) as MfaTokenPayload;
+  const decoded = jwt.verify(token, getMfaSecret(), VERIFY_OPTIONS) as MfaTokenPayload;
   if (decoded.purpose !== 'mfa' || typeof decoded.id !== 'number') {
     throw new Error('Not an MFA token');
   }
@@ -125,5 +129,5 @@ export function verifyMfaToken(token: string): MfaTokenPayload {
 
 /** Verify and decode a refresh token. Throws if invalid or expired. */
 export function verifyRefreshToken(token: string): AuthRefreshPayload {
-  return jwt.verify(token, getRefreshSecret()) as AuthRefreshPayload;
+  return jwt.verify(token, getRefreshSecret(), VERIFY_OPTIONS) as AuthRefreshPayload;
 }

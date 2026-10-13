@@ -38583,7 +38583,7 @@ Targeted pass (auth, shell calls, timers, deps, biggest files). Clean: login lim
 
 1. [x] Stray root `package.json`/`package-lock.json`/`node_modules` (untracked, 2026-10-09, only `terminal-browser`, nothing referenced it). Deleted; supply-chain risk in public repo.
 2. [x] Scheduled backup double run. Run claimed `failed` + `lastRunAt=now` up front (§508); hourly check during run >1h read claim as due fast retry, started second `createBackupArchive` beside first (app-data half queued on maintenance lock, then ran again). Fix: in-process `scheduledRunInProgress` flag around check. Rejected: DB-stored `running` state — crash leaves it stuck, which is exactly what §508 claim avoids; single process so memory flag enough.
-3. [ ] Pin `algorithms: ['HS256']` on every `jwt.verify`.
+3. [x] Pin `algorithms: ['HS256']` on every `jwt.verify`. v9 blocks `none`/RS for string secret but still took HS384/HS512; tests sign those and expect reject.
 4. [ ] Frontend dev-dep vulns (`braces`, `js-yaml`, `engine.io`, `fast-uri`, `extract-zip`, `basic-ftp`, `source-map-js`).
 5. [ ] One helper for 11 copies of `docker compose -p … run --rm --no-deps -T … | base64 -d | X`.
 6. [ ] Split `executor.ts` (1304) and `service-card.component.ts` (836).

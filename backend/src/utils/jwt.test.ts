@@ -87,3 +87,21 @@ describe('access token purpose', () => {
     expect(() => verifyAccessToken(legacy)).toThrow();
   });
 });
+
+// Every token is minted HS256. jsonwebtoken v9 still accepts any HMAC variant
+// for a string secret, so pin the one we sign with rather than trust its default.
+describe('algorithm pinning', () => {
+  it('rejects an access token signed with a different HMAC algorithm', () => {
+    const token = jwt.sign({ id: 9, username: 'ana', roles: [], purpose: 'access' }, process.env.JWT_SECRET as string, {
+      algorithm: 'HS512',
+      expiresIn: '1h',
+    });
+    expect(() => verifyAccessToken(token)).toThrow();
+  });
+
+  it('rejects a refresh token signed with a different HMAC algorithm', () => {
+    const secret = process.env.JWT_REFRESH_SECRET || (process.env.JWT_SECRET as string);
+    const token = jwt.sign({ id: 9 }, secret, { algorithm: 'HS384', expiresIn: '1h' });
+    expect(() => verifyRefreshToken(token)).toThrow();
+  });
+});

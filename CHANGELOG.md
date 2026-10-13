@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.171.3] — 2026-10-13
+
+### Fixed
+
+- Auth: token checks accept only the HS256 algorithm the tokens are signed with
+
 ## [0.171.2] — 2026-10-13
 
 ### Fixed
