@@ -27,6 +27,7 @@ import fs from 'fs';
 import path from 'path';
 import logger from '../utils/logger';
 import { resolveComposeFile } from '../config/services';
+import { composeRunCommand } from './composeRun';
 
 const SERVICE = 'authelia';
 const VALIDATE_TIMEOUT_MS = 120_000;
@@ -81,10 +82,11 @@ async function validateAutheliaConfig(candidateText: string): Promise<Validation
     // Same flags the service itself uses — the oidc secrets file and the
     // template filter are both load-bearing, and validating without them
     // would reject a config that is actually fine.
-    const command =
-      `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
+    const command = composeRunCommand(
+      resolved,
       `--entrypoint authelia ${SERVICE} validate-config ` +
-      `--config /config/${name},/data/oidc-secrets.yml --config.experimental.filters template`;
+        `--config /config/${name},/data/oidc-secrets.yml --config.experimental.filters template`
+    );
     return await runValidate(command);
   } catch (error) {
     return { ok: true, ran: false, message: (error as Error).message };

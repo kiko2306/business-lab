@@ -33,6 +33,7 @@
 import logger from '../utils/logger';
 import { runShell } from '../utils/run';
 import { resolveComposeFile } from '../config/services';
+import { composeRunCommand, pipedScript } from './composeRun';
 import { generateComplexPassword, readAppEnvValue, saveServiceEnv } from './appEnv';
 
 export const NTFY_SERVICE = 'ntfy';
@@ -105,10 +106,7 @@ export async function ensureNtfySubscriberToken(serviceName: string, force = fal
   try {
     const password = generateComplexPassword();
     const script = buildScript(password, recreate);
-    const scriptB64 = Buffer.from(script).toString('base64');
-    const command =
-      `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
-      `--entrypoint /bin/sh ${NTFY_SERVICE} -c "echo ${scriptB64} | base64 -d | /bin/sh"`;
+    const command = composeRunCommand(resolved, `--entrypoint /bin/sh ${NTFY_SERVICE} -c "${pipedScript(script, '/bin/sh')}"`);
 
     const token = parseToken(await runShell(command, { combineStderr: true }));
     if (!token) {

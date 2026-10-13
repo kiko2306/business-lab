@@ -18,6 +18,7 @@
 
 import { exec } from 'child_process';
 import { resolveComposeFile } from '../config/services';
+import { composeRunCommand, pipedScript } from './composeRun';
 
 const NEXTCLOUD_SERVICE = 'nextcloud';
 
@@ -60,11 +61,11 @@ export async function runNextcloudOccScript(
   }
 
   const script = ['set -e', 'cd /var/www/html', ...WAIT_FOR_OCC, ...bodyLines].join('\n');
-  const scriptB64 = Buffer.from(script).toString('base64');
   const passFlags = (opts.passEnv ?? []).map((name) => `-e ${name}`).join(' ');
-  const command =
-    `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
-    `--user www-data ${passFlags} --entrypoint /bin/sh nextcloud -c "echo ${scriptB64} | base64 -d | /bin/sh"`;
+  const command = composeRunCommand(
+    resolved,
+    `--user www-data ${passFlags} --entrypoint /bin/sh nextcloud -c "${pipedScript(script, '/bin/sh')}"`
+  );
 
   return new Promise((resolve) => {
     exec(

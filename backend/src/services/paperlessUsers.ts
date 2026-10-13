@@ -24,6 +24,7 @@
 import { exec } from 'child_process';
 import logger from '../utils/logger';
 import { resolveComposeFile } from '../config/services';
+import { composeRunCommand, pipedScript } from './composeRun';
 import { getAutheliaAdminUser, listAutheliaUsernames } from './autheliaUsers';
 
 export const PAPERLESS_SERVICE = 'paperless';
@@ -63,11 +64,11 @@ export async function reconcilePaperlessUsers(serviceName: string): Promise<void
     return;
   }
 
-  const scriptB64 = Buffer.from(SCRIPT).toString('base64');
-  const command =
-    `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
+  const command = composeRunCommand(
+    resolved,
     `-e PAPERLESS_FANOUT_ADMIN -e PAPERLESS_FANOUT_USERS --entrypoint /bin/sh paperless-ngx ` +
-    `-c "cd /usr/src/paperless/src && echo ${scriptB64} | base64 -d | python3 manage.py shell"`;
+      `-c "cd /usr/src/paperless/src && ${pipedScript(SCRIPT, 'python3 manage.py shell')}"`
+  );
 
   await new Promise<void>((resolve) => {
     exec(

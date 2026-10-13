@@ -25,6 +25,7 @@
 import logger from '../utils/logger';
 import { runShell } from '../utils/run';
 import { getService, resolveComposeFile } from '../config/services';
+import { composeRunCommand, pipedScript } from './composeRun';
 import { getServiceExposureRow } from './exposure';
 
 const HA_MARKER_BEGIN = '# >>> homelab-management: reverse-proxy exposure >>>';
@@ -166,12 +167,12 @@ async function reconcileHomeAssistantProxyConfig(serviceName: string): Promise<v
     return;
   }
 
-  const scriptB64 = Buffer.from(buildHomeAssistantFixScript()).toString('base64');
   // HA's own image + volume mounts, entrypoint overridden so HA never boots —
   // this only edits the bind-mounted /config as root. `--rm` cleans up.
-  const command =
-    `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
-    `--entrypoint /bin/sh home-assistant -c "echo ${scriptB64} | base64 -d | /bin/sh"`;
+  const command = composeRunCommand(
+    resolved,
+    `--entrypoint /bin/sh home-assistant -c "${pipedScript(buildHomeAssistantFixScript(), '/bin/sh')}"`
+  );
 
   const output = await runShell(command);
   logger.info('Home Assistant reverse-proxy config reconciled', { output: output.trim() || '(no changes)' });

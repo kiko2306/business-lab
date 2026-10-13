@@ -25,6 +25,7 @@
 
 import { exec } from 'child_process';
 import { resolveComposeFile } from '../config/services';
+import { composeRunCommand, pipedScript } from './composeRun';
 
 const KIMAI_SERVICE = 'kimai';
 
@@ -60,11 +61,8 @@ export async function runKimaiDbScript(
   }
 
   const script = ['<?php', ...CONNECT_PREAMBLE, ...phpBody].join('\n');
-  const scriptB64 = Buffer.from(script).toString('base64');
   const passFlags = (opts.passEnv ?? []).map((name) => `-e ${name}`).join(' ');
-  const command =
-    `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
-    `${passFlags} --entrypoint /bin/sh kimai -c "echo ${scriptB64} | base64 -d | php"`;
+  const command = composeRunCommand(resolved, `${passFlags} --entrypoint /bin/sh kimai -c "${pipedScript(script, 'php')}"`);
 
   return new Promise((resolve) => {
     exec(

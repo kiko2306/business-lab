@@ -29,6 +29,7 @@
 import logger from '../utils/logger';
 import { runShell } from '../utils/run';
 import { resolveComposeFile } from '../config/services';
+import { composeRunCommand, pipedScript } from './composeRun';
 
 const HACS_DIR = '/config/custom_components/hacs';
 // The published release asset, not `main`: once installed, HACS updates itself
@@ -96,10 +97,10 @@ export async function ensureHomeAssistantHacs(serviceName: string): Promise<void
   }
 
   try {
-    const scriptB64 = Buffer.from(buildHacsInstallScript()).toString('base64');
-    const command =
-      `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
-      `--entrypoint /bin/sh home-assistant -c "echo ${scriptB64} | base64 -d | /bin/sh"`;
+    const command = composeRunCommand(
+      resolved,
+      `--entrypoint /bin/sh home-assistant -c "${pipedScript(buildHacsInstallScript(), '/bin/sh')}"`
+    );
 
     // The install script pulls HACS from GitHub inside the container — slower
     // than anything else that shells out here, hence the longer-than-default budget.

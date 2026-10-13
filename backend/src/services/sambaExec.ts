@@ -15,6 +15,7 @@
 
 import { exec } from 'child_process';
 import { resolveComposeFile } from '../config/services';
+import { composeRunCommand } from './composeRun';
 
 const SAMBA_SERVICE = 'samba';
 const SMB_CONF_PATH = '/etc/samba/smb.conf';
@@ -61,9 +62,7 @@ export async function setSambaAccountEnabled(username: string, enabled: boolean)
   }
 
   const flag = enabled ? '-e' : '-d';
-  const command =
-    `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
-    `--entrypoint /bin/sh samba -c "smbpasswd ${flag} -c ${SMB_CONF_PATH} ${username}"`;
+  const command = composeRunCommand(resolved, `--entrypoint /bin/sh samba -c "smbpasswd ${flag} -c ${SMB_CONF_PATH} ${username}"`);
 
   return new Promise((resolve) => {
     exec(command, { timeout: 30_000, maxBuffer: 1024 * 1024 }, (error) => {

@@ -36,6 +36,7 @@
 
 import { exec } from 'child_process';
 import { resolveComposeFile } from '../config/services';
+import { composeRunCommand, pipedScript } from './composeRun';
 
 const DOCUSEAL_SERVICE = 'docuseal';
 const RAILS_BIN = '/app/bin/rails';
@@ -47,12 +48,11 @@ async function runDocusealRailsScript(script: string, passEnv: string[], env: No
     return null;
   }
 
-  const scriptB64 = Buffer.from(script).toString('base64');
   const passFlags = passEnv.map((name) => `-e ${name}`).join(' ');
-  const command =
-    `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
-    `${passFlags} --entrypoint /bin/sh docuseal ` +
-    `-c "echo ${scriptB64} | base64 -d | ${RAILS_BIN} runner -"`;
+  const command = composeRunCommand(
+    resolved,
+    `${passFlags} --entrypoint /bin/sh docuseal -c "${pipedScript(script, `${RAILS_BIN} runner -`)}"`
+  );
 
   return new Promise((resolve) => {
     exec(command, { timeout: 60_000, maxBuffer: 4 * 1024 * 1024, env }, (error, stdout) => {

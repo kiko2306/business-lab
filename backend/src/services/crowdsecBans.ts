@@ -26,6 +26,7 @@ import { isIP } from 'net';
 import logger from '../utils/logger';
 import { runShell } from '../utils/run';
 import { resolveComposeFile } from '../config/services';
+import { composeRunCommand, pipedScript } from './composeRun';
 import { readAppEnvValue } from './appEnv';
 import { getAppVersion } from '../version';
 
@@ -66,11 +67,9 @@ export async function ensureCrowdsecDashboardMachine(serviceName: string): Promi
   const script =
     `cscli -c /staging/etc/crowdsec/config.yaml machines add ${MACHINE_ID} ` +
     `--password '${password}' -f /dev/null --force`;
-  const scriptB64 = Buffer.from(script).toString('base64');
   try {
     await runShell(
-      `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
-        `--entrypoint /bin/sh ${CROWDSEC_SERVICE} -c "echo ${scriptB64} | base64 -d | /bin/sh"`
+      composeRunCommand(resolved, `--entrypoint /bin/sh ${CROWDSEC_SERVICE} -c "${pipedScript(script, '/bin/sh')}"`)
     );
     return true;
   } catch (error) {
