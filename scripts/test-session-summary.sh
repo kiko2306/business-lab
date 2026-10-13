@@ -26,6 +26,17 @@ grep -qE 'Host-verify queue: [0-9]+' <<<"$out" ||
 ! grep -q '^- \[ \] \*\*Beta-test' <<<"$out" ||
   { echo "FAIL: host-verify items listed instead of counted"; fail=1; }
 
+# The split goes by headline verb, so an item that is only beta checks but keeps an
+# action headline ("Users: fix the critique's findings" after every fix landed) gets
+# listed as agent work and the agent proposes something it cannot do (plan.md §916).
+items=$(awk '/^## TODO/{f=1;next} f && /^## /{exit} f' README.md |
+  awk '/^- \[/{if(s)print s; s=$0; next} /^      /{sub(/^ +/," "); s=s $0} END{if(s)print s}')
+while IFS= read -r h; do
+  item=$(grep -F -- "$h" <<<"$items" | head -n 1)
+  grep -qE '\*\* — +on `beta`|this item is now only the `beta` look' <<<"$item" &&
+    { echo "FAIL: beta-only item listed as agent work: $h"; fail=1; }
+done < <(grep '^- \[ \] \*\*' <<<"$out")
+
 # Every open item lands in exactly one bucket, so none can go missing.
 open=$(grep -c '^- \[ \] \*\*' README.md || true)
 listed=$(grep -oE 'open items \(([0-9]+)' <<<"$out" | grep -oE '[0-9]+' || echo 0)

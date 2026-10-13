@@ -298,7 +298,7 @@ The security remainder of the same review, four items, each its own commit and v
 
 Four items from a whole-repo review, run in this order, each its own commit and version bump.
 
-- [ ] **Stop an admin promoting itself to webmaster (plan.md §873 item 1)** — on `beta`, sign in
+- [ ] **Beta-test that an admin cannot promote itself to webmaster (plan.md §873 item 1)** — on `beta`, sign in
       as an `admin` (not a webmaster) and try, over the API and in the UI: **Edit roles** on another
       account offering Full admin, and **Reset password** on the webmaster's own row. Both must be
       refused with a clear message, and the webmaster's own Edit roles / Reset password on that same
@@ -321,7 +321,7 @@ Surfaces never critiqued. Per item: `/impeccable critique` against a real render
 score in a new plan section, then fix one page at a time, test first, own commit and version
 bump. Delete the item when its fixes land (a fix still needing a `beta` look gets its own item).
 
-- [ ] **Users: fix the critique's findings (plan.md §813)** — in order, test first, one
+- [ ] **Beta-test the Users critique fixes (plan.md §813)** — in order, test first, one
       commit and version bump each: (1) done (§814) — on `beta`, open Users on a phone and a
       laptop with a very long email and the reset-password editor open: no sideways scroll,
       Reset password and Delete reachable; (2) done (§815) — on `beta`, open any
@@ -343,7 +343,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
       label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
       no row of buttons overflows. At 1280px nothing looks different from before.
-- [ ] **Utils: fix the critique's findings (plan.md §841)** — 20/40. In order, test first, one
+- [ ] **Beta-test the Utils critique fixes (plan.md §841)** — 20/40. In order, test first, one
       commit and version bump each. Decided 2026-10-06: **fold** `/utils` away — health moves onto
       Home, the scan into a Settings panel, then the route, nav item and tile go and `/utils`
       redirects to `/home`. Order: (1) done (§842) — on `beta`, Home shows "Server health": a sentence
@@ -361,7 +361,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       (4) done (§864) — on `beta`, press Find devices: the first row is this server with a "This server" badge,
       named devices follow, devices with no name or maker sit under "Not recognised".
       On `beta`, open Home and Settings on a phone and a laptop, EN and pt-PT.
-- [ ] **Content: fix the critique's findings (plan.md §845, §847)** — 16/40, all six done. Decided 2026-10-06:
+- [ ] **Beta-test the Content critique fixes (plan.md §845, §847)** — 16/40, all six done. Decided 2026-10-06:
       Content is a **post generator**, and **subscribers are managed on the same page**. In order,
       test first, one commit and version bump each: (1) done (§846) — on `beta`, edit a draft and
       press Email to subscribers without Save: the dialog says your changes are saved first, and the email that
@@ -404,7 +404,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       "signed in as", Request access pressable when empty and names what is missing, focus on the
       confirmation after sending, "Sign in with a different account" signs out (Authelia's own
       session stays).
-- [ ] **Account: fix the critique's findings (plan.md §819)** — all five done; this item is now
+- [ ] **Beta-test the Account critique fixes (plan.md §819)** — all five done; this item is now
       only the `beta` look. (1) §820 — on `beta`, Turn it off asks for a code or recovery code (no
       password field), then a confirm; a wrong code is refused and 2FA stays on; (2) §821 — a wrong
       enrol code and a wrong disable code each show a message under their own field (in pt-PT too)
@@ -414,7 +414,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       your authenticator app" link and a Copy key button, focus lands on the step's heading, then on
       the status line after Cancel, Done and turning it off, and a line says leaving starts over.
       Run the full journey (set up, wrong code, activate, recovery codes, disable) on a phone.
-- [ ] **Sign-in flow: fix the critique's findings (plan.md §827)** — all five done; this item is now
+- [ ] **Beta-test the sign-in flow critique fixes (plan.md §827)** — all five done; this item is now
       only the `beta` look. On a phone, in EN and pt-PT, on login, setup, a used invite link and
       `/recovery`: (1) §829 — login has a closed "Locked out?" line naming the Users page and
       `./start.sh recover reset-password`, the code step has "Lost your authenticator?" naming
@@ -426,7 +426,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       characters." is under new passwords, the cursor starts in the first field, `/recovery` inputs
       are 44px; (5) §832 — the card is centred (equal space either side at every width) and all four
       pages look like the same card, `/recovery` included.
-- [ ] **Updates page: fix the critique's findings (plan.md §834)** — all five done; this item is now
+- [ ] **Beta-test the Updates page critique fixes (plan.md §834)** — all five done; this item is now
       only the `beta` look, on a phone and a laptop, EN and pt-PT. (5) §839 — the page opens with the
       panel open and leads with one badge: "Up to date" / "N updates available" / "Updating…" /
       "Last update failed" (red) / "Updated, N apps need attention"; badges are 13px; the confirm's
@@ -445,19 +445,19 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       the cause and press Update now again: the box says nothing is behind but runs, only that app
       updates, the warning goes away, and a third press says "Already up to date". Also after a build
       failure (§835) pressing Update now rebuilds instead of saying up to date.
-- [ ] **Tally: the hero figure and the comparison (plan.md §806, items 1-2)** —
+- [ ] **Beta-test Tally: the hero figure and the comparison (plan.md §806, items 1-2)** —
       on `beta`, open a shop's day view on a phone: today's takings must be the
       largest thing on the page, readable at arm's length, with "€X more/less
       than last <weekday>" under it. Check a day where last week's same weekday
       has no data, and a closed (archive) day, and confirm the sentence degrades
       rather than lying. Confirm the six Wintouch counters are collapsed by
       default and that opening them is one tap.
-- [ ] **Tally: keyboard and screen-reader pass (plan.md §806, item 3)** — on
+- [ ] **Beta-test Tally: keyboard and screen-reader pass (plan.md §806, item 3)** — on
       `beta`, Tab to a table row in the Tables tab and open it with Enter/Space;
       it must expand, announce its state, and return focus sensibly. Confirm the
       Shops page shows "Request failed" alone when the API is unreachable (stop
       the tally container) rather than also claiming there are no shops.
-- [ ] **Tally agent: the closed day the live table swallows (plan.md §810)** — in
+- [ ] **Confirm a day close empties Tally's live table (plan.md §810)** — in
       `apps/tally/app/agent/ShopReader.cs`, `ResolveDayAsync` falls back to
       `DateTime.Today` when `wsir_vnd_vendas` is empty, and `ReadOverviewAsync`
       then takes the *live* path for that date, so if Wintouch empties the live
@@ -469,21 +469,21 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       with `archive: true`, and add a "closed before midnight" fixture. Needs
       `dotnet`, which the dev host does not have; the agent installer ships it to
       every shop, so it is not an edit to make blind.
-- [ ] **Tally agent: do live and archived days agree? (plan.md §810)** — read one
+- [ ] **Compare Tally's live and archived days (plan.md §810)** — read one
       real day through both paths and compare: average ticket (net numerator over
       a sales-only denominator), discounts / customers / consumptions (defined
       differently live and archived), the hour buckets (line `EntryDate` live vs
       header `entrydate` archived, which can put a "by 14:00" comparison's two
       sides in different hours), and whether stale `wsir_vnd_pedidos` rows inflate
       Forecast. Any disagreement is a defect in what the owner is told.
-- [ ] **Tally: the fourth critique's web fixes (plan.md §810)** — on `beta`, on a
+- [ ] **Beta-test Tally: the fourth critique's web fixes (plan.md §810)** — on `beta`, on a
       phone: switch away from the app for a few minutes and back — the figures must
       refresh on return, not on the next 30 s tick; tap a column of the hourly
       chart and read its figure; on a closed day the hero names the date; a shop
       with no tables opens on Items with no empty Tables tab; the items table
       shows ten rows with "Show all"; with the till PC switched off, the panel
       says to check it and recovers on its own — also while viewing a past day.
-- [ ] **Tally: the third critique's fixes (plan.md §806.8)** — on `beta`: shortly
+- [ ] **Beta-test Tally: the third critique's fixes (plan.md §806.8)** — on `beta`: shortly
       after midnight (or any time the shop's trading day is not today's date)
       the hero must say "Taken on dd/MM", not "today"; mid-afternoon the
       comparison must read "…by HH:00" with the hour a complete one; unplug the
@@ -493,13 +493,13 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       Saturday; a typed day outside the picker's range is refused; and with an
       open-tabs figure above €10,000 on a 360px phone nothing spills out of its
       tile.
-- [ ] **Tally: sole-shop viewers skip the list (plan.md §809)** — on `beta`, sign in
+- [ ] **Beta-test Tally: sole-shop viewers skip the list (plan.md §809)** — on `beta`, sign in
       as a non-admin who has been granted exactly one shop: opening Tally must land
       on that shop directly (no flash of the list), the shop page must have no
       "← All shops" link, and the browser back button must not bounce between the
       two. Then as an admin with one shop, and as a non-admin with two, confirm
       the list and the link are both still there.
-- [ ] **Tally: clarity wording and the quiet-day view (plan.md §806.7)** — on
+- [ ] **Beta-test Tally: clarity wording and the quiet-day view (plan.md §806.7)** — on
       `beta`, mid-morning on a running day the sentence under the hero must end
       "by this hour" ("a esta hora"); on a closed day it must not. Before the
       first sale only the one-sentence card, Tables in use and Here now show —
@@ -515,12 +515,12 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       outline button and confirm its label stays readable on the filled hover.
       The hotel apps (admin, check-in, pulse) share this theme; open one in
       each mode and confirm nothing reads washed out or too dark.
-- [ ] **Tally: touch targets, titles and the tables-in-use count (plan.md §806.6)** —
+- [ ] **Beta-test Tally: touch targets, titles and the tables-in-use count (plan.md §806.6)** —
       on `beta`, on a phone: the day-counters heading, a table's number and the
       back link must each be easy to hit (44px); the tab title reads "<shop> ·
       Tally"; and with some tables awaiting payment, "Tables in use" must count
       them (e.g. 6 seated + 4 waiting shows 10, with "4 waiting to pay").
-- [ ] **Tally: URL state, refresh feedback and offline (plan.md §806.5)** — on
+- [ ] **Beta-test Tally: URL state, refresh feedback and offline (plan.md §806.5)** — on
       `beta`, pick a past day on a phone, reload: you must land on that day, and
       the address must carry `?date=`. Press Refresh: it must read "Refreshing…"
       and be disabled until it lands. Switch Tables ↔ Items and confirm no
@@ -528,7 +528,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       offline: "You are offline" must appear, and clear on reconnect. With a
       screen reader, Refresh announces "Updated at HH:MM" and the 30 s refresh
       stays silent; each chart reads as one graphic, not one line per bar.
-- [ ] **Tally: contrast and touch targets (plan.md §806, item 4)** — on `beta`,
+- [ ] **Beta-test Tally: contrast and touch targets (plan.md §806, item 4)** — on `beta`,
       in both light and dark, confirm every stat-card label is readable on a
       phone in daylight, and that Refresh, the theme toggle, the language select
       and the date input are all at least 44px tall on a touch device.
@@ -834,7 +834,7 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       item once it's fixed and the bouncer is confirmed enforcing live. Last
       checked 2026-10-09: latest release is still v0.0.18 (2026-06-02), and no
       upstream issue names the 10000 auth error.
-- [ ] **MeshCentral: prove real agent enrolment through the public tunnel**
+- [ ] **Prove MeshCentral agent enrolment through the public tunnel**
       — the app is up, reachable at its own hostname with no Authelia gate,
       and its own login page confirmed live (§505/§506), but the actual
       point of re-adding it is agents on machines that aren't ours, dialing

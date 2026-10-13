@@ -38641,3 +38641,12 @@ From §912: every scan hit `/.env*`, `/.git*`, `.aws`, `.docker`, PHPUnit `eval-
 - [x] Live probe (read-only, status only, inside backend container): current token GET on the entrypoint → `404 10003` — can read, zone has no custom rules, so first run takes the clean create path. Write scope unknown until it runs; the checklist reports it.
 
 Rejected: `matches` regex (Business plan+ only; free zones would 400). Blocking `*.php` zone-wide — Nextcloud, ITFlow, Kimai serve PHP. A new UI field for a second token — Cloudflare edits a token's scopes in place, so asking for a new secret would be a wasted step (§0.3).
+
+## 916. Startup list: beta-only items out of agent bucket
+
+[x] done. SessionStart hook split README TODO by headline verb only. 21 "agent-actionable" items listed; zero real agent work — critique items all fixes landed, only `beta` look left; Tally web items `beta` checks; Tally agent items gated on real-shop reading. Agent proposed undoable work.
+
+- Renamed 19 headlines to host-verify verbs (`Beta-test …`, `Confirm …`, `Compare …`, `Prove …`). Now 2 listed (both upstream-blocked, agent can check upstream), 96 queued.
+- `scripts/test-session-summary.sh` guard: listed item whose body opens `on \`beta\`` or says "this item is now only the `beta` look" = FAIL. Failed on 8 before rename.
+- Rejected: classify by item body inside hook. Body wording varies ("in order, test first…" on finished critique items), so no regex catches all; headline verb stay contract, test catch common drift.
+- Rule going forward: last sub-fix of item lands, rename headline to `Beta-test …` same commit.
