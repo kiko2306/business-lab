@@ -38599,7 +38599,7 @@ Read-only pass on home-srv-01: `cscli alerts list --since 120h`, `cscli decision
 **Working.** NPM Lua bouncer enforces with real client IP through the tunnel. CAPI on: ~20k community bans. Repeat-offender `duration_expr` (§538/§541) live: `34.156.249.47` 4h day 1, 20h on return. Home Assistant onboarding redirect is harmless — `user` step done, so no owner takeover.
 
 **Gaps.**
-- [ ] ntfy keeps 12h (default `cache-duration`), so no 5-day notification history. Raise to 7d.
+- [x] ntfy keeps 12h (default `cache-duration`), so no 5-day notification history. `NTFY_CACHE_DURATION: 168h` in compose; compose-only, beta item is the test.
 - [ ] Stale bouncer rows `nginx` (last pull 09-23) and `nginx@10.201.17.3` (10-07) left by replaced NPM containers. Prune from code; `cloudflare` row (never pulls — edge bouncer parked, README) must survive.
 - [ ] Exploit attempts (CVE scenarios) get same 4h first ban as a crawl. Longer first ban for them.
 - [ ] Edge WAF rule via Cloudflare API dropping `/.env*`, `/.git/*`, `/vendor/phpunit/*`, `*.php` on bare domain — cuts noise before tunnel; no app serves PHP there.

@@ -649,6 +649,9 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
 
 ### Exposure and platform
 
+- [ ] **Beta-test 7-day ntfy history (plan.md §912)** — on `beta`, after the update
+      recreates ntfy: `docker inspect ntfy-ntfy-1` shows `NTFY_CACHE_DURATION=168h`, and a
+      day later yesterday's CrowdSec/backup notifications are still in the ntfy app history.
 - [ ] **Beta-test the backup and container-command changes (plan.md §911)** — on `beta`, after
       the update restarts the backend. **Backup:** Backups → run one scheduled-time backup (or
       wait for the hour); Audit log shows exactly one `backup_create` for that run, and the
@@ -790,11 +793,6 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       is still gated, but the list is a free recon map. Options: (a) put the Home Page
       behind Authelia, (b) keep the page public but block `/api/services*` at NPM,
       (c) keep as is (§111). Production per-client deployments are the case that matters.
-- [ ] **Keep ntfy notifications for 7 days, not 12 hours (plan.md §912)** — set
-      `NTFY_CACHE_DURATION: 168h` in `apps/ntfy/docker-compose.yml` with a why-comment
-      (a 5-day CrowdSec report found only one message left). Compose-only; beta test:
-      after the update recreates ntfy, a notification from yesterday is still listed
-      in the ntfy web app / phone app history.
 - [ ] **Prune stale CrowdSec bouncer registrations automatically (plan.md §912)** —
       each NPM recreate registers a new `nginx@<ip>` bouncer and the old row stays
       (test box: `nginx`, last pull 09-23; `nginx@10.201.17.3`, 10-07). On CrowdSec

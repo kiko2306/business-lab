@@ -25,6 +25,11 @@ services:
       NTFY_BEHIND_PROXY: ${NTFY_BEHIND_PROXY:-false}
       # Persist messages / subscriptions across restarts (default is in-memory).
       NTFY_CACHE_FILE: /var/cache/ntfy/cache.db
+      # ntfy drops cached messages after 12h by default, so a phone that was
+      # offline over a weekend never gets the alerts, and a "what did CrowdSec
+      # ban this week" look back found one message left (plan.md §912). A week
+      # of alerts is a few hundred rows.
+      NTFY_CACHE_DURATION: 168h
       # ntfy's own access control (plan.md §425). `write-only` is the whole
       # trick: anyone may PUBLISH anonymously, nobody may READ without a
       # token. That is the right way round here —
