@@ -182,6 +182,35 @@ export function spliceAccessControl(configText: string, block: string): string {
   return `${block}\n${configText}`;
 }
 
+/**
+ * Where a bare login lands — someone who opened the Authelia portal directly,
+ * with no app to return to. The Home Page, now that it is every account's
+ * start page (plan.md §914); the bare domain when it has one. Null while the
+ * Home Page is not exposed: pointing Authelia at a hostname with no proxy host
+ * behind it would land every bare login on an error page, so the line is then
+ * left as it is.
+ */
+async function getLoginLandingUrl(): Promise<string | null> {
+  const result = await query<{ service_name: string; hostname: string | null }>(
+    `SELECT service_name, hostname
+     FROM service_exposure
+     WHERE enabled = TRUE AND service_name IN ('homepage', 'homepage:apex') AND hostname IS NOT NULL`
+  );
+  const pick = result.rows.find((r) => r.service_name === 'homepage:apex') ?? result.rows[0];
+  return pick?.hostname ? `https://${pick.hostname}` : null;
+}
+
+/**
+ * Point every `default_redirection_url:` line at `url`, keeping its
+ * indentation. Only the value changes, so the rest of the hand-seeded
+ * `session:` block (configuration.yml.example) is untouched.
+ */
+export function spliceDefaultRedirection(configText: string, url: string | null): string {
+  if (!url) return configText;
+  // A function replacer, for the same `$&` reason as spliceAccessControl.
+  return configText.replace(/^([ \t]*default_redirection_url:[ \t]*).*$/gm, (_m, key: string) => `${key}'${url}'`);
+}
+
 async function restartAuthelia(): Promise<void> {
   const resolved = resolveComposeFile('authelia');
   if (!resolved?.composeFile) {
@@ -204,7 +233,8 @@ export interface AccessControlSyncResult {
 }
 
 /**
- * Regenerate the `access_control` block and, if it changed, restart Authelia.
+ * Regenerate the `access_control` block and the bare-login landing page and,
+ * if either changed, restart Authelia.
  */
 export async function syncAutheliaAccessControl(trigger: string): Promise<AccessControlSyncResult> {
   const configPath = getConfigPath();
@@ -212,7 +242,7 @@ export async function syncAutheliaAccessControl(trigger: string): Promise<Access
     return { changed: false, restarted: false, ruleCount: 0, reason: 'authelia-not-installed' };
   }
 
-  const [portalDomain, gated] = await Promise.all([getPortalDomain(), getGatedApps()]);
+  const [portalDomain, gated, landingUrl] = await Promise.all([getPortalDomain(), getGatedApps(), getLoginLandingUrl()]);
 
   // A `default_policy: deny` block needs at least one rule — Authelia's own
   // schema validation refuses to boot otherwise ("must be 'two_factor' or
@@ -228,7 +258,7 @@ export async function syncAutheliaAccessControl(trigger: string): Promise<Access
   const block = renderAccessControl(portalDomain, gated);
 
   const current = fs.readFileSync(configPath, 'utf8');
-  const next = spliceAccessControl(current, block);
+  const next = spliceDefaultRedirection(spliceAccessControl(current, block), landingUrl);
   if (next === current) {
     return { changed: false, restarted: false, ruleCount: gated.length };
   }

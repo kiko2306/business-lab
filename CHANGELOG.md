@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.172.1] — 2026-10-13
+
+### Changed
+
+- Logging in at the Authelia portal directly now lands on the Home Page
+
 ## [0.172.0] — 2026-10-13
 
 ### Changed

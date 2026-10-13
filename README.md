@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.172.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.172.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -657,6 +657,10 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       not 200. Log in as a non-admin user with **no** app grants: Home Page loads. Users
       page app picker has no "Home Page" entry. Uptime Kuma's "Nginx Proxy Manager
       (public)" monitor stays up (it follows the redirect, any status accepted).
+- [ ] **Beta-test the Home Page as login landing page (plan.md §914)** — same restart as
+      the §913 item covers it. In a private window open `https://authelia.<domain>/`
+      directly and log in: you land on `https://<domain>/` (Home Page), not
+      `netbird-vpn.<domain>`. Opening a gated app first still returns to that app.
 - [ ] **Beta-test the longer ban for exploit attempts (plan.md §912)** — on `beta`, after
       the update, restart CrowdSec from the dashboard; it comes back healthy (a bad profile
       is fatal at start). On the next CVE alert (`crowdsecurity/CVE-*`, `http-cve-probing`),

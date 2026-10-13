@@ -32,7 +32,7 @@ import { query } from '../utils/database';
 import { getAllUsersAppOptions, getAppAccessOptions } from './userAppAccess';
 import { getUsersDatabasePath } from './autheliaUsers';
 import { getService, isAutheliaProtectionRequired, resolveComposeFile } from '../config/services';
-import { renderAccessControl, spliceAccessControl, syncAutheliaAccessControl } from './autheliaAccessControl';
+import { renderAccessControl, spliceAccessControl, spliceDefaultRedirection, syncAutheliaAccessControl } from './autheliaAccessControl';
 
 const mockedQuery = vi.mocked(query);
 const mockedExistsSync = vi.mocked(fs.existsSync);
@@ -50,8 +50,14 @@ const mockedResolveComposeFile = vi.mocked(resolveComposeFile);
  * free to change — and did, the moment gated secondary exposures added a third
  * query (plan.md §637).
  */
-function mockQueries(responses: { exposure?: unknown[]; settings?: unknown[]; secondary?: unknown[] }): void {
+function mockQueries(responses: {
+  exposure?: unknown[];
+  settings?: unknown[];
+  secondary?: unknown[];
+  homepage?: unknown[];
+}): void {
   mockedQuery.mockImplementation((async (sql: string) => {
+    if (sql.includes("'homepage")) return { rows: responses.homepage ?? [] };
     if (sql.includes("LIKE '%:%'")) return { rows: responses.secondary ?? [] };
     if (sql.includes('service_exposure')) return { rows: responses.exposure ?? [] };
     if (sql.includes('settings')) return { rows: responses.settings ?? [] };
@@ -189,6 +195,38 @@ describe('syncAutheliaAccessControl', () => {
     expect(written).not.toContain('app-homepage');
   });
 
+  // A bare login (someone opening the Authelia portal directly) used to land on
+  // netbird-vpn.<domain>; the Home Page is the start page now (§914).
+  it('lands a bare login on the Home Page once it is exposed, preferring the bare domain', async () => {
+    mockQueries({
+      exposure: [{ hostname: 'authelia.example.com' }],
+      settings: [{ value: 'example.com' }],
+      homepage: [
+        { service_name: 'homepage', hostname: 'homepage.example.com' },
+        { service_name: 'homepage:apex', hostname: 'example.com' },
+      ],
+    });
+    mockedReadFileSync.mockReturnValue(
+      "theme: light\nsession:\n  cookies:\n    - domain: 'example.com'\n      default_redirection_url: 'https://netbird-vpn.example.com'\n"
+    );
+
+    await syncAutheliaAccessControl('exposure_change');
+    const [, written] = mockedWriteFileSync.mock.calls[0] as [unknown, string];
+
+    expect(written).toContain("      default_redirection_url: 'https://example.com'\n");
+    expect(written).not.toContain('netbird-vpn');
+  });
+
+  it('leaves the landing page alone while the Home Page is not exposed', async () => {
+    mockQueries({ exposure: [{ hostname: 'authelia.example.com' }], settings: [{ value: 'example.com' }] });
+    mockedReadFileSync.mockReturnValue("theme: light\n      default_redirection_url: 'https://netbird-vpn.example.com'\n");
+
+    await syncAutheliaAccessControl('exposure_change');
+    const [, written] = mockedWriteFileSync.mock.calls[0] as [unknown, string];
+
+    expect(written).toContain("default_redirection_url: 'https://netbird-vpn.example.com'");
+  });
+
   it('writes and restarts once the base domain resolves, even with no gated apps yet', async () => {
     mockQueries({ exposure: [{ hostname: null }], settings: [{ value: 'example.com' }] });
     mockedReadFileSync.mockReturnValue('theme: light\n');
@@ -316,5 +354,26 @@ describe('spliceAccessControl treats the block as literal', () => {
     const out = spliceAccessControl('access_control:\n  default_policy: deny\n\ntail_marker_unique: true\n', block);
     expect(out).toContain("- '^/x$'");
     expect(out.split('tail_marker_unique').length - 1).toBe(1);
+  });
+});
+
+describe('spliceDefaultRedirection', () => {
+  const config = "session:\n  cookies:\n    - domain: 'example.com'\n      default_redirection_url: 'https://old.example.com'\nstorage: {}\n";
+
+  it('replaces only the value, keeping the indentation and the rest of the file', () => {
+    expect(spliceDefaultRedirection(config, 'https://example.com')).toBe(
+      config.replace("'https://old.example.com'", "'https://example.com'")
+    );
+  });
+
+  it('is a no-op with no landing page, or no such line', () => {
+    expect(spliceDefaultRedirection(config, null)).toBe(config);
+    expect(spliceDefaultRedirection('theme: light\n', 'https://example.com')).toBe('theme: light\n');
+  });
+
+  it('treats the URL as literal text', () => {
+    expect(spliceDefaultRedirection(config, "https://a.example.com/$&$'")).toContain(
+      "default_redirection_url: 'https://a.example.com/$&$''"
+    );
   });
 });

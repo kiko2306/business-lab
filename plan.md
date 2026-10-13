@@ -38619,3 +38619,13 @@ User decision after §912's report: `/api/services` on the public Home Page list
 Checked, unchanged: Authelia session cookie domain is the base domain, so it covers the apex. Uptime Kuma "Nginx Proxy Manager (public)" monitor probes `https://<domain>/` with any status accepted and redirects followed — stays up. `autheliaValidate` still vets the generated config before write.
 Rejected: per-user grant (works with no new rule type, but every account would need Home Page ticked to see its own start page). Blocking only `/api/services` at NPM — page stays public, and gethomepage's other endpoints (`/api/widgets`, `/api/bookmarks`) answer too.
 Not done (separate, if wanted): Authelia `default_redirection_url` still points at `netbird-vpn.`; landing on Home Page after a bare login would be natural.
+
+## 914. Bare login lands on the Home Page
+
+User follow-up to §913. Authelia's `default_redirection_url` (seeded from configuration.yml.example) pointed at `netbird-vpn.<domain>`, so opening the portal directly and logging in landed on NetBird.
+
+- [x] `syncAutheliaAccessControl` also rewrites every `default_redirection_url:` line (`spliceDefaultRedirection`, value only, function replacer for the §423 `$&` reason) to the Home Page: `homepage:apex` hostname, else `homepage`. Same validate → write → single restart path, so no extra Authelia restart.
+- [x] Home Page not exposed → line left as is (a hostname with no proxy host would land every bare login on an error).
+- [x] Proof beyond unit tests: temp copy of the live config with `default_redirection_url: 'https://tx-home-utils.com'` through `authelia validate-config` in a throwaway run — "parsed and loaded successfully". Mattered because a rejection would also have blocked §913's access rules (validation gates the whole write).
+
+Rejected: editing configuration.yml.example only — the live file is seeded once and gitignored, so existing hosts would never change.

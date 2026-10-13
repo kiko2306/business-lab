@@ -51,6 +51,8 @@ session:
     # actually be reachable at first.
     - domain: '{{ env "BASE_DOMAIN" }}'
       authelia_url: 'https://authelia.{{ env "BASE_DOMAIN" }}'
+      # Where a bare login (portal opened directly) lands. The dashboard
+      # rewrites this to the Home Page once it is exposed (plan.md §914).
       default_redirection_url: 'https://netbird-vpn.{{ env "BASE_DOMAIN" }}'
 
 storage:
