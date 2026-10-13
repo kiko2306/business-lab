@@ -50,7 +50,7 @@ describe('buildBouncerConfig (cloudflare-worker-bouncer)', () => {
 describe('buildProfilesYaml', () => {
   it('references http_default under notifications when alerting is enabled', () => {
     const docs = yaml.loadAll(buildProfilesYaml(true)) as Array<{ name: string; notifications: string[] }>;
-    expect(docs.map((d) => d.name)).toEqual(['default_ip_remediation', 'default_range_remediation']);
+    expect(docs.map((d) => d.name)).toEqual(['exploit_ip_remediation', 'default_ip_remediation', 'default_range_remediation']);
     for (const doc of docs) {
       expect(doc.notifications).toEqual(['http_default']);
       // The ban decision must survive regardless of the notification toggle —
@@ -68,13 +68,51 @@ describe('buildProfilesYaml', () => {
     }
   });
 
-  it('escalates repeat offenders on both profiles, capped at a week', () => {
-    const docs = yaml.loadAll(buildProfilesYaml(true)) as Array<{ duration_expr: string }>;
+  it('escalates repeat offenders on both default profiles, capped at a week', () => {
+    const docs = (yaml.loadAll(buildProfilesYaml(true)) as Array<{ name: string; duration_expr: string }>).filter((d) =>
+      d.name.startsWith('default_')
+    );
     for (const doc of docs) {
       expect(doc.duration_expr).toBe(
         "Sprintf('%dh', GetDecisionsCount(Alert.GetValue()) >= 41 ? 168 : (GetDecisionsCount(Alert.GetValue()) + 1) * 4)"
       );
     }
+  });
+});
+
+// An exploit attempt (CVE-2017-9841, CVE-2021-3129 in §912's report) is a
+// clearer signal than a crawl, so it starts at a day instead of 4h.
+describe('buildProfilesYaml exploit profile', () => {
+  const docs = yaml.loadAll(buildProfilesYaml(true)) as Array<{
+    name: string;
+    filters: string[];
+    decisions: { type: string; duration: string }[];
+    duration_expr: string;
+    notifications: string[];
+    on_success: string;
+  }>;
+  const exploit = docs[0];
+
+  it('comes first, so it wins over the generic IP profile', () => {
+    expect(exploit.name).toBe('exploit_ip_remediation');
+    expect(exploit.on_success).toBe('break');
+  });
+
+  it('matches only CVE scenarios on an IP', () => {
+    expect(exploit.filters).toEqual([
+      `Alert.Remediation == true && Alert.GetScope() == "Ip" && Alert.GetScenario() matches "(?i)cve"`,
+    ]);
+  });
+
+  it('bans a day first, then escalates to the same one-week cap', () => {
+    expect(exploit.decisions).toEqual([{ type: 'ban', duration: '24h' }]);
+    expect(exploit.duration_expr).toBe(
+      "Sprintf('%dh', GetDecisionsCount(Alert.GetValue()) >= 6 ? 168 : (GetDecisionsCount(Alert.GetValue()) + 1) * 24)"
+    );
+  });
+
+  it('still notifies', () => {
+    expect(exploit.notifications).toEqual(['http_default']);
   });
 });
 

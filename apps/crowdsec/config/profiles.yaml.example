@@ -12,7 +12,21 @@
 #
 # duration_expr (plan.md §541) overrides the 4h for repeat offenders: 4h per
 # decision the IP already has, plus 4h, capped at 168h (a week).
+#
+# exploit_ip_remediation (plan.md §912) comes first and catches CVE scenarios:
+# 24h first ban, plus 24h per earlier decision, same 168h cap.
 
+name: exploit_ip_remediation
+filters:
+  - Alert.Remediation == true && Alert.GetScope() == "Ip" && Alert.GetScenario() matches "(?i)cve"
+decisions:
+  - type: ban
+    duration: 24h
+duration_expr: "Sprintf('%dh', GetDecisionsCount(Alert.GetValue()) >= 6 ? 168 : (GetDecisionsCount(Alert.GetValue()) + 1) * 24)"
+notifications:
+  - http_default
+on_success: break
+---
 name: default_ip_remediation
 filters:
   - Alert.Remediation == true && Alert.GetScope() == "Ip"

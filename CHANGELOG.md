@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.171.9] — 2026-10-13
+
+### Changed
+
+- CrowdSec: exploit attempts are banned for a day at first, not 4 hours
+
 ## [0.171.8] — 2026-10-13
 
 ### Fixed

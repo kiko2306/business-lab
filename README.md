@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.171.8** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.171.9** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -649,6 +649,10 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
 
 ### Exposure and platform
 
+- [ ] **Beta-test the longer ban for exploit attempts (plan.md §912)** — on `beta`, after
+      the update, restart CrowdSec from the dashboard; it comes back healthy (a bad profile
+      is fatal at start). On the next CVE alert (`crowdsecurity/CVE-*`, `http-cve-probing`),
+      Settings → CrowdSec bans shows ~24h left for that IP, not ~4h; crawl/probe bans still 4h.
 - [ ] **Beta-test stale CrowdSec bouncer prune (plan.md §912)** — on `beta`, after the update,
       restart CrowdSec from the dashboard. Backend log has "removed stale NPM bouncer
       registrations" naming `nginx@10.201.17.3`; Settings → CrowdSec bans still loads; a
@@ -797,12 +801,6 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       is still gated, but the list is a free recon map. Options: (a) put the Home Page
       behind Authelia, (b) keep the page public but block `/api/services*` at NPM,
       (c) keep as is (§111). Production per-client deployments are the case that matters.
-- [ ] **Longer first ban for exploit attempts (plan.md §912)** — a CVE scenario
-      (`crowdsecurity/CVE-*`, `http-cve-probing`) currently gets the same 4h first ban
-      as a crawl. Add a profile ahead of `default_ip_remediation` in `buildProfilesYaml`
-      giving those e.g. 24h base, keeping the repeat-offender escalation and the
-      168h cap. Test the rendered YAML; beta test: next CVE alert's decision shows the
-      longer duration.
 - [ ] **Edge WAF rule for secret/PHP probes via Cloudflare API (plan.md §912)** — every
       scan hit the bare domain asking for `/.env*`, `/.git/*`, `/vendor/phpunit/*`,
       `*.php`. Create/maintain a zone custom rule (block) from the dashboard using the
