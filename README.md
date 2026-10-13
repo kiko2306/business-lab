@@ -238,15 +238,6 @@ Infrastructure robustness, five items. Three touch Docker or nginx, so they need
 - [ ] **Beta-test that daily backups run every day (plan.md §918)** — on `beta`, after the update
       restarts the backend: Backups lists one new archive on each of the next two mornings (the run
       at the scheduled hour), not every other one.
-- [ ] **Beta-test media apps on a root-owned share folder (plan.md §920)** — on `beta`, after the
-      update: stop Navidrome, then on the host make its folder root-owned and closed again
-      (`sudo chown root:root apps/nextcloud/data/shared/music && sudo chmod 755 …/music`), start
-      Navidrome from the dashboard: it starts, and the folder is now `drwxrwxrwx`.
-- [ ] **Beta-test the pinned socket proxy (plan.md §884 item 1, §919)** — *2026-10-13: the backend's
-      proxy ran `v0.5.0` and start/stop worked through it; the watchdog's was still `:latest`.* After
-      the update that ships §919: `docker ps` shows `watchdog-docker-proxy` on
-      `tecnativa/docker-socket-proxy:v0.5.0` and `self-update-watchdog` recreated (fresh uptime), and
-      the update itself completed.
 
 ### Review batch 2, 2026-10-08 (plan.md §879)
 
@@ -578,10 +569,9 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
 ### Apps page (impeccable critique, plan.md §761)
 
 - [ ] **Beta-test "Show details" and Try again after a real failed start (plan.md §774, §921)** —
-      *2026-10-13: the start API returns the compose failure text and the card goes `error`.* After
-      the update that ships §921: hold IT Tools' port (10490) with a listener, press Start — the row
-      shows "Couldn't start X. Try again" and "Show details" with the compose text. Free the port,
-      Try again → running **and reachable on 10490** (`docker ps` lists the port). Also look for the
+      *2026-10-13 at 0.173.4, over the API: a start on a held 10490 fails with the compose text and
+      leaves no container; after freeing it, Start → running, healthy, 10490 published and serving.*
+      Left, in the browser: the row's "Couldn't start X. Try again" + "Show details", and the
       "Starting…" Start button.
 
 - [ ] **Beta-test the "Local network" row link (plan.md §772, §773)** — the Running panel is
@@ -916,15 +906,6 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       confirmations: open a Nextcloud document and see the OnlyOffice editor
       load, and see the master cron switch on in ITFlow's own admin UI.
 
-- [ ] **Beta-test the shared poll helper on a first boot (plan.md §720)** —
-      nine first-admin bootstraps now wait through `pollUntilReady` instead of
-      their own loop, and that code only really runs on an app's *first* start.
-      On `beta`, stop an app with a bootstrap and remove its `data/` so it
-      boots fresh — **Navidrome** or **Jellyfin** are the cheapest — then start
-      it and confirm the admin account is created (log in as the Authelia admin)
-      rather than the app showing its own claim-the-server wizard.
-      `docker logs business-lab-backend` should show no "gave up: the app never
-      became reachable" for it.
 
 - [ ] **Beta-test the memoised OIDC client-secret digest (plan.md §731)** —
       the cache sits in the exposure sync path, which rewrites Authelia's

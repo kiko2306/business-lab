@@ -38704,3 +38704,11 @@ Not done, rejected:
 - Fix: `composeUpOrClearFailedStart` wraps every `up -d` in `composeUpWithManagedConfig` (start, recreate, update): on failure run `compose rm -f` (stopped containers only, running siblings untouched), rethrow original error. Cleanup failure swallowed.
 - Proven on host: fail → `rm -f` → free port → `up -d` = `0.0.0.0:10490->80/tcp`.
 - Rejected: `--force-recreate` on every start — recreates healthy containers on each Start click. Rejected: `compose down` on failure — stops siblings that came up and drops networks.
+
+## 922. Beta checks of §919–§921, and §720, 2026-10-13 (0.173.4)
+
+[x] done. After owner's Update.
+- §919 pass: `watchdog-docker-proxy` on `v0.5.0`, `self-update-watchdog` recreated (both up 6 min = the update); update run `done`.
+- §921 pass (API): held 10490 → start 500, no leftover container; free → Start = running, healthy, `0.0.0.0:10490->80/tcp`, HTTP 200. Browser look stays in README.
+- §920 pass: `music/` set `root:root 0755` via root container, Navidrome start 200, folder now `drwxrwxrwx`.
+- §720 pass: `apps/navidrome/data` moved aside by a root container (the §917 attempt failed without root), fresh start → "Navidrome admin account created" for `mat`, no "gave up". Original data moved back, app healthy. Fresh run's data was untracked in the host checkout (`apps/navidrome/data.ct-fresh`, outside gitignored `data/`) — moved to `/home/mat/ct-navidrome-data-fresh`; owner deletes (needs root).
