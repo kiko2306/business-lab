@@ -99,7 +99,16 @@ export function shouldRunScheduledBackup(
   if (Number.isNaN(lastRunMs)) {
     return true;
   }
-  return now.getTime() - lastRunMs >= (retrying ? CHECK_INTERVAL_MS : FREQUENCY_MS[frequency]);
+  if (retrying) {
+    return now.getTime() - lastRunMs >= CHECK_INTERVAL_MS;
+  }
+  // With a run-at hour, the hour gate already keeps it to one run per period;
+  // the elapsed check only has to stop a second run inside the same hour. The
+  // poll's phase is set by backend boot and `lastRunAt` by when a run finished,
+  // so the next period's in-hour check can land minutes short of the full
+  // period — demanding all of it skipped every other day (plan.md §917).
+  const slack = runAtTime ? CHECK_INTERVAL_MS : 0;
+  return now.getTime() - lastRunMs >= FREQUENCY_MS[frequency] - slack;
 }
 
 // The run below is claimed as `failed` before it starts, so a check landing

@@ -38670,3 +38670,12 @@ Not done, rejected:
 - Admin resets webmaster password: skipped — guard failure would reset owner's login and revoke sessions.
 - `./start.sh recover reset-password`: refused by Claude's permission classifier.
 - §785 "no token" error: would mean deleting the live Cloudflare token; unit tests cover it.
+
+## 918. Daily backup no longer skips every other day
+
+[x] done. Bug from §917. Poll hourly from boot; `lastRunAt` stamped at run finish; next day's in-hour check landed <24 h after → skipped, next in-hour check a day later. Box: archives 10-10, 10-12 only.
+
+- Fix: `shouldRunScheduledBackup` with run-at hour needs `period − 1 h` elapsed, not full period. Hour gate already caps one run per period; elapsed check only blocks second run inside same hour.
+- No run-at hour: unchanged (full period) — no hour gate, so slack would let it drift earlier each day.
+- Rejected: stamp `lastRunAt` at run start — still fails when the poll phase sits before the previous start minute.
+- Tests: the 10-12 → 10-13 case from the box (daily + weekly), and no second run inside same hour.

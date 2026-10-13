@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -248,12 +248,9 @@ Infrastructure robustness, five items. Three touch Docker or nginx, so they need
       failed `up -d` leaves a created container whose port binding Docker drops; the retry
       `up -d` starts that one instead of recreating it. Fix in the start path (e.g. remove the
       app's half-created containers when `up` fails), test first (plan.md §917).
-- [ ] **Daily backup skips every other day** — the scheduler checks hourly from backend boot,
-      and needs `now − lastRunAt ≥ 24h` inside the run-at hour, with `lastRunAt` stamped when the
-      run *finishes*. A check a minute short of 24h skips the hour, and the next in-hour check is
-      a day later — archives on the box are 10-10 and 10-12 only, none on 10-11 or 10-13.
-      Allow one check interval of slack in `shouldRunScheduledBackup`
-      (`backend/src/services/backupScheduler.ts`), test first (plan.md §917).
+- [ ] **Beta-test that daily backups run every day (plan.md §918)** — on `beta`, after the update
+      restarts the backend: Backups lists one new archive on each of the next two mornings (the run
+      at the scheduled hour), not every other one.
 - [ ] **Media app cannot start while its share folder is root-owned** — 2026-10-13: Navidrome's
       start failed with `EPERM … chmod '…/nextcloud/data/shared/music'`: the folder was
       `root:root 0755` (made by Docker before §870), so `ensureSharedFolders` cannot chmod it and

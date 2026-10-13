@@ -115,6 +115,27 @@ describe('shouldRunScheduledBackup', () => {
     expect(shouldRunScheduledBackup(now, lastRunAt, 'daily', due, '04:00', 'Europe/Berlin')).toBe(true);
   });
 
+  // Regression: the poll runs hourly from backend boot and `lastRunAt` is
+  // stamped when a run *finishes*, so the next day's in-hour check can land a
+  // minute short of 24 h. Requiring the full 24 h skipped that day outright —
+  // the box had archives on 10-10 and 10-12 only (plan.md §917).
+  it('runs at the configured hour even when the last run finished a little under 24 h ago', () => {
+    const lastRunAt = '2026-10-12T02:55:17Z'; // finished 03:55 Lisbon
+    const now = new Date('2026-10-13T02:54:16Z'); // next day's check, 03:54 Lisbon
+    const due = { outcome: null, consecutiveFailures: 0 } as const;
+
+    expect(shouldRunScheduledBackup(now, lastRunAt, 'daily', due, '03:00', 'Europe/Lisbon')).toBe(true);
+    expect(shouldRunScheduledBackup(new Date('2026-10-19T02:54:16Z'), lastRunAt, 'weekly', due, '03:00', 'Europe/Lisbon')).toBe(true);
+  });
+
+  it('still runs once per day at the configured hour, not twice in it', () => {
+    const lastRunAt = '2026-10-13T02:10:00Z';
+    const now = new Date('2026-10-13T02:54:00Z'); // same hour, same day
+    const due = { outcome: null, consecutiveFailures: 0 } as const;
+
+    expect(shouldRunScheduledBackup(now, lastRunAt, 'daily', due, '03:00', 'Europe/Lisbon')).toBe(false);
+  });
+
   it('handles midnight, which some ICU builds render as hour 24', () => {
     const lastRunAt = '2026-08-26T00:00:00Z';
     const now = new Date('2026-08-27T23:00:01Z'); // 00:00 in Lisbon (WEST, UTC+1)
