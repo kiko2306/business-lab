@@ -5,7 +5,8 @@
  *
  * Model: `default_policy: deny`, plus one `one_factor` rule per gated app that
  * admits `group:admins` (every webmaster) or `group:app-<name>` (a user the
- * dashboard granted that app — see autheliaSync.ts). An app with no rule is
+ * dashboard granted that app — see autheliaSync.ts), or, for an
+ * `autheliaAllUsers` app (Home Page, §913), any signed-in user. An app with no rule is
  * unreachable. Authelia's own portal is `bypass` so `deny` can't lock the
  * login page itself out.
  *
@@ -23,7 +24,7 @@ import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
 import { getService, isAutheliaProtectionRequired, resolveComposeFile } from '../config/services';
 import { EXPOSURE_SETTINGS_KEYS } from '../utils/exposureSettings';
-import { getAppAccessOptions } from './userAppAccess';
+import { getAllUsersAppOptions, getAppAccessOptions } from './userAppAccess';
 import { appGroupName } from './autheliaSync';
 import { getUsersDatabasePath } from './autheliaUsers';
 import { rejectsAutheliaConfig } from './autheliaValidate';
@@ -43,7 +44,8 @@ function getConfigPath(): string | null {
 
 interface GatedApp {
   hostname: string;
-  group: string;
+  /** `null` admits any signed-in user (`autheliaAllUsers`, plan.md §913). */
+  group: string | null;
   /** Path regexes to admit unauthenticated — see `autheliaBypassPaths`. */
   bypassPaths?: string[];
 }
@@ -66,13 +68,10 @@ export function renderAccessControl(portalDomain: string | null, gated: GatedApp
         lines.push(`        - '${resource}'`);
       }
     }
-    lines.push(
-      `    - domain: '${app.hostname}'`,
-      `      policy: one_factor`,
-      `      subject:`,
-      `        - 'group:admins'`,
-      `        - 'group:${app.group}'`
-    );
+    lines.push(`    - domain: '${app.hostname}'`, `      policy: one_factor`);
+    if (app.group) {
+      lines.push(`      subject:`, `        - 'group:admins'`, `        - 'group:${app.group}'`);
+    }
   }
   lines.push(MARK_END, '');
   return lines.join('\n');
@@ -80,14 +79,16 @@ export function renderAccessControl(portalDomain: string | null, gated: GatedApp
 
 /** The gated apps, as `{ hostname, group }`, from the live exposure rows. */
 async function getGatedApps(): Promise<GatedApp[]> {
-  const options = await getAppAccessOptions();
-  const primaries = options
-    .filter((o) => o.hostname)
-    .map((o) => ({
-      hostname: o.hostname as string,
-      group: appGroupName(o.serviceName),
-      bypassPaths: getService(o.serviceName)?.autheliaBypassPaths,
-    }));
+  const [options, allUsers] = await Promise.all([getAppAccessOptions(), getAllUsersAppOptions()]);
+  const toGated = (o: (typeof options)[number], group: string | null) => ({
+    hostname: o.hostname as string,
+    group,
+    bypassPaths: getService(o.serviceName)?.autheliaBypassPaths,
+  });
+  const primaries = [
+    ...options.filter((o) => o.hostname).map((o) => toGated(o, appGroupName(o.serviceName))),
+    ...allUsers.filter((o) => o.hostname).map((o) => toGated(o, null)),
+  ];
   return [...primaries, ...(await getGatedSecondaryExposures())];
 }
 
@@ -124,7 +125,7 @@ async function getGatedSecondaryExposures(): Promise<GatedApp[]> {
 
     gated.push({
       hostname: row.hostname as string,
-      group: appGroupName(serviceName),
+      group: service.autheliaAllUsers ? null : appGroupName(serviceName),
       bypassPaths: service.autheliaBypassPaths,
     });
   }

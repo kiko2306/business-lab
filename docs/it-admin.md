@@ -39,7 +39,8 @@ other app is started from the dashboard.
 - **Exposure**: automatic. Every app that *can* be exposed (has an HTTP port,
   isn't LAN-only like Samba or overlay-only like the NPM admin UI) gets a
   public `<name>.<domain>` hostname behind Authelia on its next start — there
-  is no toggle. Home Page is the deliberate public front door. A handful of
+  is no toggle. Home Page (also served at the bare domain) is behind Authelia
+  too, open to every signed-in account rather than granted per user. A handful of
   apps additionally skip their *own* login behind Authelia so there's no
   second form; that's a fixed per-app property, listed in
   [app-credentials.md](app-credentials.md), not a setting. Provisioning

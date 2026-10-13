@@ -38606,3 +38606,16 @@ Read-only pass on home-srv-01: `cscli alerts list --since 120h`, `cscli decision
 - [ ] Decision (user): Home Page public by design (§111), but `/api/services` lists 31 app hostnames unauthenticated (incl. `code-server`). Gate Home Page behind Authelia, block only `/api/services`, or keep.
 
 Rejected: "add repeat-offender escalation" — already exists, verified live. Edge bouncer re-enable — already tracked, upstream `cfut_` token bug unchanged.
+
+## 913. Home Page behind Authelia, for every signed-in user
+
+User decision after §912's report: `/api/services` on the public Home Page listed 31 exposed hostnames to anyone. Gate it; asked who gets in — **every signed-in account**, not a per-user grant.
+
+- [x] New registry flag `autheliaAllUsers` (types/index.ts). `homepage`: dropped `skipAutheliaProtection`, set `autheliaAllUsers`, apex `additionalExposures` entry `autheliaProtected: true` (a public apex would undo the gate). NPM forward-auth follows from `isAutheliaProtectionRequired` → true on both legs.
+- [x] `renderAccessControl`: `group: null` → `one_factor` rule with no `subject` (any authenticated user). `getGatedApps` adds `getAllUsersAppOptions()` primaries with `null`; gated secondaries of such an app also `null`.
+- [x] `userAppAccess`: `isPerUserGated` = protected and not all-users; used by `getAppAccessOptions` (so no `app-homepage` group, no OIDC/rule-by-group) and `getGrantableAppOptions` (so no Users-page picker entry — caught by its own test, missed in the first pass).
+- [x] Docs: app-conventions, app-credentials, first-run, it-admin, webmaster no longer call it public.
+
+Checked, unchanged: Authelia session cookie domain is the base domain, so it covers the apex. Uptime Kuma "Nginx Proxy Manager (public)" monitor probes `https://<domain>/` with any status accepted and redirects followed — stays up. `autheliaValidate` still vets the generated config before write.
+Rejected: per-user grant (works with no new rule type, but every account would need Home Page ticked to see its own start page). Blocking only `/api/services` at NPM — page stays public, and gethomepage's other endpoints (`/api/widgets`, `/api/bookmarks`) answer too.
+Not done (separate, if wanted): Authelia `default_redirection_url` still points at `netbird-vpn.`; landing on Home Page after a bare login would be natural.

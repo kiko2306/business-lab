@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.171.9** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.172.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -649,6 +649,14 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
 
 ### Exposure and platform
 
+- [ ] **Beta-test the Home Page behind Authelia (plan.md §913)** — on `beta`, after the
+      update, restart Home Page from the dashboard (re-provisions both hostnames and
+      regenerates Authelia's rules; Authelia restarts once). In a private window:
+      `https://<domain>/` and `https://homepage.<domain>/` both land on the Authelia login;
+      `curl -s -o /dev/null -w '%{http_code}' https://<domain>/api/services` is a redirect,
+      not 200. Log in as a non-admin user with **no** app grants: Home Page loads. Users
+      page app picker has no "Home Page" entry. Uptime Kuma's "Nginx Proxy Manager
+      (public)" monitor stays up (it follows the redirect, any status accepted).
 - [ ] **Beta-test the longer ban for exploit attempts (plan.md §912)** — on `beta`, after
       the update, restart CrowdSec from the dashboard; it comes back healthy (a bad profile
       is fatal at start). On the next CVE alert (`crowdsecurity/CVE-*`, `http-cve-probing`),
@@ -795,12 +803,6 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       closed upstream (or once an app update fixes it for us, whichever comes
       first). Last checked 2026-10-09: still open (no upstream activity since
       2025-11-05).
-- [ ] **Decide: should the public Home Page list every app? (plan.md §912)** — your call,
-      not an agent's. `https://<domain>/api/services` answers without login and lists
-      every exposed app's hostname (31 on the test box, incl. `code-server`). Each app
-      is still gated, but the list is a free recon map. Options: (a) put the Home Page
-      behind Authelia, (b) keep the page public but block `/api/services*` at NPM,
-      (c) keep as is (§111). Production per-client deployments are the case that matters.
 - [ ] **Edge WAF rule for secret/PHP probes via Cloudflare API (plan.md §912)** — every
       scan hit the bare domain asking for `/.env*`, `/.git/*`, `/vendor/phpunit/*`,
       `*.php`. Create/maintain a zone custom rule (block) from the dashboard using the

@@ -351,13 +351,15 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       allowedHosts: ['HOMEPAGE_ALLOWED_HOSTS'],
     },
     // The bare domain lands here: exposing the Home Page also publishes it at
-    // the zone apex, fully public (plan.md §111). buildExposureEnvOverrides
-    // sees this and adds <base-domain> to HOMEPAGE_ALLOWED_HOSTS alongside
-    // homepage.<base-domain>, or gethomepage 400s the apex request.
-    additionalExposures: [{ apex: true, label: 'Bare domain', portEnvVar: 'HOMEPAGE_PORT' }],
-    // The public front door (plan.md §111) — every other exposed app
-    // requires an Authelia login, this one deliberately doesn't.
-    skipAutheliaProtection: true,
+    // the zone apex (plan.md §111). buildExposureEnvOverrides sees this and
+    // adds <base-domain> to HOMEPAGE_ALLOWED_HOSTS alongside
+    // homepage.<base-domain>, or gethomepage 400s the apex request. Gated like
+    // the page itself — a public apex would undo the gate below.
+    additionalExposures: [{ apex: true, label: 'Bare domain', portEnvVar: 'HOMEPAGE_PORT', autheliaProtected: true }],
+    // Was the public front door (§111). A scan report showed its /api/services
+    // handing every exposed app's hostname to anyone (plan.md §912), so it is
+    // now behind Authelia for every signed-in account — no per-user grant.
+    autheliaAllUsers: true,
   },
   'n8n': {
     backup: { engine: 'postgres', service: 'n8n-db' },

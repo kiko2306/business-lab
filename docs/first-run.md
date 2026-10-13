@@ -242,7 +242,8 @@ That's it — every app that can be exposed (has an HTTP port, isn't LAN-only
 like Samba or overlay-only like the NPM admin UI) gets a public
 `<name>.<domain>` hostname behind Authelia on that start. There is no toggle.
 Provisioning creates the NPM proxy host, the tunnel ingress rule and the DNS
-record automatically; Home Page stays public by design.
+record automatically. Home Page is behind Authelia as well, for every
+signed-in account (no per-user grant needed).
 
 ## If something is not reachable
 

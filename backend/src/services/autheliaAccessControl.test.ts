@@ -7,7 +7,7 @@ vi.mock('../utils/audit', () => ({ writeAuditLog: vi.fn() }));
 vi.mock('../utils/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 // EXPOSURE_SETTINGS_KEYS is a plain const object — the real module is safe to
 // import (no side effects at module load), so it isn't mocked away here.
-vi.mock('./userAppAccess', () => ({ getAppAccessOptions: vi.fn() }));
+vi.mock('./userAppAccess', () => ({ getAppAccessOptions: vi.fn(), getAllUsersAppOptions: vi.fn() }));
 vi.mock('./autheliaSync', () => ({ appGroupName: (n: string) => `app-${n}` }));
 vi.mock('./autheliaUsers', () => ({ getUsersDatabasePath: vi.fn() }));
 vi.mock('../config/services', () => ({
@@ -29,7 +29,7 @@ vi.mock('child_process', () => ({ execFile: vi.fn((_cmd, _args, _opts, cb) => cb
 
 import fs from 'fs';
 import { query } from '../utils/database';
-import { getAppAccessOptions } from './userAppAccess';
+import { getAllUsersAppOptions, getAppAccessOptions } from './userAppAccess';
 import { getUsersDatabasePath } from './autheliaUsers';
 import { getService, isAutheliaProtectionRequired, resolveComposeFile } from '../config/services';
 import { renderAccessControl, spliceAccessControl, syncAutheliaAccessControl } from './autheliaAccessControl';
@@ -76,6 +76,11 @@ describe('renderAccessControl', () => {
     expect(block.trimEnd().endsWith('# <<< managed by the dashboard')).toBe(true);
   });
 
+  it('admits any signed-in user, with no subject, when an app has no group (§913)', () => {
+    const block = renderAccessControl('authelia.example.com', [{ hostname: 'example.com', group: null }]);
+    expect(block).toContain("- domain: 'example.com'\n      policy: one_factor\n# <<<");
+  });
+
   it('still denies by default with no gated apps', () => {
     const block = renderAccessControl(null, []);
     expect(block).toContain('default_policy: deny');
@@ -95,6 +100,7 @@ describe('syncAutheliaAccessControl', () => {
     mockedGetUsersDatabasePath.mockReturnValue('/apps/authelia/config/users_database.yml');
     mockedExistsSync.mockReturnValue(true);
     mockedGetAppAccessOptions.mockResolvedValue([]);
+    vi.mocked(getAllUsersAppOptions).mockResolvedValue([]);
     mockedResolveComposeFile.mockReturnValue({
       projectName: 'authelia',
       appDir: '/apps/authelia',
@@ -153,6 +159,34 @@ describe('syncAutheliaAccessControl', () => {
     // The guest hostname gets no rule at all — it is never sent to Authelia,
     // so a rule here would be dead weight at best and a login wall at worst.
     expect(written).not.toContain('hotel-checkin.example.com');
+  });
+
+  it('gates Home Page and its bare domain for every signed-in user (§913)', async () => {
+    vi.mocked(getService).mockImplementation(((name: string) =>
+      name === 'homepage'
+        ? {
+            name: 'homepage',
+            autheliaAllUsers: true,
+            additionalExposures: [{ apex: true, label: 'Bare domain', portEnvVar: 'HOMEPAGE_PORT', autheliaProtected: true }],
+          }
+        : undefined) as never);
+    vi.mocked(isAutheliaProtectionRequired).mockImplementation(((name: string) => name === 'homepage') as never);
+    vi.mocked(getAllUsersAppOptions).mockResolvedValue([
+      { serviceName: 'homepage', label: 'Home Page', hostname: 'homepage.example.com', requiredGroups: [] },
+    ]);
+    mockQueries({
+      exposure: [{ hostname: 'authelia.example.com' }],
+      settings: [{ value: 'example.com' }],
+      secondary: [{ service_name: 'homepage:apex', hostname: 'example.com' }],
+    });
+    mockedReadFileSync.mockReturnValue('theme: light\n');
+
+    await syncAutheliaAccessControl('exposure_change');
+    const [, written] = mockedWriteFileSync.mock.calls[0] as [unknown, string];
+
+    expect(written).toContain("- domain: 'homepage.example.com'\n      policy: one_factor\n    - domain");
+    expect(written).toContain("- domain: 'example.com'\n      policy: one_factor\n");
+    expect(written).not.toContain('app-homepage');
   });
 
   it('writes and restarts once the base domain resolves, even with no gated apps yet', async () => {

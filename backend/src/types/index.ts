@@ -289,11 +289,15 @@ export interface ServiceDefinition {
   // The `homepage.*` labels stay mandatory regardless (services.test.ts).
   hideFromHomePage?: boolean;
   // Every exposed app requires an Authelia login by default — this flag is
-  // the named exception. Set on `homepage` (deliberately the public front
-  // door, plan.md §111) and `authelia` (it can't forward-auth-gate its own
-  // login page). Not user-configurable per app — see
-  // isAutheliaProtectionRequired in services.ts.
+  // the named exception. Set on `authelia` (it can't forward-auth-gate its own
+  // login page) and on apps that can't hide their own login form. Not
+  // user-configurable per app — see isAutheliaProtectionRequired in services.ts.
   skipAutheliaProtection?: boolean;
+  // Behind Authelia, but for every signed-in user rather than a per-app grant:
+  // its access_control rule has no subject, it gets no `app-<name>` group and
+  // no row in the Users page's app picker. Set on `homepage` (plan.md §913) —
+  // the start page every account lands on, which lists every exposed app.
+  autheliaAllUsers?: boolean;
   // This app serves a non-HTTP LAN protocol (Samba/SMB on 445) that the
   // Cloudflare Tunnel + Nginx Proxy Manager path cannot carry (§0 principle
   // 1). It publishes a host port, so getPublishedUpstreamPort would otherwise

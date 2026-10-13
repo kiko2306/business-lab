@@ -5,9 +5,9 @@
  *
  * The set of apps that can be granted is derived, not configured: an app
  * appears here whenever it is publicly exposed *and* Authelia-protected (see
- * isAutheliaProtectionRequired in config/services.ts). That excludes Home
- * Page and Authelia itself (deliberately public / can't gate its own login),
- * and any app flagged `skipAutheliaProtection` because it can't hide its own
+ * isAutheliaProtectionRequired in config/services.ts). That excludes Authelia
+ * itself (can't gate its own login), Home Page (open to every signed-in user,
+ * `autheliaAllUsers`, so there is nothing to grant), and any app flagged `skipAutheliaProtection` because it can't hide its own
  * login form — those are exposed directly with only the app's own login, so
  * there is no per-user Authelia access to grant (§342). Slices 2c/2d turn
  * these rows into Authelia group membership and access-control rules; this
@@ -35,6 +35,11 @@ export interface AppAccessOption {
  * and `app-<name>` group naming — so they're filtered out here, before
  * `matches` ever sees them.
  */
+/** Behind Authelia *and* granted per user — not an `autheliaAllUsers` app. */
+function isPerUserGated(name: string): boolean {
+  return isAutheliaProtectionRequired(name) && !getService(name)?.autheliaAllUsers;
+}
+
 async function getExposedServiceOptions(matches: (serviceName: string) => boolean): Promise<AppAccessOption[]> {
   const result = await query<{ service_name: string; hostname: string | null }>(
     `SELECT service_name, hostname
@@ -65,7 +70,16 @@ async function getExposedServiceOptions(matches: (serviceName: string) => boolea
  * access_control rule (§342: expose-direct or hide-the-form, never both).
  */
 export async function getAppAccessOptions(): Promise<AppAccessOption[]> {
-  return getExposedServiceOptions(isAutheliaProtectionRequired);
+  return getExposedServiceOptions(isPerUserGated);
+}
+
+/**
+ * Gated apps open to every signed-in user (`autheliaAllUsers`, plan.md §913):
+ * nothing to grant, so not in the picker above, but they still need an
+ * access_control rule — a subject-less one.
+ */
+export async function getAllUsersAppOptions(): Promise<AppAccessOption[]> {
+  return getExposedServiceOptions((name) => isAutheliaProtectionRequired(name) && Boolean(getService(name)?.autheliaAllUsers));
 }
 
 /** Just the Authelia-grantable service names, for the group/rule generators. */
@@ -93,7 +107,7 @@ export async function getAppAccessOptionNames(): Promise<Set<string>> {
  */
 export async function getGrantableAppOptions(): Promise<AppAccessOption[]> {
   const noSsoNames = new Set(getNoSsoCredentialAppNames());
-  const exposedOptions = await getExposedServiceOptions((name) => isAutheliaProtectionRequired(name) || noSsoNames.has(name));
+  const exposedOptions = await getExposedServiceOptions((name) => isPerUserGated(name) || noSsoNames.has(name));
 
   const exposedNames = new Set(exposedOptions.map((option) => option.serviceName));
   const unexposedNoSsoOptions = [...noSsoNames]

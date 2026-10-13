@@ -371,8 +371,11 @@ describe('oidcClient declarations', () => {
 });
 
 describe('Authelia login is mandatory by default', () => {
-  it('exempts Home Page, Authelia itself, and apps that cannot hide their own login', () => {
-    expect(isAutheliaProtectionRequired('homepage')).toBe(false);
+  it('exempts Authelia itself and apps that cannot hide their own login', () => {
+    // Home Page was the public front door (§111) until §913 put it behind
+    // Authelia for every signed-in user.
+    expect(isAutheliaProtectionRequired('homepage')).toBe(true);
+    expect(SERVICES['homepage'].autheliaAllUsers).toBe(true);
     expect(isAutheliaProtectionRequired('authelia')).toBe(false);
     // DocuSeal community has no SSO and no way to hide its login form, so it's
     // exposed directly with only its own login rather than two logins (§342).
@@ -597,9 +600,10 @@ describe('a gated additionalExposure', () => {
     for (const extra of netbird) {
       expect(extra.autheliaProtected, `netbird ${extra.suffix} must stay public`).toBeFalsy();
     }
-    // The Home Page's apex is the public front door (§111).
+    // The Home Page's apex is gated like the page itself (§913) — it lists
+    // every exposed app's hostname.
     const apex = (SERVICES['homepage'].additionalExposures ?? []).find((e) => e.apex);
-    expect(apex?.autheliaProtected).toBeFalsy();
+    expect(apex?.autheliaProtected).toBe(true);
   });
 });
 

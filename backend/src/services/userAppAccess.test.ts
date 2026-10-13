@@ -17,6 +17,7 @@ import {
   getAppAccessForUsers,
   getAppAccessOptionNames,
   getAppAccessOptions,
+  getAllUsersAppOptions,
   getGrantableAppOptionNames,
   getGrantableAppOptions,
   getPendingFanoutForUsers,
@@ -39,8 +40,9 @@ function fakeClient(currentRows: { service_name: string }[]) {
   return { client, calls };
 }
 
-const REGISTRY: Record<string, { label: string; autheliaGroups?: string[] }> = {
+const REGISTRY: Record<string, { label: string; autheliaGroups?: string[]; autheliaAllUsers?: boolean }> = {
   vaultwarden: { label: 'Vaultwarden' },
+  homepage: { label: 'Home Page', autheliaAllUsers: true },
   bookstack: { label: 'BookStack', autheliaGroups: ['wiki-editors'] },
   jellyfin: { label: 'Jellyfin' },
 };
@@ -106,6 +108,36 @@ describe('getAppAccessOptions', () => {
     expect(options).toEqual([
       { serviceName: 'mystery', label: 'mystery', hostname: null, requiredGroups: [] },
     ]);
+  });
+});
+
+// Home Page sits behind Authelia for every signed-in user (plan.md §913): no
+// per-user grant, so no picker entry and no `app-homepage` group.
+describe('all-users apps', () => {
+  const rows = [
+    { service_name: 'vaultwarden', hostname: 'vault.example.com' },
+    { service_name: 'homepage', hostname: 'home.example.com' },
+  ];
+
+  it('keeps them out of the grantable options', async () => {
+    query.mockResolvedValue({ rows });
+    expect((await getAppAccessOptions()).map((o) => o.serviceName)).toEqual(['vaultwarden']);
+  });
+
+  it('lists them separately for the access-control rules', async () => {
+    query.mockResolvedValue({ rows });
+    expect((await getAllUsersAppOptions()).map((o) => o.serviceName)).toEqual(['homepage']);
+  });
+
+  it('keeps them out of the Users page picker too', async () => {
+    query.mockResolvedValue({ rows });
+    expect((await getGrantableAppOptions()).map((o) => o.serviceName)).toEqual(['vaultwarden']);
+  });
+
+  it('never lists one that is not Authelia-protected at all', async () => {
+    query.mockResolvedValue({ rows });
+    isAutheliaProtectionRequired.mockReturnValue(false);
+    expect(await getAllUsersAppOptions()).toEqual([]);
   });
 });
 

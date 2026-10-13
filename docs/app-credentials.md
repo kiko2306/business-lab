@@ -161,8 +161,8 @@ Paperless' *document intake* over IMAP is also its own per-account setting
 
 These have no authentication, or none enabled by default. Every exposed app
 gets an Authelia login automatically — that is their only gate, and it is no
-longer a per-app setting (Home Page is the sole exception: it's the
-deliberately public front door).
+longer a per-app setting. Home Page is gated too, but for every signed-in
+account rather than per user (plan.md §913).
 
 A separate set *do* have their own login but skip it behind Authelia, so an
 SSO login lands with no second form: **Paperless-ngx**

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.172.0] — 2026-10-13
+
+### Changed
+
+- Home Page now asks for a login (any signed-in account), at its own address and the bare domain
+
 ## [0.171.9] — 2026-10-13
 
 ### Changed

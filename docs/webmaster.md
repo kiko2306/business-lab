@@ -48,7 +48,8 @@ reverted on the next pass.
 it at the bare domain (`<your-domain>` itself), so a proxied `CNAME` at the
 apex pointing at the tunnel is *expected* whenever the Home Page is exposed —
 not drift. It is created and removed with that one toggle, same as any app
-hostname. Nothing else is ever published at the apex.
+hostname. Nothing else is ever published at the apex, and the apex asks for
+an Authelia login like the Home Page's own hostname (plan.md §913).
 
 The **dashboard's own hostname is the exception**: `start.sh` publishes it and
 routes the tunnel **straight to the frontend port, bypassing Nginx Proxy
