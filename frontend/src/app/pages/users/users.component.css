@@ -36,6 +36,16 @@
      without this they overflow the chip and bleed into the next column,
      since CSS multi-column layout doesn't clip overflow between columns. */
   overflow-wrap: anywhere;
+  position: relative;
+}
+
+/* The chip is taller than its label (equal-height rows, wrapped hostnames), so
+   a tap on its empty corner hit the div and ticked nothing. The label's overlay
+   fills the chip; a click on a label's pseudo-element still toggles its box. */
+.app-access-chip .form-check-label::after {
+  content: '';
+  position: absolute;
+  inset: 0;
 }
 
 .app-access-chip:has(.form-check-input:checked) {

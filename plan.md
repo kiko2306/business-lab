@@ -38738,3 +38738,7 @@ Not done, rejected:
 ## 925. Unsubscribe page: gateway errors read as unreachable
 
 [x] done. Found §924: backend stopped → frontend nginx 502 → `failure()` saw a status, picked `failed` ("Could not process this request") not `offline`. Status 0 never happens behind nginx. Fix: `!status || 502/503/504` → `offline`. Spec that pinned 502 → `failed` (§854 fix 5) now expects `offline`; its point (no server HTML shown) stays. New spec: 502/503/504 offline, 500 failed. Recheck rides the §854 README item.
+
+## 926. App-access chips toggle from anywhere on the chip
+
+[x] done. Found §924: `.app-access-chip` (component CSS, `display: block`) beats the global phone `.form-check` flex row, and the grid's equal-height rows make chips taller than their label — a tap on the empty corner hit the div. Fix: chip `position: relative`, label `::after { inset: 0 }` overlay; a click on a label's pseudo-element toggles its box. Both widths. Test in `users-layout.spec.ts` hit-tests the chip's bottom-right corner at 1280 and 390. Tried: scrolling the test iframe to the chip — no-doctype frame is quirks mode, the root does not scroll; grew the frame to the body's height instead.

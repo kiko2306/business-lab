@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.6] — 2026-10-13
+
+### Fixed
+
+- Tapping anywhere on an app-access row in Users ticks its box, not only its label text
+
 ## [0.173.5] — 2026-10-13
 
 ### Fixed

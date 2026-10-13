@@ -29,10 +29,15 @@ const users = [
   { id: 3, username: 'novo.colaborador', email: 'novo@padariasilva.pt', created_at: '2026-01-03', roles: ['user'], capabilities: [], appAccess: [], active: false },
 ];
 
+const APPS = [
+  { serviceName: 'it-tools', label: 'IT Tools', hostname: 'it-tools.tx-home-utils.com', requiredGroups: [] },
+  { serviceName: 'paperless', label: 'Paperless', hostname: 'paperless.tx-home-utils.com', requiredGroups: [] },
+];
+
 async function mountUsersAt(width: number): Promise<{ frame: HTMLIFrameElement; doc: Document; clean: () => void }> {
   const operations = jasmine.createSpyObj('OperationsService', ['listUsers', 'listAppAccessOptions']);
   operations.listUsers.and.returnValue(of({ items: users }));
-  operations.listAppAccessOptions.and.returnValue(of({ items: [] }));
+  operations.listAppAccessOptions.and.returnValue(of({ items: APPS }));
   await TestBed.configureTestingModule({
     imports: [UsersComponent],
     providers: [
@@ -109,5 +114,33 @@ describe('Users table fits the screen (plan.md §813)', () => {
         }
       });
     }
+  }
+});
+
+// The app-access chips are taller than their label (a two-line hostname, rows
+// of equal height), and only a tap on the label text used to tick the box —
+// the chip's empty corner did nothing (plan.md §926).
+describe('Users app-access chips (plan.md §926)', () => {
+  beforeEach(() => localStorage.clear());
+  afterEach(() => localStorage.clear());
+
+  for (const [label, width] of [['laptop', 1280], ['phone', 390]] as const) {
+    it(`toggles the box from the chip's empty corner on a ${label}`, async () => {
+      const { frame, doc, clean } = await mountUsersAt(width);
+      try {
+        const chip = doc.querySelector<HTMLElement>('.app-access-chip')!;
+        const input = chip.querySelector<HTMLInputElement>('input')!;
+        // elementFromPoint only sees the viewport; on a phone the chip sits below the 900px frame.
+        frame.style.height = `${doc.body.scrollHeight}px`;
+        const r = chip.getBoundingClientRect();
+        const hit = doc.elementFromPoint(r.right - 4, r.bottom - 4) as HTMLElement;
+        expect(hit.closest('label')).withContext(`hit ${hit.tagName}.${hit.className}`).not.toBeNull();
+        const before = input.checked;
+        hit.click();
+        expect(input.checked).toBe(!before);
+      } finally {
+        clean();
+      }
+    });
   }
 });

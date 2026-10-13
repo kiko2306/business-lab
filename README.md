@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.5** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.6** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -313,15 +313,11 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Beta-test touch targets on a phone (plan.md §824)** — *2026-10-13 at 0.173.4, 390px in
       Chrome: Users, Backups, Settings, Apps, Home, Updates have no button under 44px and no
       sideways scroll. Role and feature checkbox rows toggle from anywhere on the row; the app-access
-      rows do not (item below). Left: a Tally shop view (`claude-test` has no shops), the 1280px
+      rows did not, fixed in §926 — recheck their empty corner. Left: a Tally shop view (`claude-test` has no shops), the 1280px
       look.* On `beta`, at 390px wide (browser
       device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
       label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
       no row of buttons overflows. At 1280px nothing looks different from before.
-- [ ] **Make the whole app-access row toggle its checkbox (plan.md §924)** — Users → Add user /
-      Edit access at 390px: an `.app-access-chip` row (332×87) toggles only when the label text is
-      tapped; its empty right side and bottom do nothing. The role and feature rows already toggle
-      from anywhere. Fix: make the label fill the chip.
 - [ ] **Make the "Installed:" chip readable (plan.md §924)** — the app settings dialog's
       `badge bg-body-tertiary border` chip (`service-card.component.html:138`) has Bootstrap's white
       badge text on a light background, so "Installed: <image>" cannot be read in light mode.
