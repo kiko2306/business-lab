@@ -21,8 +21,14 @@ Two things have to exist before `start.sh` runs — see
 
 1. **The domain is a zone in your Cloudflare account.** Every public hostname
    is `<app>.<your-domain>`.
-2. **An API token** scoped to **Account → Cloudflare Tunnel: Edit** and
-   **Zone → DNS: Edit** — nothing wider.
+2. **An API token** scoped to **Account → Cloudflare Tunnel: Edit**,
+   **Zone → DNS: Edit** and **Zone → Zone WAF: Edit** — nothing wider. The WAF
+   scope is for one dashboard-managed custom rule (ref
+   `business_lab_probe_block`) that blocks `/.env*`, `/.git*`, `/.aws/`,
+   `/.docker/`, `/vendor/phpunit/` on every hostname and `*.php` on the bare
+   domain (plan.md §915). Your own custom rules in the zone are left alone.
+   Adding the scope to an existing token keeps its value, so nothing is
+   re-entered here.
 
 `start.sh` then creates the tunnel, its ingress rules and the DNS records from
 that token. It also looks up the account / zone / tunnel IDs from the domain —

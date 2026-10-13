@@ -28,6 +28,7 @@ import { regenerateHomepageServices } from './homepageConfig';
 import { getServiceStatus } from './status';
 import { syncAutheliaAccessControlSafe } from './autheliaAccessControl';
 import { syncAutheliaOidcClientsSafe } from './autheliaOidcClients';
+import { ensureEdgeWafRule } from './cloudflareWaf';
 import { ensureCriticalServiceMonitors } from './uptimeKumaCriticalMonitors';
 import logger from '../utils/logger';
 import { setSetting } from '../utils/settingsStore';
@@ -115,6 +116,11 @@ export async function reconcileExposureDrift(): Promise<ExposureReconcileSummary
   // the rendered block actually moved.
   await syncAutheliaAccessControlSafe('exposure_reconcile', null);
   await syncAutheliaOidcClientsSafe('exposure_reconcile', null);
+
+  // The edge probe-block rule (§915), healed the same way if it is deleted or
+  // switched off in the Cloudflare dashboard. Never throws; a missing token
+  // scope lands on the deployment checklist.
+  await ensureEdgeWafRule();
 
   // Re-provisioning can flip a hostname from failed to provisioned, which is
   // the point its Home Page tile becomes linkable.

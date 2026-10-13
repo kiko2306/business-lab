@@ -23,7 +23,7 @@ What it does **not** do, and you need in advance:
 | Prerequisite | Why | Notes |
 |---|---|---|
 | **A domain on Cloudflare** | Every public hostname is `<app>.<your-domain>`, published through a Cloudflare Tunnel | The domain must already be a zone in your Cloudflare account |
-| **A Cloudflare API token** | Creates the tunnel, its ingress rules and DNS records | Needs **Account → Cloudflare Tunnel: Edit** and **Zone → DNS: Edit**. Leave its **TTL** on Cloudflare's default (*No expire date*) — nothing here rotates this token, so an expiring one silently breaks tunnel/DNS provisioning later with no warning |
+| **A Cloudflare API token** | Creates the tunnel, its ingress rules and DNS records | Needs **Account → Cloudflare Tunnel: Edit** and **Zone → DNS: Edit**, plus **Zone → Zone WAF: Edit** for the edge rule that drops secret-file/PHP probes (plan.md §915 — without it everything else works and the deployment checklist says what to add). Leave its **TTL** on Cloudflare's default (*No expire date*) — nothing here rotates this token, so an expiring one silently breaks tunnel/DNS provisioning later with no warning |
 | **A Tailscale account + auth key** | NetBird's signal server is published over Tailscale Funnel; it cannot work through the Cloudflare Tunnel (see plan.md §52) | A **reusable** auth key from <https://login.tailscale.com/admin/settings/keys>, with the longest expiration Tailscale's UI offers — same reasoning as the Cloudflare token above |
 | **Tailscale Funnel enabled** | Same reason | One-time per tailnet. If it isn't, `start.sh` prints the exact one-click URL to enable it — you can also do this after the fact and re-run |
 

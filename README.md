@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.172.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -657,6 +657,18 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       not 200. Log in as a non-admin user with **no** app grants: Home Page loads. Users
       page app picker has no "Home Page" entry. Uptime Kuma's "Nginx Proxy Manager
       (public)" monitor stays up (it follows the redirect, any status accepted).
+- [ ] **Beta-test the Cloudflare edge WAF rule (plan.md §915)** — on `beta`, after the
+      update restarts the backend (the exposure check runs at boot). Settings →
+      Deployment checklist → "Edge firewall rule": either *Set*, or it names the
+      missing **Zone → Zone WAF: Edit** permission — then add that to the existing
+      token in Cloudflare (My Profile → API Tokens → Edit) and restart the backend.
+      Once *Set*: Cloudflare dashboard → Security → WAF → Custom rules lists
+      "Business Lab: secret-file and PHP exploit probes"; `curl -sI
+      https://<domain>/.env.example | head -1` and `curl -sI
+      https://nextcloud.<domain>/.git/config | head -1` both return `403` from
+      Cloudflare; `https://nextcloud.<domain>/index.php` still works (PHP is
+      blocked on the bare domain only). Disable the rule by hand; it is back
+      within 6 hours or on the next backend restart.
 - [ ] **Beta-test the Home Page as login landing page (plan.md §914)** — same restart as
       the §913 item covers it. In a private window open `https://authelia.<domain>/`
       directly and log in: you land on `https://<domain>/` (Home Page), not
@@ -807,13 +819,6 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       closed upstream (or once an app update fixes it for us, whichever comes
       first). Last checked 2026-10-09: still open (no upstream activity since
       2025-11-05).
-- [ ] **Edge WAF rule for secret/PHP probes via Cloudflare API (plan.md §912)** — every
-      scan hit the bare domain asking for `/.env*`, `/.git/*`, `/vendor/phpunit/*`,
-      `*.php`. Create/maintain a zone custom rule (block) from the dashboard using the
-      existing Cloudflare credentials; if the token lacks Zone WAF edit, ask for it once
-      in the UI. Check no managed app legitimately serves those paths first. Beta test:
-      `curl -I https://<domain>/.git/index` returns Cloudflare's 403, and CrowdSec stops
-      seeing those probes.
 - [ ] **Re-enable the CrowdSec Cloudflare Worker bouncer once its token bug is
       fixed** — the edge-level bouncer (`cloudflare-worker-bouncer` in
       `apps/crowdsec/docker-compose.yml`, behind the `edge-bouncer` compose

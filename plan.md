@@ -38629,3 +38629,15 @@ User follow-up to §913. Authelia's `default_redirection_url` (seeded from confi
 - [x] Proof beyond unit tests: temp copy of the live config with `default_redirection_url: 'https://tx-home-utils.com'` through `authelia validate-config` in a throwaway run — "parsed and loaded successfully". Mattered because a rejection would also have blocked §913's access rules (validation gates the whole write).
 
 Rejected: editing configuration.yml.example only — the live file is seeded once and gitignored, so existing hosts would never change.
+
+## 915. Cloudflare edge WAF rule for secret/PHP probes
+
+From §912: every scan hit `/.env*`, `/.git*`, `.aws`, `.docker`, PHPUnit `eval-stdin.php`, Ignition, `info.php`. Drop them at Cloudflare's edge.
+
+- [x] `services/cloudflareWaf.ts`. One custom rule, `ref: business_lab_probe_block`, `action: block`, in the zone's `http_request_firewall_custom` entrypoint. Expression: zone-wide `starts_with(lower(path), …)` for `/.env`, `/.git`, `/.aws/`, `/.docker/`, `/.boto`, `/.s3cfg`, `/.npmrc` + `contains(…, "/vendor/phpunit/")`; bare domain only: `ends_with(…, ".php")`, `/_ignition/`, `/_profiler/`. Domain validated `[a-z0-9.-]` before it goes into the quoted string.
+- [x] Only adds/updates by `ref` (`POST …/rules` at index 1, `PATCH …/rules/{id}`); `PUT` on the entrypoint only when Cloudflare says none exists (10003) — PUT replaces the whole rule list. Re-enables if switched off.
+- [x] Runs in `reconcileExposureDrift` (boot + 6h) after the Authelia sync. Never throws; records `{state, detail, at}` in setting `cloudflare_waf_status`. 403 / code 10000 → `missing-permission`.
+- [x] Deployment checklist row `edge-waf` from that setting (still no live third-party call there); en + pt-PT text names **Zone → Zone WAF: Edit** and says the token value stays the same. Docs first-run + webmaster list the scope.
+- [x] Live probe (read-only, status only, inside backend container): current token GET on the entrypoint → `404 10003` — can read, zone has no custom rules, so first run takes the clean create path. Write scope unknown until it runs; the checklist reports it.
+
+Rejected: `matches` regex (Business plan+ only; free zones would 400). Blocking `*.php` zone-wide — Nextcloud, ITFlow, Kimai serve PHP. A new UI field for a second token — Cloudflare edits a token's scopes in place, so asking for a new secret would be a wasted step (§0.3).

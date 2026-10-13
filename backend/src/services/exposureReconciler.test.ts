@@ -13,6 +13,7 @@ const authelia = vi.hoisted(() => ({
   syncAutheliaAccessControlSafe: vi.fn(async () => null),
   syncAutheliaOidcClientsSafe: vi.fn(async () => null),
 }));
+const waf = vi.hoisted(() => ({ ensureEdgeWafRule: vi.fn(async () => 'active') }));
 const kumaMonitors = vi.hoisted(() => ({ ensureCriticalServiceMonitors: vi.fn(async () => {}) }));
 const registry = vi.hoisted(() => ({ SERVICES: {} as Record<string, unknown> }));
 const status = vi.hoisted(() => ({ getServiceStatus: vi.fn(async (name: string) => ({ name, state: 'running' })) }));
@@ -25,6 +26,7 @@ vi.mock('./homepageConfig', () => homepage);
 vi.mock('./autheliaAccessControl', () => ({ syncAutheliaAccessControlSafe: authelia.syncAutheliaAccessControlSafe }));
 vi.mock('./autheliaOidcClients', () => ({ syncAutheliaOidcClientsSafe: authelia.syncAutheliaOidcClientsSafe }));
 vi.mock('./uptimeKumaCriticalMonitors', () => kumaMonitors);
+vi.mock('./cloudflareWaf', () => waf);
 vi.mock('../config/services', () => registry);
 vi.mock('./status', () => status);
 vi.mock('../utils/logger', () => ({
@@ -118,6 +120,13 @@ describe('reconcileExposureDrift', () => {
     await reconcileExposureDrift();
     expect(exposure.ensureAutoExposure.mock.calls.map((c) => c[0])).not.toContain('nextcloud:api');
     expect(exposure.provisionServiceIfEnabled.mock.calls.map((c) => c[0])).not.toContain('nextcloud:api');
+  });
+
+  // §915: the edge rule heals the same way — deleted or disabled in the
+  // Cloudflare dashboard, it is back within one pass.
+  it('re-asserts the Cloudflare WAF probe rule every pass', async () => {
+    await reconcileExposureDrift();
+    expect(waf.ensureEdgeWafRule).toHaveBeenCalledOnce();
   });
 
   it('re-asserts the Authelia rules + OIDC clients every pass (drift backstop)', async () => {

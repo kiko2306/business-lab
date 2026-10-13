@@ -14,8 +14,19 @@ import { EXPOSURE_SETTINGS_KEYS } from '../utils/exposureSettings';
 import { getMailConfig } from '../utils/mailSettings';
 import { getBackupTarget } from '../utils/backupTarget';
 import { getAutheliaAdminUser, listAutheliaUsernames } from './autheliaUsers';
+import { WAF_STATUS_KEY } from './cloudflareWaf';
 
 const CLOUDFLARE_TOKEN_KEY = 'cloudflare_tunnel_token';
+
+/** cloudflareWaf.ts's last recorded outcome, or `{}` before its first run. */
+function edgeWafParams(raw: string | undefined): Record<string, string> {
+  try {
+    const parsed = JSON.parse(raw ?? '') as { state?: unknown };
+    return typeof parsed.state === 'string' ? { state: parsed.state } : {};
+  } catch {
+    return {};
+  }
+}
 
 export interface DeploymentCheck {
   id: string;
@@ -39,7 +50,7 @@ export interface DeploymentStatus {
 }
 
 export async function getDeploymentStatus(): Promise<DeploymentStatus> {
-  const keys = [...Object.values(EXPOSURE_SETTINGS_KEYS), CLOUDFLARE_TOKEN_KEY];
+  const keys = [...Object.values(EXPOSURE_SETTINGS_KEYS), CLOUDFLARE_TOKEN_KEY, WAF_STATUS_KEY];
   const rows = await query<{ key: string; value: string }>(
     'SELECT key, value FROM settings WHERE key = ANY($1)',
     [keys]
@@ -49,6 +60,7 @@ export async function getDeploymentStatus(): Promise<DeploymentStatus> {
 
   const [mail, backup] = await Promise.all([getMailConfig(), getBackupTarget()]);
   const admin = getAutheliaAdminUser();
+  const waf = edgeWafParams(s[WAF_STATUS_KEY]);
   const userCount = listAutheliaUsernames().length;
 
   const checks: DeploymentCheck[] = [
@@ -73,6 +85,14 @@ export async function getDeploymentStatus(): Promise<DeploymentStatus> {
       params: has(EXPOSURE_SETTINGS_KEYS.cloudflareTunnelId)
         ? { tunnelIdPrefix: s[EXPOSURE_SETTINGS_KEYS.cloudflareTunnelId].slice(0, 8) }
         : {},
+      fixIn: 'Networking',
+    },
+    {
+      // Written by the exposure reconciler (cloudflareWaf.ts, §915) — a
+      // recorded outcome, not a live Cloudflare call, like every check here.
+      id: 'edge-waf',
+      done: waf.state === 'active',
+      params: waf,
       fixIn: 'Networking',
     },
     {

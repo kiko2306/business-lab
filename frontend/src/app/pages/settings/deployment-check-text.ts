@@ -26,6 +26,10 @@ export function deploymentSubtitleKey(outstanding: number): string {
 export function deploymentDetailKey(check: DeploymentCheck): string {
   const base = `settings.deployment.check.${check.id}`;
   if (!check.done) {
+    // The edge WAF rule (§915) says why: a token scope to add, a failed run,
+    // or simply not applied yet.
+    if (check.id === 'edge-waf' && check.params['state'] === 'missing-permission') return `${base}.detailTodoMissingPermission`;
+    if (check.id === 'edge-waf' && check.params['state'] === 'error') return `${base}.detailTodoError`;
     return `${base}.detailTodo`;
   }
   if (check.id === 'backup') {

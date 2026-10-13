@@ -61,6 +61,31 @@ describe('deployment checklist text', () => {
   });
 });
 
+// plan.md §915: the edge WAF check says *why* it is outstanding — a missing
+// token scope is an operator step, a pending first run is not.
+describe('deploymentDetailKey for the edge WAF rule', () => {
+  const check = (done: boolean, params: Record<string, string> = {}) =>
+    ({ id: 'edge-waf', done, fixIn: 'Networking', params }) as DeploymentCheck;
+
+  it('picks one key per recorded state, each translated in both languages', () => {
+    const keys = [
+      deploymentDetailKey(check(true, { state: 'active' })),
+      deploymentDetailKey(check(false, { state: 'missing-permission' })),
+      deploymentDetailKey(check(false, { state: 'error' })),
+      deploymentDetailKey(check(false)),
+    ];
+    expect(new Set(keys).size).toBe(4);
+    for (const key of [...keys, deploymentLabelKey('edge-waf')]) {
+      expect(en[key]).withContext(`en ${key}`).toBeTruthy();
+      expect(ptPT[key]).withContext(`pt-PT ${key}`).toBeTruthy();
+    }
+  });
+
+  it('names the exact Cloudflare permission to add', () => {
+    expect(en[deploymentDetailKey(check(false, { state: 'missing-permission' }))]).toContain('Zone WAF: Edit');
+  });
+});
+
 // plan.md §789: found live during an audit — pt-PT's outstanding-count subtitle
 // read literally "item(ns)", mirroring English's "(s)" trick, which isn't valid
 // Portuguese. Split into real singular/plural keys instead.

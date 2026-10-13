@@ -42,8 +42,8 @@ beforeEach(() => {
 describe('getDeploymentStatus', () => {
   it('reports every check outstanding on a fresh box, with no params to show', async () => {
     const status = await getDeploymentStatus();
-    expect(status.checks).toHaveLength(7);
-    expect(status.outstanding).toBe(7);
+    expect(status.checks).toHaveLength(8);
+    expect(status.outstanding).toBe(8);
     expect(status.checks.every((c) => !c.done)).toBe(true);
     expect(status.checks.every((c) => Object.keys(c.params).length === 0)).toBe(true);
   });
@@ -60,7 +60,24 @@ describe('getDeploymentStatus', () => {
     expect(byId(status, 'domain')).toMatchObject({ done: true, params: { domain: 'acme.example' } });
     expect(byId(status, 'tunnel').done).toBe(true);
     expect(byId(status, 'tunnel').params.tunnelIdPrefix).toBe('abcd1234');
-    expect(status.outstanding).toBe(4); // npm, mail, backup, admin still blank
+    expect(status.outstanding).toBe(5); // npm, mail, backup, admin, edge WAF still blank
+  });
+
+  // §915: the edge WAF rule's last recorded outcome, set by the exposure
+  // reconciler. A missing token scope is the one an operator can fix.
+  it('reports the edge WAF rule from its last recorded outcome', async () => {
+    settingsRows({ cloudflare_waf_status: JSON.stringify({ state: 'active', detail: '', at: 'x' }) });
+    expect(byId(await getDeploymentStatus(), 'edge-waf')).toMatchObject({ done: true, params: { state: 'active' } });
+
+    settingsRows({ cloudflare_waf_status: JSON.stringify({ state: 'missing-permission', detail: 'Authentication error', at: 'x' }) });
+    expect(byId(await getDeploymentStatus(), 'edge-waf')).toMatchObject({
+      done: false,
+      params: { state: 'missing-permission' },
+      fixIn: 'Networking',
+    });
+
+    settingsRows({ cloudflare_waf_status: 'not json' });
+    expect(byId(await getDeploymentStatus(), 'edge-waf')).toMatchObject({ done: false, params: {} });
   });
 
   it('tunnel stays outstanding without account and zone ids', async () => {
