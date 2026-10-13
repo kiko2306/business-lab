@@ -265,7 +265,7 @@ async function composeUpWithManagedConfig(
   }
   // Jellyfin/Navidrome/Immich: their library folder in the shared tree must
   // exist and be SMB-writable before `compose up` (no-op for other apps).
-  ensureSharedFolders(serviceName, appDir);
+  await ensureSharedFolders(serviceName, appDir);
   // Stirling-PDF: its watched folder needs a pipeline JSON or nothing is processed.
   ensureStirlingPipelines(serviceName, appDir);
   // Paperless: the post-consume script the base compose file points at must exist

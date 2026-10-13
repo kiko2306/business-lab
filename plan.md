@@ -38687,3 +38687,12 @@ Not done, rejected:
 - Fix: both watchdog services into `CORE_SIDECARS`. `up -d --no-deps --no-build` = no-op when current, recreate when image/config moved.
 - `docker-socket-proxy` stays out: backend's own compose call goes through it, recreating it mid-call cuts the call.
 - Rejected: derive list from `compose config --services` — would sweep in `database` and the backend proxy; explicit list stays (ponytail note already there).
+
+## 920. Media app starts on a root-owned share folder
+
+[x] done. Bug from §917: Navidrome start = `EPERM chmod …/shared/music`; folder `root:root 0755`, made by Docker as bind source before §870. `ensureSharedFolders` threw when chmod refused and mode closed → start blocked until Samba restart (`samba-init` chown).
+
+- Fix: on that case run `docker run --rm -v <dir>:/d alpine:latest chmod 0777 /d` (same host-path bind trick as `writeArchive`; image already pulled for backups). Helper fails too → original EPERM, start still fails loud.
+- `ensureSharedFolders` now async; one caller (`composeUpWithManagedConfig`).
+- Rejected: just warn and continue — app starts but SMB still cannot write library, the reason §870 exists. Rejected: `compose run samba-init` — recursive chown of the whole shared tree on every media start.
+- Same EPERM pattern lives in `ensurePaperlessDropbox` and `ensureTwentyStorage`; box shows both fine, not touched.

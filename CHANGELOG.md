@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.3] — 2026-10-13
+
+### Fixed
+
+- Media apps start even when their shared folder was left root-owned
+
 ## [0.173.2] — 2026-10-13
 
 ### Fixed

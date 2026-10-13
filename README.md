@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.3** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -245,12 +245,10 @@ Infrastructure robustness, five items. Three touch Docker or nginx, so they need
 - [ ] **Beta-test that daily backups run every day (plan.md §918)** — on `beta`, after the update
       restarts the backend: Backups lists one new archive on each of the next two mornings (the run
       at the scheduled hour), not every other one.
-- [ ] **Media app cannot start while its share folder is root-owned** — 2026-10-13: Navidrome's
-      start failed with `EPERM … chmod '…/nextcloud/data/shared/music'`: the folder was
-      `root:root 0755` (made by Docker before §870), so `ensureSharedFolders` cannot chmod it and
-      throws. A Samba restart (`samba-init` chowns the tree) fixed it on the box. Same for
-      `media`, `photos`, `signed`, `paperless-archive`. Make the start path fix it without a
-      Samba restart (e.g. run `samba-init` when chmod is refused), test first (plan.md §917).
+- [ ] **Beta-test media apps on a root-owned share folder (plan.md §920)** — on `beta`, after the
+      update: stop Navidrome, then on the host make its folder root-owned and closed again
+      (`sudo chown root:root apps/nextcloud/data/shared/music && sudo chmod 755 …/music`), start
+      Navidrome from the dashboard: it starts, and the folder is now `drwxrwxrwx`.
 - [ ] **Beta-test the pinned socket proxy (plan.md §884 item 1, §919)** — *2026-10-13: the backend's
       proxy ran `v0.5.0` and start/stop worked through it; the watchdog's was still `:latest`.* After
       the update that ships §919: `docker ps` shows `watchdog-docker-proxy` on

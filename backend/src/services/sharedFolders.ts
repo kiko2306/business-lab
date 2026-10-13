@@ -9,6 +9,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { runCommand } from './backup';
 
 export const SHARED_FOLDERS_BY_APP: Record<string, string[]> = {
   jellyfin: ['media'],
@@ -21,7 +22,7 @@ export const SHARED_FOLDERS_BY_APP: Record<string, string[]> = {
   'stirling-pdf': ['to-stirling-compress', 'from-stirling'],
 };
 
-export function ensureSharedFolders(serviceName: string, appDir: string): void {
+export async function ensureSharedFolders(serviceName: string, appDir: string): Promise<void> {
   for (const name of SHARED_FOLDERS_BY_APP[serviceName] ?? []) {
     const dir = path.join(appDir, '..', 'nextcloud', 'data', 'shared', name);
     fs.mkdirSync(dir, { recursive: true });
@@ -30,7 +31,17 @@ export function ensureSharedFolders(serviceName: string, appDir: string): void {
     } catch (err) {
       // chmod needs the dir's owner or root; once samba-init's container owns
       // it the backend gets EPERM even though the mode is already fine.
-      if ((fs.statSync(dir).mode & 0o007) !== 0o007) {
+      if ((fs.statSync(dir).mode & 0o007) === 0o007) {
+        continue;
+      }
+      // Closed *and* not ours: a folder Docker made root-owned 0755 as a bind
+      // source before this code existed (§870). Throwing here blocked the app's
+      // start outright until a Samba restart chowned the tree (§917), so open
+      // it as root the way samba-init would — the repo is bind-mounted at its
+      // host path, so `dir` is valid for the daemon too.
+      try {
+        await runCommand('docker', ['run', '--rm', '-v', `${dir}:/d`, 'alpine:latest', 'chmod', '0777', '/d']);
+      } catch {
         throw err;
       }
     }
