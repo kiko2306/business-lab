@@ -156,7 +156,7 @@
               </span>
               @if (dump.failures.length) {
                 <ul class="mt-1 mb-0 ps-3 text-danger">
-                  @for (f of dump.failures; track f) {
+                  @for (f of dump.failures; track $index) {
                     <li>{{ f.app }} ({{ f.kind }}): {{ f.detail }}</li>
                   }
                 </ul>
@@ -387,7 +387,7 @@
   <h3 class="h5 mb-1">{{ 'backups.settingsBackups.heading' | t }}</h3>
   <p class="text-body-secondary small mb-2">{{ 'backups.settingsBackups.description' | t }}</p>
   <div class="list-group mb-4">
-    @for (backup of backups; track backup) {
+    @for (backup of backups; track backup.name) {
       <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
           <div class="fw-semibold">{{ backup.name }}</div>
@@ -418,7 +418,7 @@
       <div class="list-group-item text-body-secondary">{{ 'common.loading' | t }}</div>
     }
     @if (!remoteBackupsLoading) {
-      @for (snapshot of remoteBackups; track snapshot) {
+      @for (snapshot of remoteBackups; track snapshot.id) {
         <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
           <div>
             <div class="fw-semibold">{{ snapshot.startTime | date:'dd/MM/yyyy, HH:mm':undefined:translate.locale() }}</div>
@@ -522,7 +522,7 @@
             [disabled]="restoringSnapshot"
             >
             <option value="">{{ 'backups.restoreModal.choosePrompt' | t }}</option>
-            @for (app of restorableApps; track app) {
+            @for (app of restorableApps; track app.name) {
               <option [value]="app.name">{{ app.label }}</option>
             }
           </select>

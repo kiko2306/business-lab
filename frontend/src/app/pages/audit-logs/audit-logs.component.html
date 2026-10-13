@@ -50,7 +50,7 @@
           </tr>
         </thead>
         <tbody>
-          @for (item of items; track item) {
+          @for (item of items; track item.id) {
             <tr>
               <td [attr.data-label]="'auditLogs.table.result' | t">
                 <span class="badge" [class.text-bg-success]="item.result === 'success'" [class.text-bg-danger]="item.result !== 'success'">

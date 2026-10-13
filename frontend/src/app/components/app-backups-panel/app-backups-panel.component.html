@@ -21,7 +21,7 @@
   }
   @if (backups.length) {
     <ul class="list-unstyled d-flex flex-column gap-2 mb-0">
-      @for (b of backups; track b) {
+      @for (b of backups; track b.file) {
         <li
           class="d-flex flex-wrap align-items-center gap-2 p-2 border rounded bg-body-tertiary"
           >

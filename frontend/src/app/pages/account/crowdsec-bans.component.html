@@ -30,7 +30,7 @@
           </tr>
         </thead>
         <tbody>
-          @for (ban of bans; track ban) {
+          @for (ban of bans; track ban.ip) {
             <tr>
               <td class="font-monospace text-break">{{ ban.ip }}</td>
               <td>

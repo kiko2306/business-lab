@@ -37,7 +37,7 @@
           </tr>
         </thead>
         <tbody>
-          @for (host of sorted; track host) {
+          @for (host of sorted; track host.ip) {
             @if (host === firstUnrecognised) {
               <tr>
                 <td colspan="3" class="fw-semibold text-body-secondary">{{ 'settings.networkScan.notRecognised' | t }}</td>

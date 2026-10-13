@@ -62,7 +62,7 @@
           </tr>
         </thead>
         <tbody>
-          @for (s of subscribers; track s) {
+          @for (s of subscribers; track s.id) {
             <tr>
               <td [attr.data-label]="'social.subscribers.table.email' | t" class="text-break">{{ s.email }}</td>
               <td [attr.data-label]="'social.subscribers.table.status' | t">

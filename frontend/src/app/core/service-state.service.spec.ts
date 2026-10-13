@@ -101,26 +101,38 @@ describe('ServiceStateService', () => {
   it('starts a dependency chain in order, then the app', fakeAsync(() => {
     const svc = (name: string, state: 'running' | 'stopped', dependsOn?: string[]) =>
       ({ name, label: name, state, dependsOn }) as never;
-    void service.startWithDependencies('app', [svc('app', 'stopped', ['auth']), svc('auth', 'stopped')]);
+    let done = false;
+    void service.startWithDependencies('app', [svc('app', 'stopped', ['auth']), svc('auth', 'stopped')]).then(() => (done = true));
+    const started: string[] = [];
 
-    httpMock.expectOne(`${API_BASE_URL}/services/auth/start`).flush({ message: 'ok' });
+    const auth = httpMock.expectOne(`${API_BASE_URL}/services/auth/start`);
+    started.push(auth.request.url);
+    auth.flush({ message: 'ok' });
     tick();
     httpMock.expectNone(`${API_BASE_URL}/services/app/start`);
     httpMock.expectOne(`${API_BASE_URL}/services/status`).flush(emptyStatus());
     tick();
-    httpMock.expectOne(`${API_BASE_URL}/services/app/start`).flush({ message: 'ok' });
+    const app = httpMock.expectOne(`${API_BASE_URL}/services/app/start`);
+    started.push(app.request.url);
+    app.flush({ message: 'ok' });
     tick();
     httpMock.expectOne(`${API_BASE_URL}/services/status`).flush(emptyStatus());
     tick();
+
+    expect(started).toEqual([`${API_BASE_URL}/services/auth/start`, `${API_BASE_URL}/services/app/start`]);
+    expect(done).toBeTrue();
   }));
 
   it('stops the chain at the first failure and never starts the app', fakeAsync(() => {
     const svc = (name: string, state: 'running' | 'stopped', dependsOn?: string[]) =>
       ({ name, label: name, state, dependsOn }) as never;
-    void service.startWithDependencies('app', [svc('app', 'stopped', ['auth']), svc('auth', 'stopped')]);
+    let done = false;
+    void service.startWithDependencies('app', [svc('app', 'stopped', ['auth']), svc('auth', 'stopped')]).then(() => (done = true));
 
     httpMock.expectOne(`${API_BASE_URL}/services/auth/start`).flush({ message: 'boom' }, { status: 500, statusText: 'x' });
     tick(1000);
     httpMock.expectNone(`${API_BASE_URL}/services/app/start`);
+    // The chain gave up rather than hanging on the failed dependency.
+    expect(done).toBeTrue();
   }));
 });

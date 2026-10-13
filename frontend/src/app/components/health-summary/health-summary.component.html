@@ -25,7 +25,7 @@
 
     @if (summary; as s) {
       <ul class="health-summary__rows list-unstyled mb-0">
-        @for (row of s.rows; track row) {
+        @for (row of s.rows; track row.key) {
           <li class="health-row" [class.health-row--issue]="!row.ok">
             <span class="health-row__label">{{ row.label }}</span>
             <span class="health-row__state">{{ (row.ok ? 'home.health.state.ok' : 'home.health.state.attention') | t }}</span>

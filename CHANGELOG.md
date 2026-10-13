@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.171.7] — 2026-10-13
+
+### Fixed
+
+- Lists keep their rows across refreshes instead of rebuilding them all
+
 ## [0.171.6] — 2026-10-13
 
 ### Changed

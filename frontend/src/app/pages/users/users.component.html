@@ -109,7 +109,7 @@
             {{ 'users.form.appAccessHint' | t }}
           </p>
           <div class="app-access-grid">
-            @for (option of filterAppOptions(newAppFilter); track option) {
+            @for (option of filterAppOptions(newAppFilter); track option.serviceName) {
               <div class="form-check app-access-chip">
                 <input
                   class="form-check-input"
@@ -156,7 +156,7 @@
           </tr>
         </thead>
         <tbody>
-          @for (user of items; track user) {
+          @for (user of items; track user.id) {
             <tr>
               <td [attr.data-label]="'users.table.username' | t">
                 {{ user.username }}
@@ -353,7 +353,7 @@
                   }
                   @if (appOptions.length) {
                     <div class="app-access-grid">
-                      @for (option of filterAppOptions(accessAppFilter); track option) {
+                      @for (option of filterAppOptions(accessAppFilter); track option.serviceName) {
                         <div class="form-check app-access-chip">
                           <input
                             class="form-check-input"

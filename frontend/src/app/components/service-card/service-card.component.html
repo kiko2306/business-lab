@@ -66,7 +66,7 @@
     @if (dependencies().length) {
       <div class="service-row-deps">
         <span class="deps-label">{{ 'serviceCard.needsLabel' | t }}</span>
-        @for (dep of dependencies(); track dep) {
+        @for (dep of dependencies(); track dep.name) {
           <span
             class="dep"
             [class.dep--down]="!dep.running"
@@ -136,7 +136,7 @@
         <!-- About: what used to crowd the row heading (plan.md §761) -->
         <section class="settings-section settings-about small d-flex flex-wrap gap-2 align-items-center">
           <span class="badge bg-body-tertiary border">{{ 'serviceCard.installedLabel' | t:{ version: installedVersion() } }}</span>
-          @for (port of service.ports; track port) {
+          @for (port of service.ports; track port.hostPort + '/' + port.protocol) {
             <span class="badge text-bg-secondary border" [title]="'serviceCard.portTitle' | t">{{ 'serviceCard.portLabel' | t:{ port: port.hostPort } }}</span>
           }
           @if (service.mobileApps?.android) {
@@ -156,7 +156,7 @@
               {{ 'serviceCard.clientApiUrlLabel' | t }}: {{ service.exposedHostname }}{{ service.clientApiPath }}
             </a>
           }
-          @for (extra of service.additionalExposureUrls; track extra) {
+          @for (extra of service.additionalExposureUrls; track extra.hostname) {
             <a
               class="badge text-bg-secondary border text-decoration-none"
               [href]="'https://' + extra.hostname"
@@ -188,7 +188,7 @@
                 {{ (missingRequiredCount() === 1 ? 'serviceCard.configuration.missingRequired.one' : 'serviceCard.configuration.missingRequired.other') | t:{ count: missingRequiredCount() } }}
               </div>
             }
-            @for (field of visibleEnvFields; track field) {
+            @for (field of visibleEnvFields; track field.key) {
               <div class="mb-2">
                 <label class="form-label small mb-1" [for]="'env-' + service.name + '-' + field.key">
                   {{ envLabel(field.key) }}

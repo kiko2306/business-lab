@@ -24,7 +24,7 @@
     }
     @if (deployment) {
       <ul class="list-group list-group-flush">
-        @for (c of deployment.checks; track c) {
+        @for (c of deployment.checks; track c.id) {
           <li class="list-group-item d-flex gap-3 px-0">
             <span class="badge align-self-start" [class.text-bg-success]="c.done" [class.text-bg-warning]="!c.done">
               {{ (c.done ? 'settings.deployment.setBadge' : 'settings.deployment.todoBadge') | t }}
