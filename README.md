@@ -361,6 +361,17 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       with no data directory.
 - [ ] **Hide "Guardar configuração" when there is nothing to save (plan.md §929)** — an app with no
       configurable settings (IT Tools) says so and still shows the Save button.
+- [ ] **Make the CrowdSec bouncer prune actually delete (plan.md §929)** — `pruneStaleCrowdsecBouncers`
+      (`crowdsecBans.ts`) runs `cscli … bouncers delete` in a one-off `compose run` container with
+      `-c /staging/etc/crowdsec/config.yaml` and logs success, but the live container's
+      `cscli bouncers list` keeps the rows (seen 2026-10-14). Run it against the live LAPI database
+      (or the running container), and have the log line confirm the row count dropped. The old
+      `nginx` row (no `@ip`) is not matched by `NPM_BOUNCER_COPY` either.
+- [ ] **Grey out an ntfy row's Test while its switch is off, and show saving (plan.md §929)** —
+      Settings → Alertas ntfy: the template binds Test to `!alertSettings.enabled[...]`, but after
+      turning CrowdSec off its Test stayed enabled. Each toggle restarts n8n and CrowdSec (~30 s) with
+      every switch silently disabled and no message; show "A guardar…" and the result. The hint
+      under each topic ("anyone who knows it can read") is stale since ntfy reads need a token (§425).
 - [ ] **Drop the stale "Unpin" wording (plan.md §928)** — the generated override header in
       `composeOverride.ts` (and comments in `status.ts`, `requireCapability.ts`, `auth.service.ts`)
       still point at an "Unpin" button on the app card that no longer exists.
@@ -679,7 +690,10 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
 - [ ] **Beta-test stale CrowdSec bouncer prune (plan.md §912)** — *2026-10-13: after a CrowdSec
       restart the backend logged "removed stale NPM bouncer registrations" for
       `nginx@10.201.17.3`, and Settings → CrowdSec bans still loads.* Left: a new probe still gets
-      banned (so `nginx@10.201.17.5` still enforces).
+      banned (so `nginx@10.201.17.5` still enforces). *2026-10-14: FAILS — the backend logged the same
+      removal again at 09:03:47, yet `cscli bouncers list` in the live container still shows
+      `nginx@10.201.17.3` (last pull 2026-10-07) and `nginx` @10.201.17.2 (2026-09-23). Live
+      `nginx@10.201.17.5` pulled at 09:04. Fix item below.*
 - [ ] **Beta-test 7-day ntfy history (plan.md §912)** — *2026-10-13: `ntfy-ntfy-1` has
       `NTFY_CACHE_DURATION=168h`.* Left: a day later, yesterday's CrowdSec/backup notifications
       are still in the ntfy app history.
@@ -864,7 +878,10 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       probe — not three cards, as this item used to say), so confirm that
       card reads healthy on the Apps page rather than showing an error.
 
-- [ ] **Beta-test the ntfy panel regrouping (§609/§615)** — one grouped row
+- [ ] **Beta-test the ntfy panel regrouping (§609/§615)** — *2026-10-14 at 0.173.4: all four rows
+      show `homelab-alerts` (the default, but reads need a token: anonymous `GET` is 403). Turning a
+      switch off saves and survives a reload. FAILS: Test stays enabled on the off row. Left:
+      CrowdSec bans still 403 at NPM.* One grouped row
       per category (switch + topic + Test) replaced the old shared-default-topic
       + single CrowdSec switch + separate Enforcement switch. On `beta`: open
       Settings → ntfy alerts and confirm all four rows show a real topic (the
