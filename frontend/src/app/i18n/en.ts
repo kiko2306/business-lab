@@ -713,6 +713,7 @@ export const en: Record<string, string> = {
   'settings.ntfy.description': 'Subscribe to a topic in the ntfy app to get its pushes on your phone. CrowdSec bans are always enforced at Nginx Proxy Manager — see its app card for details.',
   'settings.ntfy.topicInvalidHint': 'Letters, digits, hyphens and underscores only, up to 64 characters.',
   'settings.ntfy.topicHint': 'ntfy topics are open by name, so anyone who knows it can read the alert stream (which includes attacker IPs) — keep it non-obvious.',
+  'errors.tooManyRequests': 'Too many requests in a short time. Wait a few minutes, then try again.',
   'settings.ntfy.testButton': 'Test',
   'settings.ntfy.saveChannelsButton': 'Save topics',
   'settings.alertCategory.crowdsec': 'CrowdSec intrusion alerts',

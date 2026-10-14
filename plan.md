@@ -38789,3 +38789,8 @@ Not done, rejected:
 - **Bouncer prune (§912) removed.** Traced the live backend's own `pruneStaleCrowdsecBouncers` (node in the container, `exec` wrapped): the delete's stderr is `bouncer 'nginx@10.201.17.3' is auto-created and cannot be deleted, delete parent bouncer nginx instead`, exit 0 — so it logged "removed" every CrowdSec start and the row (created 2026-09-23) never went. Ruled out first, with throwaway `claude-probe-*` bouncers: one-off `compose run` writes the live DB (host and backend container, and racing a `--force-recreate`). Rejected fixes: delete parent `nginx` (cuts the live NPM bouncer until the next CrowdSec start re-registers it); `cscli bouncers prune -d` (also takes `nginx`, last pull 09-23). The copies are harmless rows; §912 only called them dead weight. Reconciler count 29 → 28.
 - **2FA issuer** `Homelab Management` → `Business Lab` (`totp.ts`). Issuer is a label in the `otpauth://` URI, not part of the secret: existing enrolments keep validating, they just keep the old label until re-enrolled.
 - **Device scan names the server.** nmap rarely resolves the scanning host. `markServer` now fills a missing name for the server row from `docker info --format {{.Name}}` (socket proxy allows INFO; `os.hostname()` in the backend is its container ID). Live: returns `home-srv-01` from inside the backend. A name nmap did find is kept.
+
+## 933. Frontend fixes from §928/§929
+
+[x] done. Each its own commit, test first.
+- **429 text.** `extractErrorMessage` (60 callers, no injector) returns `errors.tooManyRequests` in the language TranslateService sets on `<html>`. Rejected: translating each limiter's backend text — six limiters, still English to any other client.

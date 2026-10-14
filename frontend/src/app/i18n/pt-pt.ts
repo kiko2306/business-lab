@@ -713,6 +713,7 @@ export const ptPT: Record<string, string> = {
   'settings.ntfy.description': 'Subscreva um tópico na aplicação ntfy para receber as suas notificações no telemóvel. Os banimentos do CrowdSec são sempre aplicados no Nginx Proxy Manager — veja o cartão dessa app para mais detalhes.',
   'settings.ntfy.topicInvalidHint': 'Apenas letras, dígitos, hífenes e sublinhados, até 64 carateres.',
   'settings.ntfy.topicHint': 'Os tópicos ntfy são abertos por nome, pelo que qualquer pessoa que o conheça pode ler o fluxo de alertas (que inclui IPs de atacantes) — mantenha-o pouco óbvio.',
+  'errors.tooManyRequests': 'Demasiados pedidos em pouco tempo. Aguarde alguns minutos e tente de novo.',
   'settings.ntfy.testButton': 'Testar',
   'settings.ntfy.saveChannelsButton': 'Guardar tópicos',
   'settings.alertCategory.crowdsec': 'Alertas de intrusão do CrowdSec',

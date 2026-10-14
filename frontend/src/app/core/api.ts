@@ -1,5 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { environment } from '../../environments/environment';
+import { en } from '../i18n/en';
+import { ptPT } from '../i18n/pt-pt';
 
 const configuredApiUrl = environment.apiUrl.trim().replace(/\/+$/, '');
 
@@ -13,6 +15,11 @@ export function extractErrorMessage(
   fallback = 'Something went wrong. Please try again.'
 ): string {
   if (error instanceof HttpErrorResponse) {
+    // Every rate limiter answers in English (plan.md §933). This helper has ~60
+    // callers and no injector, so it reads the language TranslateService puts on <html>.
+    if (error.status === 429) {
+      return (document.documentElement.lang === 'pt-PT' ? ptPT : en)['errors.tooManyRequests'];
+    }
     const apiError = error.error;
     if (typeof apiError === 'string' && apiError.trim()) {
       return apiError;

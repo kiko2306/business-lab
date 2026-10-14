@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.12** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.13** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -340,10 +340,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       draft so features can be picked in the same edit, as the Add user form already allows.
 - [ ] **Beta-test the authenticator name (plan.md §932)** — on `beta`, set up 2FA on a test account:
       the authenticator app lists it as "Business Lab". An entry set up before keeps working.
-- [ ] **Translate the API rate-limit message (plan.md §929)** — in pt-PT, a 429 from `apiLimiter`
-      (`backend/src/index.ts`, 200 requests per 15 min per IP) shows "Too many requests, please try
-      again later" in English under the 2FA field. Map 429 to a translated string in the frontend, as
-      the other errors are. Seen after ~45 min of scripted checks from one IP.
+- [ ] **Beta-test the translated rate-limit message (plan.md §933)** — hard to provoke by hand (200 API
+      calls per 15 min); if a 429 shows up in pt-PT it reads "Demasiados pedidos em pouco tempo…".
 - [ ] **Colour Home's backup badge by age (plan.md §929)** — the Backups tile's "Copiado hoje" uses
       the same yellow `menu-tile__badge` as "Atualização disponível" and as a weeks-old backup, so good
       news reads as a warning. Neutral/green when recent, yellow only when old.

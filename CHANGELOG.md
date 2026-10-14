@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.13] — 2026-10-14
+
+### Fixed
+
+- A rate-limited request says so in the page's language instead of English
+
 ## [0.173.12] — 2026-10-14
 
 ### Fixed
