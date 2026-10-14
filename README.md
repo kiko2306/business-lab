@@ -227,7 +227,9 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
 - [ ] **Beta-test Angular 21 (plan.md §898)** — *2026-10-13 at 0.173.4, Chrome on the LAN URL:
       all 10 pages load, login without 2FA works, no CSP violation or `NG0*` in the console, live
       status updates. On the public URL the service worker is active and, after two hard reloads,
-      serves the same `main-*.js` as the server's `index.html`. Left: forms, login with 2FA.* On `beta`, after the update rebuilds the frontend: every
+      serves the same `main-*.js` as the server's `index.html`. 2026-10-14: Settings → General and
+      Users → Edit access save unchanged values with a success toast, no console error. Left: the other
+      pages' forms, login with 2FA.* On `beta`, after the update rebuilds the frontend: every
       page loads and its forms work (Home, Apps, Backups, Users, Settings, Update, Account, Audit log,
       login with and without 2FA); the service worker updates rather than serving a stale shell (hard
       reload twice, check the new bundle hash loads); the browser console reports no CSP violation
@@ -313,11 +315,22 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Beta-test touch targets on a phone (plan.md §824)** — *2026-10-13 at 0.173.4, 390px in
       Chrome: Users, Backups, Settings, Apps, Home, Updates have no button under 44px and no
       sideways scroll. Role and feature checkbox rows toggle from anywhere on the row; the app-access
-      rows did not, fixed in §926 — recheck their empty corner. Left: a Tally shop view (`claude-test` has no shops), the 1280px
-      look.* On `beta`, at 390px wide (browser
+      rows did not, fixed in §926 — recheck their empty corner. Left: a Tally shop view (`claude-test` has no shops). 2026-10-14
+      at 1280px: no page scrolls sideways; Users wraps mid-word (item below).* On `beta`, at 390px wide (browser
       device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
       label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
       no row of buttons overflows. At 1280px nothing looks different from before.
+- [ ] **Stop Users rows wrapping mid-word at 1280px (plan.md §928)** — at a 1280px viewport the
+      Users table squeezes the Created column so dates break inside the number ("08/09/2" / "026"),
+      and the Actions buttons break inside words ("Elimin" / "ar", "Repor palavra-" / "passe").
+      Keep dates and button labels on one line (`text-nowrap`), and let the table scroll or stack
+      the buttons instead.
+- [ ] **Translate start/stop toasts (plan.md §928)** — in pt-PT, stopping Samba shows "Service samba
+      stopped successfully": the card shows the backend's English `message`
+      (`executor.ts` stop/start results) instead of a translated string.
+- [ ] **Drop the stale "Unpin" wording (plan.md §928)** — the generated override header in
+      `composeOverride.ts` (and comments in `status.ts`, `requireCapability.ts`, `auth.service.ts`)
+      still point at an "Unpin" button on the app card that no longer exists.
 - [ ] **Beta-test the readable settings-dialog chips (plan.md §927)** — on `beta`, light mode:
       open NetBird VPN → Settings. "Installed: …", "Has an Android app" and "Has an iPhone/iPad
       app" read as dark text on the pale chip; in dark mode they still read light on dark.
@@ -547,7 +560,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       Home Assistant 8123. Still to do: public and secondary URLs on the card, two tabs open at
       once, the pin badge clearing.* *2026-10-13 at 0.173.4, Chrome: Pi-hole's Settings lists 53, 53,
       10320; netbird-vpn's its four ports plus Management API and Relay hostnames; a stop showed in
-      both tabs within one tick. Left: the pin badge clearing.* The whole status
+      both tabs within one tick. 2026-10-14: there is no Unpin button any more — only a per-app
+      update clears pins (`executor.ts` `clearImagePins`). Left: after the next self-update re-pins,
+      a card's pin badge shows the new tag, not the old one.* The whole status
       payload now comes from one `docker ps -a` and one `service_exposure`
       read, so a mistake here shows up as *every* app reading wrong at once.
       On `beta`: open Apps and confirm each app's state matches
@@ -562,18 +577,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       own. Finally check an app with a pinned image still shows its pin badge
       after the pin is cleared from the Updates page (the compose YAML is now
       memoised on mtime, so a stale badge would be the bug).
-- [ ] **Beta-test the WebSocket/SSE fix for live service status (plan.md §792)** —
-      *2026-10-13 at 0.173.4, public URL in Chrome: Apps shows **Connected**, and
-      `wss://<host>/ws/services` answered `101`. Left: Home's headline flipping live.*
-      on `beta`, open Apps and expand "All apps": confirm it shows real rows (not
-      a permanent "Loading services…") and a **Connected** badge, not **sse** or
-      **polling**, within a second or two of opening the page. Open the browser's
-      Network tab and confirm `wss://<host>/ws/services` shows `101 Switching
-      Protocols`, not a plain 200. Check Home's status headline updates live too
-      (stop an app from another tab/device and watch it flip without a manual
-      refresh). This was never actually working through nginx before — confirm
-      it now does on the real tunnel/NPM path, not just the direct container
-      path the test stack exercises.
 - [ ] **Beta-test Home's new badges (plan.md §788)** — *2026-10-07: the data behind both is right
       (`/backups/last-successful` is dated today; `/self-update/check` reports `commitsBehind: 1`
       when `beta` is ahead). Still to do: how the two tiles render, and the failed-read case.* On `beta`, with a
@@ -771,7 +774,7 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       repo's config. Check that issue periodically; delete this item once it's
       closed upstream (or once an app update fixes it for us, whichever comes
       first). Last checked 2026-10-09: still open (no upstream activity since
-      2025-11-05). Rechecked 2026-10-13: unchanged.
+      2025-11-05). Rechecked 2026-10-13 and 2026-10-14: unchanged.
 - [ ] **Re-enable the CrowdSec Cloudflare Worker bouncer once its token bug is
       fixed** — the edge-level bouncer (`cloudflare-worker-bouncer` in
       `apps/crowdsec/docker-compose.yml`, behind the `edge-bouncer` compose
@@ -786,7 +789,7 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       works or upstream fixes the auth path. Check periodically; delete this
       item once it's fixed and the bouncer is confirmed enforcing live. Last
       checked 2026-10-09: latest release is still v0.0.18 (2026-06-02), and no
-      upstream issue names the 10000 auth error. Rechecked 2026-10-13: unchanged.
+      upstream issue names the 10000 auth error. Rechecked 2026-10-13 and 2026-10-14: unchanged.
 - [ ] **Prove MeshCentral agent enrolment through the public tunnel**
       — the app is up, reachable at its own hostname with no Authelia gate,
       and its own login page confirmed live (§505/§506), but the actual

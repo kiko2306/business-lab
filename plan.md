@@ -38746,3 +38746,15 @@ Not done, rejected:
 ## 927. Settings-dialog chips readable in light mode
 
 [x] done. Found §924. `badge bg-body-tertiary border` keeps Bootstrap's white `.badge` text → 1.05:1 on the pale chip in light mode. Swept the codebase for the pattern: also the Android and iPhone/iPad chips in the same dialog; the health badge sets its own `text-*`. Fix: `text-body` on all three. Spec measures every `.settings-about .badge` ≥ 4.5:1 in light and dark.
+
+## 928. Browser beta checks in Chrome, 2026-10-14 (0.173.4)
+
+[x] done. Owner's Chrome, own debug profile (`--remote-debugging-port=9222`), driven by `e2e/` playwright `connectOverCDP` from WSL Node 18 (Docker containers cannot reach the port). Owner logged in as `mat`. Box still on 0.173.4; `beta` is 0.173.7, so §925–§927 rechecks wait for owner's update.
+- Upstream: netbirdio/android-client#96 still open; cs-cloudflare-worker-bouncer still v0.0.18.
+- §792 item deleted. Its only open step (Home headline flips live on a stop) cannot work as written: headline is `s.error ? needYou : allFine`, so a stopped app stays "all fine". Everything else in it passed (§923/§924: Connected, `101`, two-tab stop in one tick); Apps counters went 44/0 → 43/1 live.
+- §798 pin step rewritten: no Unpin button exists (spec asserts none); pins clear only on a per-app update (`clearImagePins`). Check badge after next self-update instead. `composeOverride.ts` header still tells readers to "use Unpin on the app card" — stale.
+- §898: Settings → General save and Users → Edit access save (unchanged values) → success toasts, no console error.
+- §824 1280px: no sideways scroll on Users/Settings/Backups/Apps/Home. Users table wraps dates and button labels mid-word. New README item.
+- Found: start/stop toast shows backend English `message` in pt-PT. New README item.
+- Tried and rejected: resizing the real window to 1280 CSS px (display scaling caps it at 929); `setViewportSize` emulation used instead — its full-page screenshots clip the right edge, so overflow was measured in-page, not by eye.
+- Samba stopped/started once (~30 s), back healthy.
