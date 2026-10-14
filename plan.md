@@ -38846,3 +38846,10 @@ Not done, rejected:
 - Read Mealie's source (`openid_provider.py`, `settings.py`, mealie-next) rather than assume: `OIDC_REQUIRES_GROUP_CLAIM` is true once `OIDC_ADMIN_GROUP` is set, `is_admin` is computed only then, and an existing user's `admin` is re-set at every sign-in — so `mat` is fixed on next login, no migration. Compose's `${OIDC_ADMIN_GROUP:-}` gives "" when OIDC is off; Mealie then grants no admin (falsy group), and the claim check is moot with OIDC off.
 - Tests: Mealie's appEnv maps `admins`; every Mealie appEnv key is in its compose `environment:` (the guard that would have caught a dashboard-written key the container never sees).
 - Rejected: mapping `app-mealie` to admin — that is every user granted Mealie.
+
+## 940. Beta proof at 0.173.26, and a self-update ordering gap
+
+[x] §939 proved, item deleted. [ ] ordering gap — new README item.
+- After the owner's update: `mealie-mealie-1` up 2 min, `business-lab-backend-1` up 17 s, container env `OIDC_ADMIN_GROUP=` (empty). The update recreated Mealie (compose changed) while the old backend still ran, and the old code has no such key. Parar/Iniciar from Apps → `OIDC_ADMIN_GROUP=admins`.
+- Then Mealie sign-in through Authelia: `mat` (webmaster, group `admins`) `/api/users/self` → `admin=true` — promoted on login, no migration, as Mealie's source said; `claude-test` (Administrador, not webmaster) → `admin=false`.
+- Gap: self-update recreates changed apps before the backend restarts on new code, so any release that adds a dashboard-rendered app setting lands empty until a manual restart. Not fixed here (new work).

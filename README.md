@@ -327,10 +327,12 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
       label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
       no row of buttons overflows. At 1280px nothing looks different from before.
-- [ ] **Beta-test Mealie admins from Authelia (plan.md §939)** — on `beta`, after the update recreates
-      Mealie (its compose changed): sign out of Mealie, "Iniciar sessão com Authelia" as `mat` — Mealie's
-      Definições now shows the admin pages (`/api/users/self` `admin: true`). Sign in as `claude-test` (an
-      Administrador, not Administrador total): stays a plain user.
+- [ ] **Let a self-update render app settings with the new code (plan.md §940)** — updating to 0.173.26
+      recreated Mealie (its compose changed) two minutes before the new backend started, so the *old* backend
+      wrote Mealie's env and `OIDC_ADMIN_GROUP` came out empty; a manual Parar/Iniciar fixed it. Any release
+      that adds a dashboard-rendered app setting (`oidcClient.appEnv`, managed env keys) hits the same: recreate
+      the changed apps after the backend restarts, or re-run their start reconcilers then. Test first; the beta
+      item is a release that changes one app's rendered env and needs no manual restart.
 - [ ] **Beta-test the translated rate-limit message (plan.md §933)** — hard to provoke by hand (200 API
       calls per 15 min); if a 429 shows up in pt-PT it reads "Demasiados pedidos em pouco tempo…".
 - [ ] **Beta-test the Utils critique fixes (plan.md §841)** — *2026-10-14 at 0.173.4, pt-PT laptop:
