@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.17] — 2026-10-14
+
+### Fixed
+
+- An app with nothing to configure no longer shows a Save button
+
 ## [0.173.16] — 2026-10-14
 
 ### Fixed

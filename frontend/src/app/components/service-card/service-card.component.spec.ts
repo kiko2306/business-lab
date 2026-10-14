@@ -814,7 +814,8 @@ describe('ServiceCardComponent port fields', () => {
     const save = Array.from(el.querySelectorAll('.settings-section button')).find((b) =>
       b.textContent?.includes('Save configuration')
     ) as HTMLButtonElement | undefined;
-    expect(save?.disabled ?? true).toBeTrue();
+    // A greyed button under "nothing to configure" still read as a step to take (plan.md §933).
+    expect(save).toBeUndefined();
   });
 });
 

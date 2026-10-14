@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.16** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.17** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -347,8 +347,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       (IT Tools): the red button reads "Parar IT Tools" / "Stop IT Tools". Cancel it.
 - [ ] **Beta-test Back up now on an app with no data (plan.md §933)** — on `beta` in pt-PT, IT Tools →
       Definições → Fazer cópia agora: the error reads "IT Tools não guarda dados próprios…".
-- [ ] **Hide "Guardar configuração" when there is nothing to save (plan.md §929)** — an app with no
-      configurable settings (IT Tools) says so and still shows the Save button.
+- [ ] **Beta-test the hidden Save button (plan.md §933)** — on `beta`, IT Tools → Definições: no
+      "Guardar configuração" under "não tem definições configuráveis".
 - [ ] **Grey out an ntfy row's Test while its switch is off, and show saving (plan.md §929)** —
       Settings → Alertas ntfy: Test is bound to the saved `alertSettings.enabled[...]`, so for the
       whole save after turning CrowdSec off its Test stayed enabled; bind it to the switch. Each toggle restarts n8n and CrowdSec (~30 s) with

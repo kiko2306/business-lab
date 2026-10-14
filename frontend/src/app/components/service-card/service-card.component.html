@@ -283,17 +283,19 @@
                 }
               </div>
             }
-            <button
-              type="button"
-              class="btn btn-outline-primary btn-sm mt-1"
-              [disabled]="envSaving || !visibleEnvFields.length"
-              (click)="saveEnv()"
-              >
-              @if (envSaving) {
-                <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-              }
-              {{ 'serviceCard.configuration.saveButton' | t }}
-            </button>
+            @if (visibleEnvFields.length) {
+              <button
+                type="button"
+                class="btn btn-outline-primary btn-sm mt-1"
+                [disabled]="envSaving"
+                (click)="saveEnv()"
+                >
+                @if (envSaving) {
+                  <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                }
+                {{ 'serviceCard.configuration.saveButton' | t }}
+              </button>
+            }
           }
         </section>
         <!-- Backups -->
