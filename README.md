@@ -262,11 +262,11 @@ The security remainder of the same review, four items, each its own commit and v
 Four items from a whole-repo review, run in this order, each its own commit and version bump.
 
 - [ ] **Beta-test that an admin cannot promote itself to webmaster (plan.md §873 item 1)** — *2026-10-13,
-      over the API as an `admin`: granting `webmaster` is 403 "Only a webmaster can grant the
-      webmaster role."; making an account `admin`, resetting an ordinary password and deleting all
-      work.* Left: as that admin, **Reset password** on the webmaster's own row (skipped so a
-      guard failure could not lock you out) must be refused; the webmaster's own Edit roles /
-      Reset password on the admin still work; the UI shows the refusals as clear messages.
+      over the API as an `admin`: granting `webmaster` is 403; making an account `admin`, resetting an
+      ordinary password and deleting all work. 2026-10-14 at 0.173.30 (§954): as `claude-test` (admin),
+      `PUT /api/users/1/password` on `mat` (webmaster) is 403 "Only a webmaster can change a webmaster
+      account." and the password is unchanged; the Users page shows only Edit access on `mat`'s row.*
+      Left, as the webmaster: Edit roles and Reset password on an admin's row still work.
 - [ ] **Beta-test the cached status and health polls (plan.md §873 item 3)** — *2026-10-13 at
       0.173.4, two Chrome tabs: a Samba stop showed in 2.5 s and 14.1 s, a start in ~3 s, CPU moves
       in both. Left: disk alert. The port-change step no longer applies — `*_PORT` keys are hidden
@@ -357,10 +357,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       a laptop, EN and pt-PT.
 - [ ] **Beta-test the busy-provider fallback (plan.md §953)** — on `beta`, with keys for two providers
       in Settings → AI API Keys, generate a draft while the chosen one is overloaded (Gemini's "high
-      demand" happens on its own; or save a deliberately wrong base model only if the code ever allows
-      it — it does not, so wait for a real spike): the draft still arrives, and the backend log shows
-      "AI provider busy while generating a social draft" with `next` naming the provider that wrote it.
-      With only one key, a busy spell costs one quiet retry (about 1.5 s) before the usual message.
+      demand" spells come on their own; there is no way to force one): the draft still arrives, and the
+      backend log shows "AI provider busy while generating a social draft" with `next` naming the
+      provider that wrote it. With only one key, a busy spell costs one quiet retry (about 1.5 s) before
+      the usual message.
 - [ ] **Beta-test the small pages' fixes (plan.md §855-§862)** — *2026-10-13 at 0.173.4, Audit
       logs in Chrome: Result first, actions as sentences with the code on hover, "21–40 of 9735",
       the 30-day/Europe/Lisbon line, Enter on a no-match filter gives Clear filters, a long probe
