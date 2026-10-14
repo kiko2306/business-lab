@@ -375,6 +375,12 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Name this server in the device scan (plan.md §929)** — Definições → Encontrar dispositivos:
       the first row has the Este servidor badge but reads "Desconhecido" for name and maker. The box
       knows its own hostname; fill it in (principle 3).
+- [ ] **Fix Content → Gerar failing with HTTP 404 (plan.md §929)** — 2026-10-14, Generate gives
+      "Não foi possível escrever o rascunho" (frontend 502); the backend logs "AI provider request
+      failed: HTTP 404". Likely cause: `aiSettings.ts` asks Anthropic for `generateModel:
+      'claude-opus-5'`, which is not a current model ID (current: `claude-opus-5-5`,
+      `claude-haiku-5-5`) — confirm which provider is selected, check every provider's model IDs
+      against its live model list, and make a 404 from the provider say the model is unavailable.
 - [ ] **Drop the stale "Unpin" wording (plan.md §928)** — the generated override header in
       `composeOverride.ts` (and comments in `status.ts`, `requireCapability.ts`, `auth.service.ts`)
       still point at an "Unpin" button on the app card that no longer exists.
@@ -405,7 +411,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       (4) done (§864) — on `beta`, press Find devices: the first row is this server with a "This server" badge,
       named devices follow, devices with no name or maker sit under "Not recognised".
       On `beta`, open Home and Settings on a phone and a laptop, EN and pt-PT.
-- [ ] **Beta-test the Content critique fixes (plan.md §845, §847)** — 16/40, all six done. Decided 2026-10-06:
+- [ ] **Beta-test the Content critique fixes (plan.md §845, §847)** — *2026-10-14 at 0.173.4, pt-PT:
+      (2) adding an address with Enter announces "… adicionado." and keeps focus in the box; Remover
+      asks first, names the address, and the row goes. (5) cannot run: a key is set, and Generate
+      fails (item below). Left: everything needing a draft, the public form, a phone.* 16/40, all six done. Decided 2026-10-06:
       Content is a **post generator**, and **subscribers are managed on the same page**. In order,
       test first, one commit and version bump each: (1) done (§846) — on `beta`, edit a draft and
       press Email to subscribers without Save: the dialog says your changes are saved first, and the email that
