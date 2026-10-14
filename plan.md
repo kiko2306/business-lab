@@ -38853,3 +38853,7 @@ Not done, rejected:
 - After the owner's update: `mealie-mealie-1` up 2 min, `business-lab-backend-1` up 17 s, container env `OIDC_ADMIN_GROUP=` (empty). The update recreated Mealie (compose changed) while the old backend still ran, and the old code has no such key. Parar/Iniciar from Apps → `OIDC_ADMIN_GROUP=admins`.
 - Then Mealie sign-in through Authelia: `mat` (webmaster, group `admins`) `/api/users/self` → `admin=true` — promoted on login, no migration, as Mealie's source said; `claude-test` (Administrador, not webmaster) → `admin=false`.
 - Gap: self-update recreates changed apps before the backend restarts on new code, so any release that adds a dashboard-rendered app setting lands empty until a manual restart. Not fixed here (new work).
+
+## 941. TODO tidy, 2026-10-14
+
+[x] done. §824 touch targets deleted — every step passed (§923/§924 pages, §926 chip corner at 0.173.21, §934 1280px, Tally 44px under touch). §615 ntfy note: Test-greyed step passed at 0.173.21, only the NPM 403 check left.

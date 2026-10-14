@@ -317,16 +317,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       tick the boxes, the chosen one shows pressed, editing a box shows Custom, and nothing changes until
       Save; the same in the Add user form and in pt-PT, with no sideways scroll on a phone. The P2 focus-ring and control-border contrast belongs to the shared theme and
       is its own item below. On `beta`, after each: open Users on a phone with a long email.
-- [ ] **Beta-test touch targets on a phone (plan.md §824)** — *2026-10-13 at 0.173.4, 390px in
-      Chrome: Users, Backups, Settings, Apps, Home, Updates have no button under 44px and no
-      sideways scroll. Role and feature checkbox rows toggle from anywhere on the row; the app-access
-      rows did not, fixed in §926 — 2026-10-14 at 0.173.21 the corner, bottom and right side of a
-      312×87 chip each toggle it. Tally shop view (Mat Laptop) at 390px: no
-      sideways scroll; with touch emulated every control is 44px. Left: the app-access recheck. 2026-10-14
-      at 1280px: no page scrolls sideways; Users wraps mid-word (item below).* On `beta`, at 390px wide (browser
-      device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
-      label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
-      no row of buttons overflows. At 1280px nothing looks different from before.
 - [ ] **Let a self-update render app settings with the new code (plan.md §940)** — updating to 0.173.26
       recreated Mealie (its compose changed) two minutes before the new backend started, so the *old* backend
       wrote Mealie's env and `OIDC_ADMIN_GROUP` came out empty; a manual Parar/Iniciar fixed it. Any release
@@ -851,7 +841,7 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
 - [ ] **Beta-test the ntfy panel regrouping (§609/§615)** — *2026-10-14 at 0.173.4: all four rows
       show `homelab-alerts` (the default, but reads need a token: anonymous `GET` is 403). Turning a
       switch off saves and survives a reload. Test stayed enabled on the off row for the
-      ~30 s save (not rechecked after it); fix item below. Left: Test greyed once saved, CrowdSec
+      ~30 s save; fixed in §933 and at 0.173.21 Test greys at once with "A guardar…". Left: CrowdSec
       bans still 403 at NPM.* One grouped row
       per category (switch + topic + Test) replaced the old shared-default-topic
       + single CrowdSec switch + separate Enforcement switch. On `beta`: open
