@@ -348,6 +348,19 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       (`backend/src/index.ts`, 200 requests per 15 min per IP) shows "Too many requests, please try
       again later" in English under the 2FA field. Map 429 to a translated string in the frontend, as
       the other errors are. Seen after ~45 min of scripted checks from one IP.
+- [ ] **Colour Home's backup badge by age (plan.md §929)** — the Backups tile's "Copiado hoje" uses
+      the same yellow `menu-tile__badge` as "Atualização disponível" and as a weeks-old backup, so good
+      news reads as a warning. Neutral/green when recent, yellow only when old.
+- [ ] **Fill the app name into the stop confirm button (plan.md §929)** — stopping an exposed app
+      (IT Tools) shows a confirm whose red button reads "Parar {{label}}" / "Stop {{label}}":
+      `service-card.component.ts` `stopConfirmation()` translates `confirmStopExposed.confirmText`
+      without passing `{ label }`. Pass it, and add a spec that the button names the app.
+- [ ] **Say why Back up now did nothing (plan.md §929)** — IT Tools → Definições → "Fazer cópia
+      agora" goes busy for 0.3 s and stops: the API answers 400 "it-tools has no data directory to
+      back up." but the dialog shows no message. Show the error, or hide the backup section for apps
+      with no data directory.
+- [ ] **Hide "Guardar configuração" when there is nothing to save (plan.md §929)** — an app with no
+      configurable settings (IT Tools) says so and still shows the Save button.
 - [ ] **Drop the stale "Unpin" wording (plan.md §928)** — the generated override header in
       `composeOverride.ts` (and comments in `status.ts`, `requireCapability.ts`, `auth.service.ts`)
       still point at an "Unpin" button on the app card that no longer exists.
@@ -427,8 +440,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       refused in Portuguese and 2FA stays on. (2) wrong enrol and disable codes show their message and
       keep the cursor in the field. (3) "Guarde-os agora" first, no green alert, "Já os guardei" greyed
       until the tick box. (4) panel open, no TOTP wording. (5) authenticator link, Copiar chave, focus
-      on the step heading, the starts-over line. Left: focus after Cancel/Done/turn-off, a successful
-      turn-off (blocked by the rate limit, item below), EN.* All five done; this item is now
+      on the step heading, the starts-over line. A valid code then turns it off and
+      focus lands on the "Inativo" status line. Left: focus after Cancel and Done, EN.* All five done; this item is now
       only the `beta` look. (1) §820 — on `beta`, Turn it off asks for a code or recovery code (no
       password field), then a confirm; a wrong code is refused and 2FA stays on; (2) §821 — a wrong
       enrol code and a wrong disable code each show a message under their own field (in pt-PT too)
@@ -540,7 +553,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       is still there. "Forecast" reads "Taken plus open tabs" and Open tabs reads
       "Not paid yet". A closed day with no sales says "No takings that day", not
       "yet"/"today".
-- [ ] **Beta-test the shared theme's semantic colours (plan.md §807)** — on `beta`,
+- [ ] **Beta-test the shared theme's semantic colours (plan.md §807)** — *2026-10-14 at 0.173.4:
+      every text-warning/danger/success/info, button, badge and alert on Home, Apps (all categories
+      open, 231), Backups and Settings meets 4.5:1 (3:1 large) in light and dark; a hovered outline
+      button is white on rgb(10,88,202). Left: the hotel apps.* On `beta`,
       look at the dashboard in both light and dark: the Start/Stop/Settings
       buttons on Apps, the red failure text on Backups and Settings, the green
       "OK" states, and any outline button must all be clearly readable — the
@@ -565,14 +581,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       in both light and dark, confirm every stat-card label is readable on a
       phone in daylight, and that Refresh, the theme toggle, the language select
       and the date input are all at least 44px tall on a touch device.
-- [ ] **Beta-test the OnPush service card (plan.md §808)** — on `beta`, on the
-      Apps page with a real, busy box: start an app and watch its startup popup
-      stream lines, flip to "running" and auto-close; open Settings and confirm
-      the config and snapshot list fill in; run "Back up now" and see it go busy
-      and idle; stop an app and confirm its row, health badge and dependency
-      chips update within one 15 s tick *without* a manual refresh; switch the
-      language and confirm every card re-renders. Any card that shows stale
-      state after one of those is a missed `markForCheck()` (plan.md §808).
 - [ ] **Beta-test the single settings writer (plan.md §799)** — *2026-10-07, over the API on
       the box: general (timezone, update branch), backup schedule, backup target, mail (+ its
       Test), alerts and exposure (blank password; Test passes for NPM and Cloudflare) all come back
@@ -612,7 +620,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       memoised on mtime, so a stale badge would be the bug).
 - [ ] **Beta-test Home's new badges (plan.md §788)** — *2026-10-07: the data behind both is right
       (`/backups/last-successful` is dated today; `/self-update/check` reports `commitsBehind: 1`
-      when `beta` is ahead). Still to do: how the two tiles render, and the failed-read case.* On `beta`, with a
+      when `beta` is ahead). Still to do: how the two tiles render, and the failed-read case.* *2026-10-14 at 0.173.4, 6
+      behind: Home shows "Atualização disponível" on Updates and "Copiado hoje" on Backups, no toast.
+      Left: the failed-read case.* On `beta`, with a
       successful app-data backup on record, confirm the Backups tile shows
       its age ("Backed up Nd ago" / "Backed up today"), and that the Updates
       tile shows "Update available" only once `beta` is genuinely behind
@@ -738,7 +748,9 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       web UI, open a document and confirm the OnlyOffice editor actually
       launches, and complete one SAML login.
 
-- [ ] **Beta-test light/dark mode (plan.md §696)** — on `beta`, after pulling
+- [ ] **Beta-test light/dark mode (plan.md §696)** — *2026-10-14 at 0.173.4, dashboard: follows
+      an OS light/dark switch, `theme-init.js` runs sync in `<head>`, the header toggle flips it and
+      survives a reload. Left: walking each page by eye, Tally, the Hotel pages.* On `beta`, after pulling
       (dashboard and Tally rebuild), open the dashboard and `tally.<domain>`
       with the OS set to light: both should load light with no dark flash, and
       with the OS set to dark, dark. The ☀/☾ button in the header/navbar should
