@@ -302,7 +302,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       characters" appears, typing stops at 4000; the wait line shows while generating; a failed
       generate (Gemini "high demand", 502) says "The draft could not be written. Try again in a moment.",
       keeps the text and the focus; Delete asks first and announces "Draft deleted."; pt-PT phone has no
-      English and no sideways scroll. Retried 14:19 (§952): Gemini still "high demand". Left: after a successful generate — Drafts opens with the cursor
+      English and no sideways scroll. Retried 14:19 (§952) and 15:24 (§959): Gemini still "high demand". Left: after a successful generate — Drafts opens with the cursor
       in the new draft; Copy, Save (cursor stays), Email to subscribers' dialog; Delete puts the cursor
       in the request box; the public form.* 16/40, all six done. Decided 2026-10-06:
       Content is a **post generator**, and **subscribers are managed on the same page**. In order,
@@ -331,7 +331,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       should the post say?", with Drafts open too once there are drafts, and no "Brief" or "Claude"
       anywhere, in pt-PT too. All six are done (plus two minor findings, §908: trailing-whitespace dirty check, brief counter — on `beta`, paste 3600+ characters into the brief box: a "N / 4000 characters" line appears, typing stops at 4000); this item is now only the `beta` looks. On `beta`, after each: open Content on a phone and
       a laptop, EN and pt-PT.
-- [ ] **Beta-test the busy-provider fallback (plan.md §953)** — on `beta`, with keys for two providers
+- [ ] **Beta-test the busy-provider fallback (plan.md §953)** — *2026-10-14 at 0.173.31 (plan.md §959): the one-key path is proven live — Gemini busy at 15:24:35 ("next": "google"), retried 4.4 s later, busy again ("next": null), then the usual 502 and message. Left: the switch to a second provider, which needs a second key (Groq has a free tier).* on `beta`, with keys for two providers
       in Settings → AI API Keys, generate a draft while the chosen one is overloaded (Gemini's "high
       demand" spells come on their own; there is no way to force one): the draft still arrives, and the
       backend log shows "AI provider busy while generating a social draft" with `next` naming the
