@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.22] — 2026-10-14
+
+### Fixed
+
+- The ntfy topic hint no longer shows stray backticks
+
 ## [0.173.21] — 2026-10-14
 
 ### Fixed

@@ -712,7 +712,7 @@ export const ptPT: Record<string, string> = {
   'settings.ntfy.subtitle': 'Um tópico ntfy por fonte de alertas, cada um com o seu próprio interruptor',
   'settings.ntfy.description': 'Subscreva um tópico na aplicação ntfy para receber as suas notificações no telemóvel. Os banimentos do CrowdSec são sempre aplicados no Nginx Proxy Manager — veja o cartão dessa app para mais detalhes.',
   'settings.ntfy.topicInvalidHint': 'Apenas letras, dígitos, hífenes e sublinhados, até 64 carateres.',
-  'settings.ntfy.topicHint': 'Ler um tópico exige o utilizador `subscriber` do ntfy, mostrado no painel Definições do ntfy na página Aplicações, por isso o nome do tópico não precisa de ser secreto.',
+  'settings.ntfy.topicHint': 'Ler um tópico exige o utilizador "subscriber" do ntfy, mostrado no painel Definições do ntfy na página Aplicações, por isso o nome do tópico não precisa de ser secreto.',
   'settings.ntfy.saving': 'A guardar… isto reinicia o encaminhamento de alertas e o CrowdSec, cerca de 30 segundos.',
   'errors.tooManyRequests': 'Demasiados pedidos em pouco tempo. Aguarde alguns minutos e tente de novo.',
   'serviceState.done.start': '{{label}} está a funcionar.',
