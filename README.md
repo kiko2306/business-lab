@@ -294,7 +294,13 @@ Surfaces never critiqued. Per item: `/impeccable critique` against a real render
 score in a new plan section, then fix one page at a time, test first, own commit and version
 bump. Delete the item when its fixes land (a fix still needing a `beta` look gets its own item).
 
-- [ ] **Beta-test the Users critique fixes (plan.md §813)** — in order, test first, one
+- [ ] **Beta-test the Users critique fixes (plan.md §813)** — *2026-10-14 at 0.173.4, pt-PT in
+      Chrome: (2)-(5) pass — focus trapped in the delete dialog, Esc returns it to Eliminar, Enter on
+      the page opens nothing; delete lists the apps; unticking Code Server shows "Ao guardar, remove
+      o acesso a: Code Server."; Reset password shows the 8-character rule with Save disabled; presets
+      Tudo/No dia a dia/Só consulta tick 9/4/2 boxes, a hand edit shows Personalizado, Cancel keeps
+      the saved roles; own row has no Editar funções; 390px no sideways scroll. Features show only
+      for an already-saved Admin (item below). Left: a row with a very long email, EN.* In order, test first, one
       commit and version bump each: (1) done (§814) — on `beta`, open Users on a phone and a
       laptop with a very long email and the reset-password editor open: no sideways scroll,
       Reset password and Delete reachable; (2) done (§815) — on `beta`, open any
@@ -308,7 +314,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       tick the boxes, the chosen one shows pressed, editing a box shows Custom, and nothing changes until
       Save; the same in the Add user form and in pt-PT, with no sideways scroll on a phone. The P2 focus-ring and control-border contrast belongs to the shared theme and
       is its own item below. On `beta`, after each: open Users on a phone with a long email.
-- [ ] **Beta-test the shared theme's focus ring and control edges (plan.md §818)** — on `beta`,
+- [ ] **Beta-test the shared theme's focus ring and control edges (plan.md §818)** — *2026-10-14
+      at 0.173.4: Tab through Users (16 stops), Settings (31) and Backups (33), light and dark — every
+      stop has a ring, a mouse-clicked button has none, all 37 Settings inputs/selects/boxes have an
+      edge at 3:1 or more. Left: a Tally shop view.* On `beta`,
       Tab through Users, Settings and Backups in dark and light: every control shows a solid blue
       ring (no mouse-click ring on buttons), and inputs, selects and unticked boxes have a visible
       edge. Open a Tally shop view and check the same there.
@@ -328,6 +337,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Translate start/stop toasts (plan.md §928)** — in pt-PT, stopping Samba shows "Service samba
       stopped successfully": the card shows the backend's English `message`
       (`executor.ts` stop/start results) instead of a translated string.
+- [ ] **Show Features when Edit roles ticks Admin (plan.md §929)** — Users → Edit roles on an App
+      user: ticking Administrador shows no Features block or presets until the role is saved and the
+      row re-opened, because `showFeatures()` reads the saved `user.roles`, not the draft. Read the
+      draft so features can be picked in the same edit, as the Add user form already allows.
 - [ ] **Drop the stale "Unpin" wording (plan.md §928)** — the generated override header in
       `composeOverride.ts` (and comments in `status.ts`, `requireCapability.ts`, `auth.service.ts`)
       still point at an "Unpin" button on the app card that no longer exists.
@@ -425,8 +438,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       are 44px; (5) §832 — the card is centred (equal space either side at every width) and all four
       pages look like the same card, `/recovery` included.
 - [ ] **Beta-test the Updates page critique fixes (plan.md §834)** — *2026-10-13 at 0.173.4, EN
-      and pt-PT laptop: panel open, one "Up to date"/"Atualizado" badge at 13px, Update now blue. The
-      confirm only shows when behind — look at it on the next update.* All five done; this item is now
+      and pt-PT laptop: panel open, one "Up to date"/"Atualizado" badge at 13px, Update now blue. 2026-10-14,
+      6 behind: the confirm (pt-PT at 1280/390px, EN at 1280px) has a blue Atualizar/Update, says
+      changed apps update too and no backup is made first, naming the Backups page — (2) and (5) pass.
+      Left: (1), (3), (4) — offline box, failed check, a real update.* All five done; this item is now
       only the `beta` look, on a phone and a laptop, EN and pt-PT. (5) §839 — the page opens with the
       panel open and leads with one badge: "Up to date" / "N updates available" / "Updating…" /
       "Last update failed" (red) / "Updated, N apps need attention"; badges are 13px; the confirm's
