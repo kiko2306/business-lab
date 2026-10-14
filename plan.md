@@ -36820,3 +36820,16 @@ Rejected: rewriting the code comments in three `theme.css` files — anchors fix
 ## 954. An admin cannot reset the webmaster's password — proven live (§873 item 1)
 
 [x] done at 0.173.30. Owner accepted the lockout risk; read `webmasterGuard` first — it runs before the hash/write in `PUT /users/:id/password`, the same `webmasterOnlyReason` that refused the grant on 2026-10-13. As `claude-test` (`admin`), `PUT /api/users/1/password` on `mat` (only `webmaster`) → 403 `{"error":"Only a webmaster can change a webmaster account."}`; `mat` unchanged. Users page as that admin: `mat`'s row offers only Edit access (`canAdminister`), other rows Edit roles / Edit access / Reset password / Delete. Left: the webmaster's own actions on an admin — needs the owner's login.
+
+## 955. Browser pass over the whole TODO list, 2026-10-14 (0.173.30)
+
+[x] done. Owner asked: "use the browser and test all you can". Playwright (Chromium, E2E image) as `claude-test` — on the LAN URL for the dashboard, and through Authelia on the public hostnames for the apps (one-factor works for it). 75 open items read; about 20 had a browser-testable part.
+
+- **Deleted, fully passed:**
+  - §893 sealed secrets: Cloudflare token Test ("verified", 3 zones visible — the panel's own scope warning shows), NPM + Cloudflare Test, Email Test ("Sending and receiving both verified"), Gemini key Test, WebDAV destination Test ("credentials accepted"); every secret field empty with a masked placeholder (`cfut••••••7e88`, "configured — leave blank to keep"), none looks like ciphertext; no "Unable to seal stored third-party secrets" in the backend log.
+  - §708 Hotel card: running, no health warning.
+  - §813 Users: `claude-noaccess`'s email set to a 74-character address (Joi caps the local part at 64 — a longer one is 422), Reset password open: no sideways scroll, Reset/Delete on screen at 390 and 1280; email restored and confirmed over the API.
+  - §666 Outline: through its API with the session — draft created, a PNG attached (`attachments.create` 200, upload 200), read back 200 `image/png`, byte-identical; draft deleted. Outline needs `x-csrf-token` from the `__Host-csrfToken` cookie; a first try left one draft (deleted on the next run).
+  - §711 Nextcloud: SAML sign-in through Authelia lands on the dashboard; `/Shared` opens (empty); a document opens in OnlyOffice — `Templates/Business model canvas.ods` via `/apps/onlyoffice/<fileid>`, editor frame from `onlyoffice.<domain>`, sheet loaded. The first-run wizard covers the file list for a new account; going by file id avoids it.
+- **Trimmed** (status line added to each): §892 (mail Test), §879 item 1 (silent refresh after a rejected access token: two 401s, one `/auth/refresh`, no toast; Logout → password form), §799 (exposure, General, Email saved unchanged through the UI and identical on reload), §841 (pt-PT phone), §696 and §807 (Tally/Hotel/Check-in/Feedback empty states clean in light and dark), §906 (Hotel admin sign-in, guest pages explain a missing code), §692 (admin, no toast), §719 (OnlyOffice half).
+- **Reached the limit of `claude-test`:** Tally shows "No shops yet" and Hotel "No properties yet" for it, and the guest pages need a code — every Tally and Hotel item that needs data stays open. ITFlow has its own login. Nothing was emailed; no app was restarted.

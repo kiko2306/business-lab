@@ -214,17 +214,12 @@ owner. Listed most-severe first, which is the order to take them in. Each was re
 against the tree at `0.167.1`. Test first, own commit and version bump each; delete an item when
 its fix lands (a fix still needing a `beta` look leaves its own beta item behind).
 
-- [ ] **Beta-test sealed third-party secrets (plan.md §893)** — on `beta`, after the update: test the
-      Cloudflare token, send a test email, run an AI-backed action, test the NPM connection and save
-      the exposure settings, and run a backup to a password-protected target. Each has to still
-      authenticate, and the Settings page must still show the masked value, not ciphertext. Backend logs must
-      show no "Unable to seal stored third-party secrets" line at boot.
-- [ ] **Beta-test nodemailer 10 (plan.md §892)** — *2026-10-13 at 0.173.4: an invite reached
+- [ ] **Beta-test nodemailer 10 (plan.md §892)** — *2026-10-14 at 0.173.30 (plan.md §955): Settings → Email → Test connection: "Sending and receiving both verified." Left: backup and alert mails.* *2026-10-13 at 0.173.4: an invite reached
       Gmail with its set-password link, and the link worked. Left: Settings test email, backup/alert
       mails.* On `beta`, after the update rebuilds the backend:
       send a test email from Settings, invite a user and confirm the set-password link arrives,
       and check the backup/alert mails still send.
-- [ ] **Beta-test the app workspaces on Angular 21 (plan.md §906)** — *2026-10-14 at 0.173.4: Hotel
+- [ ] **Beta-test the app workspaces on Angular 21 (plan.md §906)** — *2026-10-14 at 0.173.30 (plan.md §955): Hotel admin signs in through Authelia and loads ("No properties yet" for `claude-test`), Check-in and Feedback load and explain a missing code; no console errors.* *2026-10-14 at 0.173.4: Hotel
       admin loads with its data, Tally lists the shop and its day view loads, the language select flips
       it to English and back; no console errors. Left: Check-in submit and Pulse (guest links), Hotel
       sign-in.* On `beta`, after the update
@@ -243,7 +238,7 @@ Infrastructure robustness, five items. Three touch Docker or nginx, so they need
 
 The security remainder of the same review, four items, each its own commit and version bump.
 
-- [ ] **Beta-test the access-token purpose claim (plan.md §879 item 1)** — on `beta`, keep a
+- [ ] **Beta-test the access-token purpose claim (plan.md §879 item 1)** — *2026-10-14 at 0.173.30 (plan.md §955): a tab whose access token the server rejects (bad signature) got two 401s, one `/auth/refresh` 200, stayed signed in, no toast; Logout then a reload lands on the password form. Left: a tab kept open across a real update, and one left open over an hour.* on `beta`, keep a
       tab signed in *across* the update, then click around: every access token issued before
       the change is now rejected, so the first request 401s and the app spends its refresh token
       for a new one behind the scenes. You should **not** be signed out and should see no error —
@@ -283,26 +278,6 @@ Surfaces never critiqued. Per item: `/impeccable critique` against a real render
 score in a new plan section, then fix one page at a time, test first, own commit and version
 bump. Delete the item when its fixes land (a fix still needing a `beta` look gets its own item).
 
-- [ ] **Beta-test the Users critique fixes (plan.md §813)** — *2026-10-14 at 0.173.4, pt-PT in
-      Chrome: (2)-(5) pass — focus trapped in the delete dialog, Esc returns it to Eliminar, Enter on
-      the page opens nothing; delete lists the apps; unticking Code Server shows "Ao guardar, remove
-      o acesso a: Code Server."; Reset password shows the 8-character rule with Save disabled; presets
-      Tudo/No dia a dia/Só consulta tick 9/4/2 boxes, a hand edit shows Personalizado, Cancel keeps
-      the saved roles; own row has no Editar funções; 390px no sideways scroll. Features show only
-      for an already-saved Admin (item below). Left: a row with a very long email, EN.* In order, test first, one
-      commit and version bump each: (1) done (§814) — on `beta`, open Users on a phone and a
-      laptop with a very long email and the reset-password editor open: no sideways scroll,
-      Reset password and Delete reachable; (2) done (§815) — on `beta`, open any
-      confirm (delete a user): focus is in the dialog, Tab stays in it, Esc returns focus to the
-      button, Enter with focus on the page does nothing; (3) done (§816) — on `beta`, delete a user
-      with app access (the dialog lists the apps), untick an app in Edit access (the line under the
-      grid names it), open Reset password (the 8-character rule is visible, Save is held); (4) done (§817) — on `beta`, open Users: the
-      accounts are listed without a click, each person is one line, **Edit roles** opens the
-      checkboxes and Cancel drops unsaved ones, and your own row has no Edit roles; (5) done (§826) — on `beta`, open Edit roles: the roles read Full admin, Admin and App user
-      with a line each, no "SSO user" or "Webmaster"; under Features, Everything, Day to day and View only
-      tick the boxes, the chosen one shows pressed, editing a box shows Custom, and nothing changes until
-      Save; the same in the Add user form and in pt-PT, with no sideways scroll on a phone. The P2 focus-ring and control-border contrast belongs to the shared theme and
-      is its own item below. On `beta`, after each: open Users on a phone with a long email.
 - [ ] **Beta-test that an update applies new app settings without a restart (plan.md §944)** — on `beta`,
       the first update that rebuilds the backend *and* changes an app (any `apps/<name>/` file): during the
       run the Update page reaches "Restarting backend", then shows "Updating apps" (step 5 of 5) after the
@@ -311,7 +286,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       Parar/Iniciar. Audit log: one `self_update_complete` with `appsUpdated`.
 - [ ] **Beta-test the translated rate-limit message (plan.md §933)** — hard to provoke by hand (200 API
       calls per 15 min); if a 429 shows up in pt-PT it reads "Demasiados pedidos em pouco tempo…".
-- [ ] **Beta-test the Utils critique fixes (plan.md §841)** — *pt-PT laptop passed (2026-10-14 at
+- [ ] **Beta-test the Utils critique fixes (plan.md §841)** — *2026-10-14 at 0.173.30 (plan.md §955): Home and Settings in pt-PT at 390px: no English, no sideways scroll.* *pt-PT laptop passed (2026-10-14 at
       0.173.4); EN on a phone passed (2026-10-14 at 0.173.26, plan.md §947): Server health rows, Try again
       when the health read fails and recovery after it, Find devices by keyboard and click with focus
       kept, "Scanning your network…" then "Found 10 devices." announced, This server first, Not
@@ -485,7 +460,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       is still there. "Forecast" reads "Taken plus open tabs" and Open tabs reads
       "Not paid yet". A closed day with no sales says "No takings that day", not
       "yet"/"today".
-- [ ] **Beta-test the shared theme's semantic colours (plan.md §807)** — *2026-10-14 at 0.173.4:
+- [ ] **Beta-test the shared theme's semantic colours (plan.md §807)** — *2026-10-14 at 0.173.30 (plan.md §955): Check-in and Feedback (no-code pages) pass in both modes; a real guest link is still unseen.* *2026-10-14 at 0.173.4:
       every text-warning/danger/success/info, button, badge and alert on Home, Apps (all categories
       open, 231), Backups and Settings meets 4.5:1 (3:1 large) in light and dark; a hovered outline
       button is white on rgb(10,88,202). Hotel admin and a Tally shop view: every text node passes in
@@ -517,7 +492,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       offline: "You are offline" must appear, and clear on reconnect. With a
       screen reader, Refresh announces "Updated at HH:MM" and the 30 s refresh
       stays silent; each chart reads as one graphic, not one line per bar.
-- [ ] **Beta-test the single settings writer (plan.md §799)** — *2026-10-07, over the API on
+- [ ] **Beta-test the single settings writer (plan.md §799)** — *2026-10-14 at 0.173.30 (plan.md §955): through the UI, exposure (blank NPM password, then Test passes for NPM and Cloudflare), General (timezone, update branch) and Email (then Test) saved unchanged and re-opened identical; Cloudflare token, AI key and backup destination Tests pass. Left: saving the Cloudflare token and an AI key, health thresholds, a restore.* *2026-10-07, over the API on
       the box: general (timezone, update branch), backup schedule, backup target, mail (+ its
       Test), alerts and exposure (blank password; Test passes for NPM and Cloudflare) all come back
       byte-identical after a save. Still to do: Cloudflare token, AI API keys, health thresholds,
@@ -634,21 +609,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       the next time a real "check if X can update" comes up.
 
 
-- [ ] **Beta-test Nextcloud's 34→35 major upgrade (plan.md §711)** — the
-      upgrade itself is **confirmed** (2026-09-28, over SSH at 0.151.5): the
-      image pulled, the container is healthy, and `/status.php` reports
-      `"version":"35.0.1.1"` with `maintenance:false` and
-      `needsDbUpgrade:false` — so it did not stick in maintenance mode, which
-      was this item's real risk. Also confirmed as far as `occ` proves it:
-      `files_external:verify` on the `/Shared` mount returns `status: ok` and
-      `/shared` lists inside the container; `onlyoffice 10.2.1` and
-      `user_saml 8.4.0` are both **Enabled** and the OnlyOffice container is
-      healthy. What is left needs a browser — that state being right does not
-      prove the UI works: browse a folder under `/Shared` in the Nextcloud
-      web UI, open a document and confirm the OnlyOffice editor actually
-      launches, and complete one SAML login.
-
-- [ ] **Beta-test light/dark mode (plan.md §696)** — *dashboard done: OS switch, `theme-init.js`,
+- [ ] **Beta-test light/dark mode (plan.md §696)** — *2026-10-14 at 0.173.30 (plan.md §955): Tally (Shops), Hotel admin, Check-in and Feedback load in light and dark at 390px, no text under 4.5:1, no sideways scroll, no console errors — but `claude-test` has no shop or property and no guest code, so only the empty states were seen.* *dashboard done: OS switch, `theme-init.js`,
       the toggle and reload (2026-10-14 at 0.173.4); every page walked in light with all panels open
       and a service card's settings dialog, 390px and 1280px, no text under 4.5:1 and no sideways
       scroll (2026-10-14 at 0.173.26, plan.md §947).* Left: Tally's shop page in light, and the Hotel
@@ -663,7 +624,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       sold tabs, dates as dd/MM, money as `4 582,18 €`) and the Manage panel
       (access list, Issue enrolment code) should have no English left except
       shop/staff/item names from Wintouch.
-- [ ] **Beta-test Paperless user provisioning (plan.md §692, §693)** — the
+- [ ] **Beta-test Paperless user provisioning (plan.md §692, §693)** — *2026-10-14 at 0.173.30 (plan.md §955): as an Authelia admin (`claude-test`) the dashboard loads with no permission toast. Left: a non-admin, and the fresh-clone check.* the
       database half is **confirmed** (2026-09-28, over SSH at 0.151.5, and
       the same half §706 reached): `mat` — the Authelia admin, checked
       against `users_database.yml` — is `is_superuser=True, is_staff=True`,
@@ -684,20 +645,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       backend": no red "Something went wrong" / "Unable to reach the backend"
       toasts should appear (from the status poll or the resource strip), and
       the panel should end on the "up to date" success toast.
-- [ ] **Beta-test the new Outline app (plan.md §666)** — *2026-10-14: Outline is at `wiki.<domain>`,
-      healthy 7 days; `mat` is in with Invite people; `claude-test` signed in through Authelia with no
-      invite and landed in TurnkeyBox. Left: an image upload persisting.* On `beta`, after
-      pulling, start Outline from the Apps page (it needs Authelia running
-      and the app exposed — Outline has no local login). Confirm: the
-      `outline-init` chown runs and `outline` reaches healthy (first boot
-      runs all DB migrations, ~2 min); a browser sign-in at
-      `outline.<domain>` completes through Authelia with no
-      `invalid_client` at `/auth/oidc.callback` (if it does, switch
-      `tokenEndpointAuthMethod` to `client_secret_basic`, as §665); the first
-      user lands as workspace admin; uploading an image to a doc persists
-      (proves the storage chown); and **a second Authelia user can sign in**
-      — if Outline demands an invite, open a follow-up to invite users
-      automatically (principle 3).
 - [ ] **Beta-test the self-update panel's richer progress detail (plan.md
       §659)** — on `beta`, trigger a real self-update while a commit is
       pending and confirm: the progress alert shows a `detail` suffix naming
@@ -750,16 +697,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       and pulse each return `Cache-Control: no-cache` on `/` and on a deep
       link. What is left is a phone: push a visible change and confirm a phone
       that already opened the guest link shows it on the next open.
-
-- [ ] **Beta-test the Hotel healthcheck fix (plan.md §708)** — the container
-      half is **confirmed** (2026-09-28, over SSH at 0.151.5): `docker ps`
-      shows `admin`, `check-in` and `pulse` all `healthy`, last probe exit
-      code 0, and the HTTP probe the dashboard uses — hotel-core's
-      `/api/health` — answers `200 {"status":"ok"}`. What is left is looking
-      at the dashboard itself: Hotel is **one** card in the registry (there
-      is a single `hotel` entry in `services.ts`, health-checked by that one
-      probe — not three cards, as this item used to say), so confirm that
-      card reads healthy on the Apps page rather than showing an error.
 
 - [ ] **Beta-test the ntfy panel regrouping (§609/§615)** — *2026-10-14 at 0.173.4: all four rows
       show `homelab-alerts` (the default, but reads need a token: anonymous `GET` is 403). Turning a
@@ -856,7 +793,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       hour follows the zone, not UTC.* Left: a schedule set to `00:00` still runs (the
       midnight/hour-24 path).
 
-- [ ] **Beta-test the post-start reconciler refactor (plan.md §719)** — on
+- [ ] **Beta-test the post-start reconciler refactor (plan.md §719)** — *2026-10-14 at 0.173.30 (plan.md §955): a Nextcloud document (Templates/Business model canvas.ods) opens in the OnlyOffice editor from `onlyoffice.<domain>` and loads. Left: the master cron switch in ITFlow's own admin (needs an ITFlow login).* on
       `beta`, this touches every app's start path, so check a few apps whose
       post-`up` wiring is visible: start **Nextcloud** (its OnlyOffice/SAML
       `occ` wiring still applies — open a document, confirm the editor
