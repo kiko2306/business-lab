@@ -320,43 +320,21 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Beta-test touch targets on a phone (plan.md §824)** — *2026-10-13 at 0.173.4, 390px in
       Chrome: Users, Backups, Settings, Apps, Home, Updates have no button under 44px and no
       sideways scroll. Role and feature checkbox rows toggle from anywhere on the row; the app-access
-      rows did not, fixed in §926 — recheck their empty corner. Tally shop view (Mat Laptop) at 390px: no
+      rows did not, fixed in §926 — 2026-10-14 at 0.173.21 the corner, bottom and right side of a
+      312×87 chip each toggle it. Tally shop view (Mat Laptop) at 390px: no
       sideways scroll; with touch emulated every control is 44px. Left: the app-access recheck. 2026-10-14
       at 1280px: no page scrolls sideways; Users wraps mid-word (item below).* On `beta`, at 390px wide (browser
       device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
       label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
       no row of buttons overflows. At 1280px nothing looks different from before.
-- [ ] **Beta-test the Users table at 1280px (plan.md §934)** — on `beta`, Users at a 1280px window, pt-PT:
-      dates read "08/09/2026" on one line and Eliminar / Repor palavra-passe stay whole; at 390px the rows still stack.
-- [ ] **Beta-test the translated start/stop message (plan.md §933)** — on `beta` in pt-PT, stop and start
-      Samba: the toasts read "Samba parou." and "Samba está a funcionar.".
-- [ ] **Beta-test promoting an App user to Admin (plan.md §933)** — on `beta`, Users → Edit roles on
-      `claude-noaccess`: tick Administrador — the features and presets appear; pick Só consulta, Save
-      roles: the row shows Administrador with 2 of 8 features. Put it back to App user after.
-- [ ] **Beta-test the authenticator name (plan.md §932)** — on `beta`, set up 2FA on a test account:
-      the authenticator app lists it as "Business Lab". An entry set up before keeps working.
 - [ ] **Beta-test the translated rate-limit message (plan.md §933)** — hard to provoke by hand (200 API
       calls per 15 min); if a 429 shows up in pt-PT it reads "Demasiados pedidos em pouco tempo…".
-- [ ] **Beta-test the Home backup badge colour (plan.md §933)** — on `beta`, Home: "Copiado hoje" is
-      green in light and dark; it turns yellow only once the last backup is two days old.
-- [ ] **Beta-test the stop confirm button label (plan.md §931)** — on `beta`, Stop an exposed app
-      (IT Tools): the red button reads "Parar IT Tools" / "Stop IT Tools". Cancel it.
-- [ ] **Beta-test Back up now on an app with no data (plan.md §933)** — on `beta` in pt-PT, IT Tools →
-      Definições → Fazer cópia agora: the error reads "IT Tools não guarda dados próprios…".
-- [ ] **Beta-test the hidden Save button (plan.md §933)** — on `beta`, IT Tools → Definições: no
-      "Guardar configuração" under "não tem definições configuráveis".
-- [ ] **Beta-test the ntfy switches (plan.md §933)** — on `beta`, Settings → Alertas ntfy: turn CrowdSec
-      off — its Testar greys at once and "A guardar…" shows until the ~30 s save lands; turn it back on.
-      The line under each topic no longer says anyone can read it.
-- [ ] **Beta-test the server's name in Find devices (plan.md §932)** — on `beta`, Settings →
-      Encontrar dispositivos: the Este servidor row reads `home-srv-01`, not Desconhecido.
 - [ ] **Beta-test AI drafts on the new Gemini model (plan.md §930)** — on `beta` after the update
       rebuilds the backend: Content → Gerar a rascunho with the stored Google key produces a draft
       (now `gemini-3.8-flash`); Settings → Testar chave on Google succeeds; a Mealie URL import still
-      parses. If Google refuses a model, the error names it instead of a bare "HTTP 404".
-- [ ] **Beta-test the readable settings-dialog chips (plan.md §927)** — on `beta`, light mode:
-      open NetBird VPN → Settings. "Installed: …", "Has an Android app" and "Has an iPhone/iPad
-      app" read as dark text on the pale chip; in dark mode they still read light on dark.
+      parses. If Google refuses a model, the error names it instead of a bare "HTTP 404". *2026-10-14 at
+      0.173.21: no 404 — Google answered "This model is currently experiencing high demand" three times
+      in three minutes (its message now reaches the log). Retry later; Testar chave not read yet.*
 - [ ] **Beta-test the Utils critique fixes (plan.md §841)** — *2026-10-14 at 0.173.4, pt-PT laptop:
       (1) Home's Saúde do servidor sentence, four rows with Bem and "Verificado às"; (2) Enter on
       Encontrar dispositivos keeps focus on it, "A procurar…" then "Encontrados 10 dispositivos." are
@@ -418,7 +396,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       stopped gives the Retry alert (below the stale rows, off-screen on a full page). (6) passed
       as `claude-noaccess`: "signed in as", empty Request access names the missing email, focus
       lands on "Request sent", "Sign in with a different account" signs out and Authelia's
-      session stays. (5) failed: a 502 showed the generic text, fixed in §925 — recheck with the backend stopped. Left: (1-2) unsubscribe from a real advert email.* All seven §854 findings are in; on
+      session stays. (5) failed: a 502 showed the generic text, fixed in §925 — 2026-10-14 at 0.173.21 with the backend
+      stopped it reads "Não foi possível contactar o servidor…" and Tentar de novo. Left: (1-2) unsubscribe from a real advert email.* All seven §854 findings are in; on
       `beta`, EN and pt-PT, phone and laptop: (1-2) open an unsubscribe link from a real advert
       email: one button, nothing happens until the tap, reload does not unsubscribe, a second tap is
       harmless; the email ends "You are receiving this because you subscribed to <dashboard host>."

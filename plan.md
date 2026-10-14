@@ -38807,3 +38807,11 @@ Not done, rejected:
 - **Unpin leftovers.** No route used `requireWebmaster` since the Unpin button went — deleted with its tests. Override-file header now says the next app update replaces it (it does: `clearImagePins` before pull); comments in `status.ts`, `composeOverride.ts`, `auth.service.ts` follow.
 - **Users table at 1280px.** `overflow-wrap: anywhere` on every cell (§813, for a 70-char email) also split dates and button labels. Above md: `.users-created` and action `.btn` get `nowrap`; the email column keeps `anywhere`. Spec measures text height vs line-height at 1280px (en, pt-PT) — checked red with the rule off (14 wraps), green with it; the §813 no-overflow specs at 1280/390 still pass. First try counted `getClientRects` lines — flagged one-word "Delete"; a `td` is as tall as its row, so dates are measured by their text range.
 - **Retracted: Tally under 44px (§929).** Tally sizes targets under `@media (pointer: coarse)` on purpose (styles.css). §929 measured a mouse-driven window at 390px; with CDP touch emulation (`pointer: coarse` true) the back link, counters toggle and both tabs are 44px. Item deleted, §806.6/§824 notes corrected.
+
+## 935. Beta checks at 0.173.21, 2026-10-14
+
+[x] done. Owner updated from the Update page (first attempt never ran: host `origin/beta` still `ce8137f`, no update log). Same CDP Chrome as §928.
+- Pass, items deleted: §927 chips (NetBird VPN settings, light, 10.2:1); §931 "Parar IT Tools" (cancelled); §932 otpauth issuer "Business Lab" (set-up cancelled), scan row `home-srv-01`; §933 toasts "Samba parou." / "Samba está a funcionar.", Home badge `--ok`, IT Tools Back up now "não guarda dados próprios", no Save button, ntfy Test greyed + "A guardar…" (switch restored on), promote `claude-noaccess` → Admin + Só consulta saves "1 de 8" (reverted to App user); §934 Users at 1280 no wraps.
+- Pass, notes updated: §926 chip corner/bottom/right toggle (first click was off-screen at 390×844 — not a failure); §925 unsubscribe with backend stopped (~25 s) → "Não foi possível contactar o servidor…".
+- Open: §930 Gemini draft — no 404 now, Google answered "high demand" three times in three minutes. Its message now reaches the log; the UI's "Tente novamente daqui a pouco" is right for it.
+- Found: ntfy hint showed literal backticks around subscriber — fixed next commit.
