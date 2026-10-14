@@ -1005,6 +1005,12 @@ export const SERVICES: Record<string, ServiceDefinition> = {
         OIDC_CLIENT_ID: '{CLIENT_ID}',
         OIDC_CLIENT_SECRET: '{CLIENT_SECRET}',
         OIDC_PROVIDER_NAME: 'Authelia',
+        // An Administrador total (Authelia `admins`, autheliaSync.ts) is a Mealie
+        // admin. Setting it also switches on Mealie's groups-claim check, and
+        // Mealie then re-sets `admin` at every sign-in, so accounts it already
+        // created as plain users (all of them, before §938) are fixed on their
+        // next login.
+        OIDC_ADMIN_GROUP: 'admins',
       },
     },
   },

@@ -38839,3 +38839,10 @@ Not done, rejected:
 - Authelia sign-in lands in Mealie: `/api/users/self` 200, `mat`, `authMethod: OIDC`. URL import of an allrecipes page saved "Best Chocolate Chip Cookies". "Importar com IA" saved "Banana Banana Bread" with Mealie calling `generativelanguage.googleapis.com/v1beta/openai/chat/completions` → 200 — the dashboard-managed provider row works end to end. (The auto "Analisar ingredientes" after import used Mealie's built-in parser; no Google call.)
 - Testar chave reads "A chave funciona.". §930 and both §937 beta items deleted.
 - Found: no `OIDC_ADMIN_GROUP` for Mealie — `mat` created non-admin; new README item. Two test recipes and two Content drafts left for the owner.
+
+## 939. Mealie admins from the Authelia admins group
+
+[x] done. §938 found every SSO account landing as a Mealie non-admin. `oidcClient.appEnv.OIDC_ADMIN_GROUP: 'admins'` (the group autheliaSync gives a webmaster, as Hotel/Tally's `isAdmin`) + passed through Mealie's compose `environment:`.
+- Read Mealie's source (`openid_provider.py`, `settings.py`, mealie-next) rather than assume: `OIDC_REQUIRES_GROUP_CLAIM` is true once `OIDC_ADMIN_GROUP` is set, `is_admin` is computed only then, and an existing user's `admin` is re-set at every sign-in — so `mat` is fixed on next login, no migration. Compose's `${OIDC_ADMIN_GROUP:-}` gives "" when OIDC is off; Mealie then grants no admin (falsy group), and the claim check is moot with OIDC off.
+- Tests: Mealie's appEnv maps `admins`; every Mealie appEnv key is in its compose `environment:` (the guard that would have caught a dashboard-written key the container never sees).
+- Rejected: mapping `app-mealie` to admin — that is every user granted Mealie.

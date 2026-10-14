@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.25** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.26** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -327,11 +327,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
       label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
       no row of buttons overflows. At 1280px nothing looks different from before.
-- [ ] **Map an Authelia group to Mealie admin (plan.md §938)** — Mealie's compose sets no `OIDC_ADMIN_GROUP`,
-      so every Authelia sign-in lands as a non-admin (`mat` was created `admin: false` on 2026-10-14) and only
-      the dashboard's own `mealie-local-admin` reaches Mealie's admin pages. Render `OIDC_ADMIN_GROUP` into
-      Mealie's `.env` from the same Authelia admins group the other OIDC apps use (§270), and decide what happens
-      to an account Mealie already created as non-admin.
+- [ ] **Beta-test Mealie admins from Authelia (plan.md §939)** — on `beta`, after the update recreates
+      Mealie (its compose changed): sign out of Mealie, "Iniciar sessão com Authelia" as `mat` — Mealie's
+      Definições now shows the admin pages (`/api/users/self` `admin: true`). Sign in as `claude-test` (an
+      Administrador, not Administrador total): stays a plain user.
 - [ ] **Beta-test the translated rate-limit message (plan.md §933)** — hard to provoke by hand (200 API
       calls per 15 min); if a 429 shows up in pt-PT it reads "Demasiados pedidos em pouco tempo…".
 - [ ] **Beta-test the Utils critique fixes (plan.md §841)** — *2026-10-14 at 0.173.4, pt-PT laptop:

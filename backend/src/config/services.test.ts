@@ -370,6 +370,28 @@ describe('oidcClient declarations', () => {
   });
 });
 
+// plan.md §938: Mealie set no admin group, so every Authelia sign-in landed as a
+// non-admin and only the dashboard's own account could reach Mealie's admin pages.
+// `admins` is what autheliaSync gives an Administrador total (webmaster).
+describe('Mealie admins come from Authelia', () => {
+  it('maps the Authelia admins group to Mealie admin', () => {
+    expect(SERVICES['mealie'].oidcClient?.appEnv?.OIDC_ADMIN_GROUP).toBe('admins');
+  });
+
+  // A key the dashboard writes into the app's env file does nothing unless the
+  // compose file's `environment:` passes it into the container.
+  it('passes every OIDC setting the dashboard writes into the Mealie container', () => {
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const compose = yaml.load(fs.readFileSync(path.join(repoRoot, 'apps/mealie/docker-compose.yml'), 'utf8')) as {
+      services: { mealie: { environment: Record<string, string> } };
+    };
+    const passed = Object.keys(compose.services.mealie.environment);
+    for (const key of Object.keys(SERVICES['mealie'].oidcClient?.appEnv ?? {})) {
+      expect(passed, key).toContain(key);
+    }
+  });
+});
+
 describe('Authelia login is mandatory by default', () => {
   it('exempts Authelia itself and apps that cannot hide their own login', () => {
     // Home Page was the public front door (§111) until §913 put it behind

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.26] — 2026-10-14
+
+### Fixed
+
+- Administrador total accounts are Mealie admins when they sign in through Authelia, including accounts Mealie had already created as plain users
+
 ## [0.173.25] — 2026-10-14
 
 ### Fixed
