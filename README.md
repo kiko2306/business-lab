@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.27** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.28** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -409,13 +409,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       mismatch under the confirm field, "At least 8 characters.", Show on both fields, cursor in the
       first field) and set-password from a fresh invite (cursor in the password, a refused password
       shown inside the card, Show on both fields), each on a phone in EN and pt-PT.
-- [ ] **"Locked out?" does not open on the first tap (plan.md §945)** — on `/login` the cursor starts in
-      the username field. Pressing "Locked out?" blurs it, the field's "required" error appears, the
-      line moves down, and the release lands on another element, so no click happens. A second tap
-      works. Same on the code step ("Lost your authenticator?") with the code field. Seen in Chromium,
-      desktop click and phone tap. Test first (a spec that presses the summary with the field focused
-      and empty, and expects it open), then fix — e.g. do not mark the field touched on a blur that
-      goes to the summary, or keep the error's space reserved.
+- [ ] **Beta-test "Locked out?" on the first press (plan.md §946)** — on `beta`, on a phone and a
+      laptop: open `/login`, and without typing anything press "Locked out?" once — it opens, and no
+      "required" error appears under the username. Same on the code step with "Lost your
+      authenticator?". Typing one letter in the username and leaving it still shows its error.
 - [ ] **Beta-test the Updates page critique fixes (plan.md §834)** — *2026-10-13 at 0.173.4, EN
       and pt-PT laptop: panel open, one "Up to date"/"Atualizado" badge at 13px, Update now blue. 2026-10-14,
       6 behind: the confirm (pt-PT at 1280/390px, EN at 1280px) has a blue Atualizar/Update, says

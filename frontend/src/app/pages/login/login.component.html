@@ -24,7 +24,9 @@
           maxlength="64"
           (paste)="sanitizePaste($event, 'username', 64)"
           />
-        @if (form.controls.username.touched && form.controls.username.invalid) {
+        <!-- Only once typed in (dirty): the cursor starts here, and an error on a bare blur moved
+             everything below it mid-press, so "Locked out?" missed the click (plan.md §946). -->
+        @if (form.controls.username.touched && form.controls.username.dirty && form.controls.username.invalid) {
           <div class="text-danger small mt-1" appFieldError="username">
             {{ 'login.username.error' | t }}
           </div>
@@ -44,7 +46,7 @@
             />
           <button type="button" class="btn btn-outline-secondary" appPasswordToggle="password" #pwToggle="appPasswordToggle" [attr.aria-label]="'auth.password.toggleLabel' | t">{{ (pwToggle.shown ? 'auth.password.hide' : 'auth.password.show') | t }}</button>
         </div>
-        @if (form.controls.password.touched && form.controls.password.invalid) {
+        @if (form.controls.password.touched && form.controls.password.dirty && form.controls.password.invalid) {
           <div class="text-danger small mt-1" appFieldError="password">
             {{ 'login.password.error' | t }}
           </div>
@@ -76,7 +78,7 @@
           maxlength="32"
           autofocus
           />
-        @if (mfaForm.controls.code.touched && mfaForm.controls.code.invalid) {
+        @if (mfaForm.controls.code.touched && mfaForm.controls.code.dirty && mfaForm.controls.code.invalid) {
           <div class="text-danger small mt-1" appFieldError="code">
             {{ 'login.mfa.error' | t }}
           </div>

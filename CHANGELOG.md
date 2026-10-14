@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.28] — 2026-10-14
+
+### Fixed
+
+- On the sign-in page, "Locked out?" and "Lost your authenticator?" open on the first press: leaving an empty field no longer flashes an error that moved them.
+
 ## [0.173.27] — 2026-10-14
 
 ### Fixed

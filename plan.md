@@ -36747,3 +36747,13 @@ Rejected: rewriting the code comments in three `theme.css` files — anchors fix
 - **Bug found → README item:** "Locked out?" does not open on the first press. Event trace: `pointerdown`/`mousedown` on SUMMARY, `mouseup`/`click` on a DIV — the username blur shows its "required" error, the line moves down between press and release. JS `summary.click()` opens it fine. Same shape on the code step.
 - Minor wording, not filed: the panel says "Two-factor authentication", the disable confirm says "two-step sign-in".
 - Hiccup: the first `claude-test` sign-ins returned 401; worked after the account was reset (backend log, 13:28). Four failed sign-ins in total, two deliberate.
+
+## 946. "Locked out?" opens on the first press (§945)
+
+[x] done, 0.173.28. [ ] beta look — README item.
+
+- Cause (event trace in §945): the cursor starts in the username (§831). Pressing "Locked out?" blurred the empty field, Angular marked it touched, its "required" error appeared above, the line moved 25px down, and the release landed on another element — no click. Same on the code step.
+- Fix (`login.component.html`): the three field errors need `dirty` as well as `touched`. A field the person never typed in shows nothing on blur, so nothing moves. Typed-and-left-wrong still shows.
+- Rejected: `mousedown.preventDefault()` on the summary — fixes only that one control, and every other button below a field (Show, "Use a recovery code", "Start over") has the same geometry; reserving space under each field — adds empty gaps to every form for a rare message.
+- Cost: an empty, never-typed field shows no error; the disabled Sign in button and two empty boxes say enough on a two-field form. Setup and set-password keep `touched` (more fields, rules worth showing); same hazard there only if a field above a press target is left empty — not seen, not filed.
+- Tests: 3 in `login.component.spec.ts` (2 failed first: error shown, line moved 704 vs 679; 1 guards typed-and-left). Frontend 613, build clean, E2E 12 passed / 3 skipped.

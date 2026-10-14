@@ -265,6 +265,44 @@ describe('LoginComponent', () => {
       expect(text).not.toContain('reset-password');
     });
 
+    // plan.md §946: the cursor starts in the username, so pressing the line blurred an empty field,
+    // its "required" error appeared above, the line moved down, and the press missed it.
+    const errors = () => (fixture.nativeElement as HTMLElement).querySelectorAll('[appFieldError]').length;
+    const leave = (id: string) => {
+      const field = (fixture.nativeElement as HTMLElement).querySelector(`#${id}`) as HTMLInputElement;
+      field.dispatchEvent(new Event('focus'));
+      field.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+      return field;
+    };
+
+    it('does not move when pressed straight from the empty username', () => {
+      const before = locked()!.getBoundingClientRect().top;
+      leave('username');
+
+      expect(errors()).toBe(0);
+      expect(locked()!.getBoundingClientRect().top).toBe(before);
+    });
+
+    it('does not move when pressed straight from the empty code field', () => {
+      authService.login.and.returnValue(of({ mfaRequired: true, mfaToken: 'mfa-token' } as MfaChallenge));
+      component['form'].setValue({ username: 'admin', password: 'password123' });
+      component.submit();
+      fixture.detectChanges();
+      leave('code');
+
+      expect(errors()).toBe(0);
+    });
+
+    it('still flags a field the person typed in and left wrong', () => {
+      const field = (fixture.nativeElement as HTMLElement).querySelector('#username') as HTMLInputElement;
+      field.value = 'ab';
+      field.dispatchEvent(new Event('input'));
+      leave('username');
+
+      expect(errors()).toBe(1);
+    });
+
     it('says it in Portuguese for a pt-PT reader', () => {
       TestBed.inject(TranslateService).setLocale('pt-PT');
       fixture.detectChanges();
