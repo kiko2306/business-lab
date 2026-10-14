@@ -85,10 +85,29 @@ function ipSortKey(ip: string): number {
  * host (nmap skips the scanning machine in some setups). With no known LAN IP
  * yet (the cache fills on boot) nothing is tagged rather than guessed.
  */
-export function markServer(hosts: DiscoveredHost[], serverIp: string | null): DiscoveredHost[] {
+export function markServer(hosts: DiscoveredHost[], serverIp: string | null, serverName: string | null = null): DiscoveredHost[] {
   if (!serverIp) return hosts.map((h) => ({ ...h, isServer: false }));
-  const marked = hosts.map((h) => ({ ...h, isServer: h.ip === serverIp }));
-  return marked.some((h) => h.isServer) ? marked : [{ ip: serverIp, hostname: null, type: null, isServer: true }, ...marked];
+  // nmap rarely resolves the scanning box's own name, so its row read "Unknown"
+  // although the host knows what it is called (§932).
+  const marked = hosts.map((h) =>
+    h.ip === serverIp ? { ...h, hostname: h.hostname ?? serverName, isServer: true } : { ...h, isServer: false }
+  );
+  return marked.some((h) => h.isServer)
+    ? marked
+    : [{ ip: serverIp, hostname: serverName, type: null, isServer: true }, ...marked];
+}
+
+/**
+ * The Docker host's own name (`docker info`'s Name — the socket proxy allows
+ * INFO). The backend's `os.hostname()` is only its container ID. Null when
+ * Docker will not say; the scan still works, the row just stays unnamed.
+ */
+export async function hostName(): Promise<string | null> {
+  try {
+    return (await run('docker', ['info', '--format', '{{.Name}}'])).trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function scanLan(): Promise<DiscoveredHost[]> {

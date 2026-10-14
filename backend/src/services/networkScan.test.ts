@@ -83,6 +83,16 @@ describe('markServer', () => {
     expect(out).toHaveLength(3);
   });
 
+  it('names the server row with the host\'s own name when the sweep had none', () => {
+    expect(markServer(hosts, '192.168.1.236', 'home-srv-01')[1].hostname).toBe('home-srv-01');
+    expect(markServer(hosts, '192.168.1.50', 'home-srv-01')[0].hostname).toBe('home-srv-01');
+  });
+
+  it('keeps a name the sweep found for the server', () => {
+    const named = [{ ip: '192.168.1.236', hostname: 'nas.lan', type: null }];
+    expect(markServer(named, '192.168.1.236', 'home-srv-01')[0].hostname).toBe('nas.lan');
+  });
+
   it('flags nothing when the server\'s IP is not known yet', () => {
     expect(markServer(hosts, null).every((h) => !h.isServer)).toBe(true);
   });

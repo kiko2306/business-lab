@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.11** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.12** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -363,9 +363,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Bring Tally's day-view tabs and counters toggle to 44px (plan.md §929)** — shop view at
       390px: the Mesas / Artigos vendidos `nav-link` buttons are 42px tall, and "▸ Contadores do dia"
       and "← Todas as lojas" are 19px, under the 44px rule the rest of the app now meets (§824).
-- [ ] **Name this server in the device scan (plan.md §929)** — Definições → Encontrar dispositivos:
-      the first row has the Este servidor badge but reads "Desconhecido" for name and maker. The box
-      knows its own hostname; fill it in (principle 3).
+- [ ] **Beta-test the server's name in Find devices (plan.md §932)** — on `beta`, Settings →
+      Encontrar dispositivos: the Este servidor row reads `home-srv-01`, not Desconhecido.
 - [ ] **Beta-test AI drafts on the new Gemini model (plan.md §930)** — on `beta` after the update
       rebuilds the backend: Content → Gerar a rascunho with the stored Google key produces a draft
       (now `gemini-3.8-flash`); Settings → Testar chave on Google succeeds; a Mealie URL import still

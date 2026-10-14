@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.12] — 2026-10-14
+
+### Fixed
+
+- Find devices names this server's own row with its host name instead of "Unknown"
+
 ## [0.173.11] — 2026-10-14
 
 ### Fixed
