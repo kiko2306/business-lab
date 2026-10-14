@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.29** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.30** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -224,16 +224,6 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
       mails.* On `beta`, after the update rebuilds the backend:
       send a test email from Settings, invite a user and confirm the set-password link arrives,
       and check the backup/alert mails still send.
-- [ ] **Beta-test Angular 21 (plan.md §898)** — *2026-10-13 at 0.173.4, Chrome on the LAN URL:
-      all 10 pages load, login without 2FA works, no CSP violation or `NG0*` in the console, live
-      status updates. On the public URL the service worker is active and, after two hard reloads,
-      serves the same `main-*.js` as the server's `index.html`. 2026-10-14: Settings → General and
-      Users → Edit access save unchanged values with a success toast, no console error. 2026-10-14: login with 2FA
-      (claude-test) lands on Home. Left: the other pages' forms.* On `beta`, after the update rebuilds the frontend: every
-      page loads and its forms work (Home, Apps, Backups, Users, Settings, Update, Account, Audit log,
-      login with and without 2FA); the service worker updates rather than serving a stale shell (hard
-      reload twice, check the new bundle hash loads); the browser console reports no CSP violation
-      and no `NG0100` error on Home; live status (WebSocket) still updates.
 - [ ] **Beta-test the app workspaces on Angular 21 (plan.md §906)** — *2026-10-14 at 0.173.4: Hotel
       admin loads with its data, Tally lists the shop and its day view loads, the language select flips
       it to English and back; no console errors. Left: Check-in submit and Pulse (guest links), Hotel
@@ -333,10 +323,13 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       `settings:manage` sees no Find devices panel and gets 403 from `POST /api/network/scan`; with the
       box's network unplugged, a scan's failure shows beside the button; Home and Settings in pt-PT on a
       phone.
-- [ ] **Beta-test the Backups Destination box (plan.md §948)** — on `beta`, open Backups with WebDAV
-      saved as the destination: the main Destination box reads "WebDAV server" (pt-PT: its Portuguese
-      name), not blank; picking Disk there hides that extra entry and switching back via "Advanced: more
-      destination kinds" brings it back. Saving unchanged keeps WebDAV.
+- [ ] **Beta-test the Backups Destination boxes (plan.md §948, §949)** — *at 0.173.29 the main box
+      read "WebDAV server" / "Servidor WebDAV" with WebDAV saved, and picking Disk dropped the extra
+      entry; but picking WebDAV again under Advanced left the main box on Disk (fixed in §949).* On
+      `beta`: with WebDAV saved, the main box names it; pick Disk there, then WebDAV under "Advanced:
+      more destination kinds" — the main box follows to "WebDAV server"; pick SFTP in the main box —
+      the Advanced box no longer shows WebDAV. On a phone (iOS too) the main box lists only Disk, SMB,
+      S3, SFTP and the kind in use.
 - [ ] **Beta-test the Content critique fixes (plan.md §845, §847)** — *2026-10-14 at 0.173.4, pt-PT:
       (2) adding an address with Enter announces "… adicionado." and keeps focus in the box; Remover
       asks first, names the address, and the row goes. (5) cannot run: a key is set, and Generate
@@ -397,10 +390,11 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       mismatch under the confirm field, "At least 8 characters.", Show on both fields, cursor in the
       first field) and set-password from a fresh invite (cursor in the password, a refused password
       shown inside the card, Show on both fields), each on a phone in EN and pt-PT.
-- [ ] **Beta-test "Locked out?" on the first press (plan.md §946)** — on `beta`, on a phone and a
-      laptop: open `/login`, and without typing anything press "Locked out?" once — it opens, and no
-      "required" error appears under the username. Same on the code step with "Lost your
-      authenticator?". Typing one letter in the username and leaving it still shows its error.
+- [ ] **Beta-test "Lost your authenticator?" on the first press (plan.md §946)** — *login page passed
+      on `beta` at 0.173.29 (plan.md §949): opens on the first click (1280px, EN) and tap (390px,
+      pt-PT), no error under the empty username, typed-and-left still flagged.* Left: the code step
+      (needs an account with 2FA on) — press "Lost your authenticator?" once with the code field empty:
+      it opens and no error appears.
 - [ ] **Beta-test the Updates page critique fixes (plan.md §834)** — *2026-10-13 at 0.173.4, EN
       and pt-PT laptop: panel open, one "Up to date"/"Atualizado" badge at 13px, Update now blue. 2026-10-14,
       6 behind: the confirm (pt-PT at 1280/390px, EN at 1280px) has a blue Atualizar/Update, says

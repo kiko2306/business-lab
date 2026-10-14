@@ -77,8 +77,19 @@ export class BackupsComponent implements OnInit, OnDestroy {
   // §786: only these four sit under the "more kinds" disclosure; the other
   // four (disk/smb/s3/sftp) stay in the main select.
   private static readonly MORE_KINDS: BackupTargetKind[] = ['nfs', 'webdav', 'ftp', 'ftps'];
+  protected readonly moreKinds = BackupsComponent.MORE_KINDS;
   protected isMoreKind(kind: BackupTargetKind): boolean {
     return BackupsComponent.MORE_KINDS.includes(kind);
+  }
+
+  /**
+   * Both destination selects share `kind`, but a value typed into one view is not written back to
+   * the other (Angular skips model-to-view for a view change), so each showed a stale kind (§949).
+   * Re-setting it pushes the value to both.
+   */
+  protected syncKind(): void {
+    const kind = this.backupTargetForm.controls.kind;
+    kind.setValue(kind.value);
   }
 
   // The one "extra flags" field every kind but disk has, consolidated under a

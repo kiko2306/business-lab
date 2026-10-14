@@ -430,7 +430,7 @@ describe('BackupsComponent', () => {
 
     it('keeps only Disk, SMB, S3 and SFTP in the main destination select', () => {
       const options = Array.from(
-        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLOptionElement>('#backupKind option')
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLOptionElement>('#backupKind option:not([hidden])')
       ).map((o) => o.value);
       expect(options).toEqual(['disk', 'smb', 's3', 'sftp']);
     });
@@ -462,6 +462,23 @@ describe('BackupsComponent', () => {
       const main = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('#backupKind')!;
 
       expect(main.selectedIndex).toBeGreaterThan(-1);
+      expect(main.options[main.selectedIndex]?.textContent?.trim()).toBe('WebDAV server');
+    });
+
+    // plan.md §949: picked below after a main kind, the entry was added after Angular had set the
+    // box's value, so it was never selected and the box kept showing Disk.
+    it('follows a kind picked under Advanced after a main kind', async () => {
+      const host = fixture.nativeElement as HTMLElement;
+      const main = host.querySelector<HTMLSelectElement>('#backupKind')!;
+      main.value = 'disk';
+      main.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+      const more = host.querySelector<HTMLSelectElement>('#backupKindMore')!;
+      more.value = 'webdav';
+      more.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
       expect(main.options[main.selectedIndex]?.textContent?.trim()).toBe('WebDAV server');
     });
 

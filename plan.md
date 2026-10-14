@@ -36776,3 +36776,14 @@ Rejected: rewriting the code comments in three `theme.css` files — anchors fix
 - Fix (`backups.component.html`): while `isMoreKind(kind)`, the main select gets one extra option for that kind, labelled from the existing `backups.target.kind.*` keys. It disappears when a main kind is picked, so the four-kind list (§786) stays as it was.
 - Rejected: listing all eight in the main select — undoes §786's "four up front"; a placeholder like "Other — see below" — names nothing, when the kind in use is known.
 - Test: 1 in `backups.component.spec.ts` (failed first: `selectedIndex` -1). Frontend 614, build clean.
+
+## 949. Beta pass at 0.173.29, and the Destination boxes really in step (§898, §946, §948)
+
+[x] done, 0.173.30. [ ] beta look — README item.
+
+- **Angular 21 forms (§898), passed — item deleted:** as `claude-test`, 1280px EN: an app's settings (NetBird) saved unchanged → 200, "Configuration saved." (no restart: `PUT /:name/env` only writes `.env`); Backups → Save schedule unchanged → `PUT` 200, "Backup schedule updated."; Audit log Export CSV downloads `audit-logs.csv` with its header row; Update → Check now 200, "Up to date", v0.173.29. No console error, CSP violation or `NG0*` across the run. The owner updated the box to 0.173.29 mid-run.
+- **"Locked out?" (§946), login page passed:** opens on the first click (1280, EN) and tap (390, pt-PT), no error under the empty username, cursor starts there, "ab" then leaving still shows "Username must be 3-64 characters." Code step not seen live (needs 2FA on) — item trimmed to it.
+- **Destination box (§948), half passed:** main box reads "WebDAV server" / "Servidor WebDAV", Disk drops the extra entry. **Failed:** Disk in the main box, then WebDAV under Advanced → main box stayed on Disk with the WebDAV option now present.
+- **Cause, second attempt:** first guess was timing (the `@if` option appearing after Angular wrote the value); moved to always-present options, `[hidden]` + `[disabled]` unless in use — the new spec still failed. Real cause: two `formControlName="kind"` on one control; a view change calls `setValue(…, {emitModelToViewChange: false})`, so no accessor, the other select included, is written. The same left the Advanced box showing WebDAV after Disk was picked. §786's design hid it: nothing showed both until §948.
+- **Fix:** `(change)="syncKind()"` on both selects re-sets `kind` with model-to-view on. The always-present hidden/disabled options stay: the option must exist when the write lands. Disabled because iOS Safari ignores `hidden` on `<option>`.
+- Tests: 1 new in `backups.component.spec.ts` (failed with the live symptom, "Another disk on this machine"); the "only four in the main select" spec now counts visible options. Frontend 615, build clean.

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.30] — 2026-10-14
+
+### Fixed
+
+- Backups: the two Destination boxes now always agree — picking a kind in one updates the other.
+
 ## [0.173.29] — 2026-10-14
 
 ### Fixed

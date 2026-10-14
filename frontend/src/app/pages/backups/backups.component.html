@@ -190,15 +190,17 @@
         <form [formGroup]="backupTargetForm" (ngSubmit)="saveBackupTarget()" class="row g-3">
           <div class="col-md-4">
             <label class="form-label fw-semibold" for="backupKind">{{ 'backups.target.kindLabel' | t }}</label>
-            <select id="backupKind" class="form-select" formControlName="kind">
+            <select id="backupKind" class="form-select" formControlName="kind" (change)="syncKind()">
               <option value="disk">{{ 'backups.target.kind.disk' | t }}</option>
               <option value="smb">{{ 'backups.target.kind.smb' | t }}</option>
               <option value="s3">{{ 'backups.target.kind.s3' | t }}</option>
               <option value="sftp">{{ 'backups.target.kind.sftp' | t }}</option>
               <!-- Shares `kind` with the select below: with no option for an Advanced kind this box
-              showed blank once one was saved, so name the one in use (plan.md §948). -->
-              @if (isMoreKind(backupTargetForm.controls.kind.value)) {
-                <option [value]="backupTargetForm.controls.kind.value">{{ 'backups.target.kind.' + backupTargetForm.controls.kind.value | t }}</option>
+              showed blank once one was saved, so it names the one in use (plan.md §948). Hidden and
+              disabled rather than added by @if, so the option is there whenever syncKind() writes
+              the value (§949); disabled too, since iOS ignores `hidden` on an option. -->
+              @for (kind of moreKinds; track kind) {
+                <option [value]="kind" [hidden]="backupTargetForm.controls.kind.value !== kind" [disabled]="backupTargetForm.controls.kind.value !== kind">{{ 'backups.target.kind.' + kind | t }}</option>
               }
             </select>
           </div>
@@ -208,7 +210,7 @@
             <summary>{{ 'backups.target.moreKindsSummary' | t }}</summary>
             <div class="col-md-4 mt-2">
               <label class="form-label" for="backupKindMore">{{ 'backups.target.moreKindsLabel' | t }}</label>
-              <select id="backupKindMore" class="form-select" formControlName="kind">
+              <select id="backupKindMore" class="form-select" formControlName="kind" (change)="syncKind()">
                 <option value="nfs">{{ 'backups.target.kind.nfs' | t }}</option>
                 <option value="webdav">{{ 'backups.target.kind.webdav' | t }}</option>
                 <option value="ftp">{{ 'backups.target.kind.ftp' | t }}</option>
