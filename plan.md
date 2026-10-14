@@ -38799,3 +38799,4 @@ Not done, rejected:
 - **Back up now on a stateless app.** Not silent after all — §929's selector missed the toast; it read the backend's English "Failed to back up the app". `backupOneApp` now sets `reason: 'no_data'`, the route passes it, the panel words it.
 - **Save configuration** not rendered when no field is visible (was disabled).
 - **ntfy switch** updates `alertSettings.enabled` before the save (Test greys at once), shows `settings.ntfy.saving`, reloads stored state on error. Topic hint rewritten: reads need the `subscriber` login (§425).
+- **Edit roles** `showFeatures` reads the draft roles while editing; `capDraft` exists for every row; Save roles also saves picked features when the result is admin. The row's feature count stays on saved roles.

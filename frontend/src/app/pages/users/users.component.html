@@ -191,7 +191,7 @@
                     <span class="badge text-bg-secondary">{{ ('users.role.' + role) | t }}</span>
                   }
                 </div>
-                @if (showFeatures(user)) {
+                @if (user.roles.includes('admin') && !user.roles.includes('webmaster')) {
                   <div class="form-text mt-1">
                     {{ 'users.featuresCount' | t:{ picked: user.capabilities?.length ?? 0, total: allCapabilities.length } }}
                   </div>

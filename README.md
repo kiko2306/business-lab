@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.18** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.19** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -333,10 +333,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       the buttons instead.
 - [ ] **Beta-test the translated start/stop message (plan.md §933)** — on `beta` in pt-PT, stop and start
       Samba: the toasts read "Samba parou." and "Samba está a funcionar.".
-- [ ] **Show Features when Edit roles ticks Admin (plan.md §929)** — Users → Edit roles on an App
-      user: ticking Administrador shows no Features block or presets until the role is saved and the
-      row re-opened, because `showFeatures()` reads the saved `user.roles`, not the draft. Read the
-      draft so features can be picked in the same edit, as the Add user form already allows.
+- [ ] **Beta-test promoting an App user to Admin (plan.md §933)** — on `beta`, Users → Edit roles on
+      `claude-noaccess`: tick Administrador — the features and presets appear; pick Só consulta, Save
+      roles: the row shows Administrador with 2 of 8 features. Put it back to App user after.
 - [ ] **Beta-test the authenticator name (plan.md §932)** — on `beta`, set up 2FA on a test account:
       the authenticator app lists it as "Business Lab". An entry set up before keeps working.
 - [ ] **Beta-test the translated rate-limit message (plan.md §933)** — hard to provoke by hand (200 API

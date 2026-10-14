@@ -107,3 +107,56 @@ describe('Users roles and presets', () => {
     expect(editor().querySelector('button.btn-primary')).not.toBeNull();
   });
 });
+
+// plan.md §933: ticking Admin on an App user showed no features until the role
+// was saved and the row reopened, because the block read the saved roles.
+describe('Users promoting an App user to Admin', () => {
+  it('shows the features as soon as Admin is ticked and saves them with the role', async () => {
+    localStorage.clear();
+    const operations = jasmine.createSpyObj('OperationsService', [
+      'listUsers', 'listAppAccessOptions', 'updateUserRoles', 'updateUserCapabilities',
+    ]);
+    operations.listUsers.and.returnValue(of({ items: [me, admin, staff] }));
+    operations.listAppAccessOptions.and.returnValue(of({ items: [] }));
+    operations.updateUserRoles.and.returnValue(of({}));
+    operations.updateUserCapabilities.and.returnValue(of({}));
+    await TestBed.configureTestingModule({
+      imports: [UsersComponent],
+      providers: [
+        provideRouter([]),
+        { provide: OperationsService, useValue: operations },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+        { provide: SettingsService, useValue: { getMailSettings: () => of({ configured: true }) } },
+        { provide: AuthService, useValue: { user$: of({ id: 1 }), hasCapability: () => of(true), isWebmaster: () => true } },
+        { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(UsersComponent);
+    fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+    const settle = async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+    const row = Array.from(element.querySelectorAll('tbody tr')).find((r) => r.textContent?.includes('ana')) as HTMLElement;
+    (row.querySelector('.edit-roles') as HTMLButtonElement).click();
+    await settle();
+    const editor = element.querySelector('.roles-editor') as HTMLElement;
+    expect(editor.querySelectorAll('button.preset').length).toBe(0);
+
+    (editor.querySelector('#role-3-admin') as HTMLInputElement).click();
+    await settle();
+    const everything = Array.from(editor.querySelectorAll('button.preset')).find(
+      (b) => b.textContent?.trim() === 'Everything'
+    ) as HTMLButtonElement;
+    expect(everything).toBeTruthy();
+
+    everything.click();
+    await settle();
+    (Array.from(editor.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Save roles') as HTMLButtonElement).click();
+    await settle();
+    expect(operations.updateUserRoles).toHaveBeenCalledWith(3, jasmine.arrayContaining(['admin']));
+    expect(operations.updateUserCapabilities).toHaveBeenCalled();
+  });
+});

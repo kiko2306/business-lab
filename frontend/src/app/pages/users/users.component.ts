@@ -140,9 +140,8 @@ export class UsersComponent implements OnInit {
         this.capDraft = {};
         for (const user of this.items) {
           this.roleDraft[user.id] = this.toRecord(user.roles);
-          if (this.showFeatures(user)) {
-            this.capDraft[user.id] = capsRecord(user.capabilities);
-          }
+          // Every row, not just admins: ticking Admin in Edit roles shows the features at once.
+          this.capDraft[user.id] = capsRecord(user.capabilities);
         }
         this.loading = false;
       },
@@ -177,9 +176,7 @@ export class UsersComponent implements OnInit {
   protected cancelRolesEdit(user: AdminUser): void {
     this.rolesEditId = null;
     this.roleDraft[user.id] = this.toRecord(user.roles);
-    if (this.showFeatures(user)) {
-      this.capDraft[user.id] = capsRecord(user.capabilities);
-    }
+    this.capDraft[user.id] = capsRecord(user.capabilities);
   }
 
   protected rolesDirty(user: AdminUser): boolean {
@@ -221,9 +218,15 @@ export class UsersComponent implements OnInit {
     return this.auth.isWebmaster() || !user.roles.includes('webmaster');
   }
 
-  /** A row gets the Features editor when it is an admin and not a webmaster. */
+  /**
+   * A row gets the Features editor when it is an admin and not a webmaster —
+   * by the ticked roles while Edit roles is open, so promoting an App user
+   * shows the features in the same edit (plan.md §933).
+   */
   protected showFeatures(user: AdminUser): boolean {
-    return user.roles.includes('admin') && !user.roles.includes('webmaster');
+    const draft = this.rolesEditId === user.id ? this.roleDraft[user.id] : undefined;
+    const roles = draft ? this.selected(draft) : user.roles;
+    return roles.includes('admin') && !roles.includes('webmaster');
   }
 
   protected capsDirty(user: AdminUser): boolean {
@@ -370,6 +373,11 @@ export class UsersComponent implements OnInit {
       .subscribe({
         next: () => {
           this.toast.success(this.translate.t('users.toast.rolesUpdated', { username: user.username }));
+          // Features picked in the same edit go with the promotion; saveCaps closes and reloads.
+          if (roles.includes('admin') && this.capsDirty(user)) {
+            this.saveCaps(user);
+            return;
+          }
           this.rolesEditId = null;
           this.load();
         },
