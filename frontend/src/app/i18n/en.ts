@@ -714,6 +714,8 @@ export const en: Record<string, string> = {
   'settings.ntfy.topicInvalidHint': 'Letters, digits, hyphens and underscores only, up to 64 characters.',
   'settings.ntfy.topicHint': 'ntfy topics are open by name, so anyone who knows it can read the alert stream (which includes attacker IPs) — keep it non-obvious.',
   'errors.tooManyRequests': 'Too many requests in a short time. Wait a few minutes, then try again.',
+  'serviceState.done.start': '{{label}} is running.',
+  'serviceState.done.stop': '{{label}} stopped.',
   'settings.ntfy.testButton': 'Test',
   'settings.ntfy.saveChannelsButton': 'Save topics',
   'settings.alertCategory.crowdsec': 'CrowdSec intrusion alerts',

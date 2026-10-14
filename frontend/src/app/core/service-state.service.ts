@@ -15,6 +15,7 @@ import {
 import { ToastService } from './toast.service';
 import { AuthService } from './auth.service';
 import { startChain } from './start-chain';
+import { TranslateService } from '../i18n/translate.service';
 
 /**
  * Pull the most detailed text out of a failed start response — the backend
@@ -43,6 +44,7 @@ export class ServiceStateService {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
+  private readonly translate = inject(TranslateService);
 
   private readonly servicesSubject = new BehaviorSubject<ServiceStatus[] | null>(null);
   private readonly summarySubject = new BehaviorSubject<ServiceSummary>({
@@ -332,7 +334,9 @@ export class ServiceStateService {
           // fires the whole thing a second time on top of the first one's side
           // effects. `fetchServices` above is a GET and keeps its retry.
           tap((response) => {
-            this.toast.success(response.message);
+            // The backend's `message` is English whatever the page language (plan.md §933).
+            const label = this.servicesSubject.value?.find((svc) => svc.name === serviceName)?.label ?? serviceName;
+            this.toast.success(this.translate.t(`serviceState.done.${action}`, { label }));
             if (action !== 'stop') {
               this.startupEventsSubject.next({ serviceName, ok: true, message: response.message });
             }

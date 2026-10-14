@@ -49,7 +49,9 @@ describe('ServiceStateService', () => {
   it('refreshes the service list after a successful start', fakeAsync(() => {
     service.startService('paperless');
 
-    httpMock.expectOne(`${API_BASE_URL}/services/paperless/start`).flush({ message: 'Service started' });
+    // The backend's own text ("Service paperless started successfully") is English
+    // whatever the page language (plan.md §933), so the toast is built here.
+    httpMock.expectOne(`${API_BASE_URL}/services/paperless/start`).flush({ message: 'Service paperless started successfully' });
     tick();
 
     httpMock.expectOne(`${API_BASE_URL}/services/status`).flush({
@@ -59,7 +61,7 @@ describe('ServiceStateService', () => {
     });
     tick();
 
-    expect(toast.success).toHaveBeenCalledWith('Service started');
+    expect(toast.success).toHaveBeenCalledWith('paperless is running.');
   }));
 
   // plan.md §773: a failed start leaves the container `created`/`restarting`,

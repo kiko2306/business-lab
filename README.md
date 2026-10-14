@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.13** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.14** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -331,9 +331,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       and the Actions buttons break inside words ("Elimin" / "ar", "Repor palavra-" / "passe").
       Keep dates and button labels on one line (`text-nowrap`), and let the table scroll or stack
       the buttons instead.
-- [ ] **Translate start/stop toasts (plan.md §928)** — in pt-PT, stopping Samba shows "Service samba
-      stopped successfully": the card shows the backend's English `message`
-      (`executor.ts` stop/start results) instead of a translated string.
+- [ ] **Beta-test the translated start/stop message (plan.md §933)** — on `beta` in pt-PT, stop and start
+      Samba: the toasts read "Samba parou." and "Samba está a funcionar.".
 - [ ] **Show Features when Edit roles ticks Admin (plan.md §929)** — Users → Edit roles on an App
       user: ticking Administrador shows no Features block or presets until the role is saved and the
       row re-opened, because `showFeatures()` reads the saved `user.roles`, not the draft. Read the

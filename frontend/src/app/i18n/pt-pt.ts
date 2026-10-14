@@ -714,6 +714,8 @@ export const ptPT: Record<string, string> = {
   'settings.ntfy.topicInvalidHint': 'Apenas letras, dígitos, hífenes e sublinhados, até 64 carateres.',
   'settings.ntfy.topicHint': 'Os tópicos ntfy são abertos por nome, pelo que qualquer pessoa que o conheça pode ler o fluxo de alertas (que inclui IPs de atacantes) — mantenha-o pouco óbvio.',
   'errors.tooManyRequests': 'Demasiados pedidos em pouco tempo. Aguarde alguns minutos e tente de novo.',
+  'serviceState.done.start': '{{label}} está a funcionar.',
+  'serviceState.done.stop': '{{label}} parou.',
   'settings.ntfy.testButton': 'Testar',
   'settings.ntfy.saveChannelsButton': 'Guardar tópicos',
   'settings.alertCategory.crowdsec': 'Alertas de intrusão do CrowdSec',
