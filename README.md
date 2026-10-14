@@ -399,12 +399,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       has no data, and a closed (archive) day, and confirm the sentence degrades
       rather than lying. Confirm the six Wintouch counters are collapsed by
       default and that opening them is one tap.
-- [ ] **Beta-test Tally: keyboard and screen-reader pass (plan.md §806, item 3)** — on
-      `beta`, Tab to a table row in the Tables tab and open it with Enter/Space;
-      it must expand, announce its state, and return focus sensibly. Confirm the
-      Shops page shows "Request failed" alone when the API is unreachable (stop
-      the tally container) rather than also claiming there are no shops.
-- [ ] **Confirm a day close empties Tally's live table (plan.md §810)** — in
+- [ ] **Confirm a day close empties Tally's live table (plan.md §810)** — *2026-10-14 at 0.173.30 (plan.md §956): the sample shop has archived data back past the one-year floor (27/07/2025 compares with the Sunday before), so a day with no last-week data cannot be produced from it.* in
       `apps/tally/app/agent/ShopReader.cs`, `ResolveDayAsync` falls back to
       `DateTime.Today` when `wsir_vnd_vendas` is empty, and `ReadOverviewAsync`
       then takes the *live* path for that date, so if Wintouch empties the live
@@ -423,7 +418,15 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       header `entrydate` archived, which can put a "by 14:00" comparison's two
       sides in different hours), and whether stale `wsir_vnd_pedidos` rows inflate
       Forecast. Any disagreement is a defect in what the owner is told.
-- [ ] **Beta-test Tally: the fourth critique's web fixes (plan.md §810)** — *2026-10-14 at 0.173.4, Mat Laptop shop (sample day 27/07/2026), 390px pt-PT: 
+- [ ] **Tally drops a valid `?date=` on reload when the running day lags today (plan.md §956)** —
+      `readStateFromUrl` runs before `runningDate` is known, so `dayAllowed` measures the one-year
+      floor from today's real date instead of from the running day the picker uses. On the sample
+      shop (running day 27/07/2026, today 14/10/2026) any day between 27/07/2025 and 14/10/2025 can be
+      picked, but a reload or shared link for it silently shows the running day's figures while the
+      address still carries the date. Real shops only hit it while the agent is days behind. Test
+      first (reload with a date between the two floors); re-check the date once `runningDate` is known
+      instead of dropping it up front.
+- [ ] **Beta-test Tally: the fourth critique's web fixes (plan.md §810)** — *2026-10-14 at 0.173.30 (plan.md §956): a `visibilitychange` back to the page fetched `overview` and `tables` at once; tapping an hourly column reads "14:00 · 434,00 €". Left: a shop with no tables, the till PC off.* *2026-10-14 at 0.173.4, Mat Laptop shop (sample day 27/07/2026), 390px pt-PT: 
       Items shows ten rows and "Mostrar todos (101)"; a past day's hero names its date. Left: refresh
       on return to the app, tapping a chart column, a shop with no tables, the till PC off.* On `beta`, on a
       phone: switch away from the app for a few minutes and back — the figures must
@@ -432,7 +435,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       with no tables opens on Items with no empty Tables tab; the items table
       shows ten rows with "Show all"; with the till PC switched off, the panel
       says to check it and recovers on its own — also while viewing a past day.
-- [ ] **Beta-test Tally: the third critique's fixes (plan.md §806.8)** — *2026-10-14 at 0.173.4, Mat Laptop shop (sample day 27/07/2026), 390px pt-PT: 
+- [ ] **Beta-test Tally: the third critique's fixes (plan.md §806.8)** — *2026-10-14 at 0.173.30 (plan.md §956): a Saturday reads "… acima de sábado da semana passada". Left: "Last seen" with the till offline, a €10,000+ open tab at 360px.* *2026-10-14 at 0.173.4, Mat Laptop shop (sample day 27/07/2026), 390px pt-PT: 
       "Faturado em 27/07", "…até às 19:00", "segunda-feira da semana passada"; a typed 2030 date is
       refused. Left: "Last seen" with the till offline, a Saturday, a €10,000+ open tab at 360px.* On `beta`: shortly
       after midnight (or any time the shop's trading day is not today's date)
@@ -444,7 +447,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       Saturday; a typed day outside the picker's range is refused; and with an
       open-tabs figure above €10,000 on a 360px phone nothing spills out of its
       tile.
-- [ ] **Beta-test Tally: sole-shop viewers skip the list (plan.md §809)** — on `beta`, sign in
+- [ ] **Beta-test Tally: sole-shop viewers skip the list (plan.md §809)** — *2026-10-14 at 0.173.30 (plan.md §956): as `claude-test` (not a Tally admin, one shop): opening Tally lands on the shop, no "All shops" link, Back leaves the app instead of bouncing. Left: an admin with one shop, a non-admin with two.* on `beta`, sign in
       as a non-admin who has been granted exactly one shop: opening Tally must land
       on that shop directly (no flash of the list), the shop page must have no
       "← All shops" link, and the browser back button must not bounce between the
@@ -480,19 +483,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       back link must each be easy to hit (44px); the tab title reads "<shop> ·
       Tally"; and with some tables awaiting payment, "Tables in use" must count
       them (e.g. 6 seated + 4 waiting shows 10, with "4 waiting to pay").
-- [ ] **Beta-test Tally: URL state, refresh feedback and offline (plan.md §806.5)** — *2026-10-14 at 0.173.4, Mat Laptop shop (sample day 27/07/2026), 390px pt-PT: 
-      a past day lands at `?date=` and survives a reload; Refresh reads "A atualizar…" disabled
-      until it lands; Tables ↔ Items fetches only `tables`/`sold-items`; offline shows "Sem ligação…"
-      and clears; a polite live region reads "Atualizado às…"; the hourly chart is one `role=img`.
-      Left: the silent 30 s refresh with a screen reader.* On
-      `beta`, pick a past day on a phone, reload: you must land on that day, and
-      the address must carry `?date=`. Press Refresh: it must read "Refreshing…"
-      and be disabled until it lands. Switch Tables ↔ Items and confirm no
-      overview request goes to the shop (browser Network tab). Turn the phone
-      offline: "You are offline" must appear, and clear on reconnect. With a
-      screen reader, Refresh announces "Updated at HH:MM" and the 30 s refresh
-      stays silent; each chart reads as one graphic, not one line per bar.
-- [ ] **Beta-test the single settings writer (plan.md §799)** — *2026-10-14 at 0.173.30 (plan.md §955): through the UI, exposure (blank NPM password, then Test passes for NPM and Cloudflare), General (timezone, update branch) and Email (then Test) saved unchanged and re-opened identical; Cloudflare token, AI key and backup destination Tests pass. Left: saving the Cloudflare token and an AI key, health thresholds, a restore.* *2026-10-07, over the API on
+- [ ] **Beta-test the single settings writer (plan.md §799)** — *2026-10-14 at 0.173.30 (plan.md §956): the sample day has no table awaiting payment ("0 a aguardar pagamento"), so the count with some waiting is still unseen.* *2026-10-14 at 0.173.30 (plan.md §955): through the UI, exposure (blank NPM password, then Test passes for NPM and Cloudflare), General (timezone, update branch) and Email (then Test) saved unchanged and re-opened identical; Cloudflare token, AI key and backup destination Tests pass. Left: saving the Cloudflare token and an AI key, health thresholds, a restore.* *2026-10-07, over the API on
       the box: general (timezone, update branch), backup schedule, backup target, mail (+ its
       Test), alerts and exposure (blank password; Test passes for NPM and Cloudflare) all come back
       byte-identical after a save. Still to do: Cloudflare token, AI API keys, health thresholds,
@@ -609,7 +600,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       the next time a real "check if X can update" comes up.
 
 
-- [ ] **Beta-test light/dark mode (plan.md §696)** — *2026-10-14 at 0.173.30 (plan.md §955): Tally (Shops), Hotel admin, Check-in and Feedback load in light and dark at 390px, no text under 4.5:1, no sideways scroll, no console errors — but `claude-test` has no shop or property and no guest code, so only the empty states were seen.* *dashboard done: OS switch, `theme-init.js`,
+- [ ] **Beta-test light/dark mode (plan.md §696)** — *2026-10-14 at 0.173.30 (plan.md §956): Tally's shop page passes: light at 390px pt-PT and dark at 1280px EN, no text under 4.5:1, no sideways scroll. Left: the Hotel pages with data, a guest link on a phone.* *2026-10-14 at 0.173.30 (plan.md §955): Tally (Shops), Hotel admin, Check-in and Feedback load in light and dark at 390px, no text under 4.5:1, no sideways scroll, no console errors — but `claude-test` has no shop or property and no guest code, so only the empty states were seen.* *dashboard done: OS switch, `theme-init.js`,
       the toggle and reload (2026-10-14 at 0.173.4); every page walked in light with all panels open
       and a service card's settings dialog, 390px and 1280px, no text under 4.5:1 and no sideways
       scroll (2026-10-14 at 0.173.26, plan.md §947).* Left: Tally's shop page in light, and the Hotel
