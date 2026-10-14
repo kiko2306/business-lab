@@ -99,9 +99,10 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
   private static readonly STEPS: readonly SelfUpdateRunState[] = [
     'pulling',
     'building',
-    'updating_apps',
     'restarting_frontend',
     'restarting_backend',
+    // Last: apps are recreated after both restarts, by the new backend when it restarted (plan.md §940).
+    'updating_apps',
   ];
   protected readonly totalSteps = SelfUpdateComponent.STEPS.length;
 

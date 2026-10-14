@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.27] — 2026-10-14
+
+### Fixed
+
+- An update that restarts the dashboard backend now recreates the changed apps after the restart, so new app settings are filled in without a manual stop/start.
+
 ## [0.173.26] — 2026-10-14
 
 ### Fixed

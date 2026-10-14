@@ -36724,3 +36724,15 @@ Rejected: caveman-compress of the whole file (~2.3 MB rewrite, large token cost,
 - §806.9 — never written inside §806; the work is §807 ("this is §806.9"). Labelled anchor at the end of §806, same pattern as §649.1 (§735).
 
 Rejected: rewriting the code comments in three `theme.css` files — anchors fix every citer at once and leave app code alone.
+
+## 944. Self-update: apps recreated by the new backend (§940)
+
+[x] done, 0.173.27. [ ] beta proof — README item.
+
+- Bug (§940): a run that rebuilt the backend recreated changed apps *before* the backend restart, so the old code rendered their env. Mealie's `OIDC_ADMIN_GROUP` came out empty at 0.173.26.
+- Fix (`selfUpdate.ts`): when the run rebuilds the backend and touches apps, it records them in new column `pending_apps` (JSON list, or `"all"` when the diff could not be read) and does not recreate them. `reconcileDanglingSelfUpdateRun` on the new process's boot sees `restarting_backend` + matching commit + pending apps: sets `updating_apps`, clears `finished_at` (new `reopen` flag, so a second press is refused), runs `updateAllInstalledApps` in the background (boot schema step must not wait minutes), then `done` with `appsFailed` and a `self_update_complete` audit.
+- Pending list cleared *before* the batch: a second restart mid-batch finds `updating_apps` and just closes the run. Rejected re-running it — could restart-loop on whatever killed the first (§295); failed apps are retried from the page (§835).
+- Apps now always run last, after the frontend restart, so the Update page's fixed step list (`STEPS`) holds for both run kinds: `updating_apps` moved to step 5.
+- Rejected: re-running only the start reconcilers after boot — env is written to `.env` but the container still needs a recreate to read it, which is what the app batch already does.
+- Not covered: a backend-only change to a rendered setting with no `apps/<name>/` change still recreates no app. Same as before; the restart prompt covers it.
+- Tests: 4 new in `selfUpdate.test.ts` (defer, recreate on boot with in-progress state, `all` fallback, no redo after a second restart); 4 fixtures adjusted to the new order. Frontend step spec reordered.

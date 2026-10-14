@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.26** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.27** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -317,12 +317,12 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       tick the boxes, the chosen one shows pressed, editing a box shows Custom, and nothing changes until
       Save; the same in the Add user form and in pt-PT, with no sideways scroll on a phone. The P2 focus-ring and control-border contrast belongs to the shared theme and
       is its own item below. On `beta`, after each: open Users on a phone with a long email.
-- [ ] **Let a self-update render app settings with the new code (plan.md §940)** — updating to 0.173.26
-      recreated Mealie (its compose changed) two minutes before the new backend started, so the *old* backend
-      wrote Mealie's env and `OIDC_ADMIN_GROUP` came out empty; a manual Parar/Iniciar fixed it. Any release
-      that adds a dashboard-rendered app setting (`oidcClient.appEnv`, managed env keys) hits the same: recreate
-      the changed apps after the backend restarts, or re-run their start reconcilers then. Test first; the beta
-      item is a release that changes one app's rendered env and needs no manual restart.
+- [ ] **Beta-test that an update applies new app settings without a restart (plan.md §944)** — on `beta`,
+      the first update that rebuilds the backend *and* changes an app (any `apps/<name>/` file): during the
+      run the Update page reaches "Restarting backend", then shows "Updating apps" (step 5 of 5) after the
+      dashboard comes back, then "Up to date". The changed app's container must be younger than
+      `business-lab-backend-1`, and its env must carry what the new code renders, with no manual
+      Parar/Iniciar. Audit log: one `self_update_complete` with `appsUpdated`.
 - [ ] **Beta-test the translated rate-limit message (plan.md §933)** — hard to provoke by hand (200 API
       calls per 15 min); if a 429 shows up in pt-PT it reads "Demasiados pedidos em pouco tempo…".
 - [ ] **Beta-test the Utils critique fixes (plan.md §841)** — *2026-10-14 at 0.173.4, pt-PT laptop:

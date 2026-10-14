@@ -478,7 +478,7 @@ describe('SelfUpdateComponent', () => {
       expect(progress()?.getAttribute('role')).toBe('status');
     });
 
-    for (const [state, step] of [['pulling', 1], ['building', 2], ['updating_apps', 3], ['restarting_frontend', 4], ['restarting_backend', 5]] as const) {
+    for (const [state, step] of [['pulling', 1], ['building', 2], ['restarting_frontend', 3], ['restarting_backend', 4], ['updating_apps', 5]] as const) {
       it(`says "Step ${step} of 5" in ${state}`, () => {
         show(running(state));
 

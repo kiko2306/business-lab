@@ -121,6 +121,12 @@ export interface SelfUpdateRunRow {
   failedPhase: SelfUpdateRunState | null;
   /** Apps whose update failed in a run that otherwise landed; always an array. */
   appsFailed: string[];
+  /**
+   * Apps a run that restarts the backend leaves for the new backend to
+   * recreate on its first boot (plan.md §940); `'all'` when the diff could not
+   * be read. Empty once handed over, or when there were none.
+   */
+  pendingApps: string[] | 'all';
   startedAt: string;
   finishedAt: string | null;
 }
@@ -161,6 +167,7 @@ export async function ensureSelfUpdateTable(): Promise<void> {
   await query(`ALTER TABLE self_update_runs ADD COLUMN IF NOT EXISTS detail TEXT`);
   await query(`ALTER TABLE self_update_runs ADD COLUMN IF NOT EXISTS failed_phase VARCHAR(30)`);
   await query(`ALTER TABLE self_update_runs ADD COLUMN IF NOT EXISTS apps_failed TEXT`);
+  await query(`ALTER TABLE self_update_runs ADD COLUMN IF NOT EXISTS pending_apps TEXT`);
 }
 
 function requireRepoRoot(): string {
@@ -180,6 +187,7 @@ interface SelfUpdateRunDbRow {
   detail: string | null;
   failed_phase: string | null;
   apps_failed: string | null;
+  pending_apps: string | null;
   started_at: Date;
   finished_at: Date | null;
 }
@@ -193,6 +201,10 @@ function parseAppsFailed(raw: string | null): string[] {
   }
 }
 
+function parsePendingApps(raw: string | null): string[] | 'all' {
+  return raw === '"all"' ? 'all' : parseAppsFailed(raw);
+}
+
 function rowFromDb(row: SelfUpdateRunDbRow): SelfUpdateRunRow {
   return {
     id: row.id,
@@ -203,6 +215,7 @@ function rowFromDb(row: SelfUpdateRunDbRow): SelfUpdateRunRow {
     detail: row.detail,
     failedPhase: (row.failed_phase as SelfUpdateRunState | null) ?? null,
     appsFailed: parseAppsFailed(row.apps_failed),
+    pendingApps: parsePendingApps(row.pending_apps),
     startedAt: row.started_at.toISOString(),
     finishedAt: row.finished_at ? row.finished_at.toISOString() : null,
   };
@@ -233,6 +246,9 @@ async function updateRun(
     finished?: boolean;
     failedPhase?: SelfUpdateRunState;
     appsFailed?: string[];
+    pendingApps?: string[] | 'all';
+    /** Clears finished_at: the deferred app recreate reopens a run that had finished (plan.md §940). */
+    reopen?: boolean;
   }
 ): Promise<void> {
   await query(
@@ -241,10 +257,11 @@ async function updateRun(
          to_commit = COALESCE($3, to_commit),
          error_message = COALESCE($4, error_message),
          detail = CASE WHEN $5 THEN $6 ELSE detail END,
-         finished_at = CASE WHEN $7 THEN NOW() ELSE finished_at END,
+         finished_at = CASE WHEN $12 THEN NULL WHEN $7 THEN NOW() ELSE finished_at END,
          failed_phase = COALESCE($8, failed_phase),
          apps_failed = COALESCE($9, apps_failed),
-         from_commit = COALESCE($10, from_commit)
+         from_commit = COALESCE($10, from_commit),
+         pending_apps = COALESCE($11, pending_apps)
      WHERE id = $1`,
     [
       id,
@@ -257,6 +274,8 @@ async function updateRun(
       fields.failedPhase ?? null,
       fields.appsFailed ? JSON.stringify(fields.appsFailed) : null,
       fields.fromCommit ?? null,
+      fields.pendingApps ? JSON.stringify(fields.pendingApps) : null,
+      fields.reopen ?? false,
     ]
   );
 }
@@ -622,27 +641,6 @@ async function runSelfUpdateSequence(
       await pruneDockerCruft('building');
     }
 
-    // Only the apps whose own files changed in the pull (or all, on the
-    // fallback) — a :latest app moves when its image-check date is bumped
-    // after vetting, never as a side effect of a code deploy (§750). Best-effort: updateAllInstalledApps never throws, it logs a
-    // per-app failure and moves on.
-    let appResults: Awaited<ReturnType<typeof updateAllInstalledApps>> = [];
-    if (willTouchApps) {
-      await enter('updating_apps');
-      appResults = await updateAllInstalledApps(userId, scope.apps, (label) => updateRun(runId, { detail: label }));
-      // Recorded on the run, so a run that landed with some apps failed no
-      // longer reads as a plain "Up to date" (plan.md §835).
-      await updateRun(runId, { detail: null, appsFailed: appResults.filter((r) => !r.ok).map((r) => r.serviceName) });
-      const appsFailed = appResults.filter((r) => !r.ok);
-      if (appsFailed.length) {
-        logger.warn(`Self-update: ${appsFailed.length}/${appResults.length} app(s) failed to update`, {
-          failed: appsFailed.map((r) => r.serviceName),
-        });
-      }
-      await pruneDockerCruft('updating_apps');
-    }
-    const appsFailed = appResults.filter((r) => !r.ok);
-
     // `--no-deps` is load-bearing: the root compose's `frontend` service
     // `depends_on: [backend]`, so a plain `up -d frontend` recreates `backend`
     // *first* — killing this very process (and its child `docker compose`)
@@ -660,6 +658,37 @@ async function runSelfUpdateSequence(
       );
     }
 
+    // Only the apps whose own files changed in the pull (or all, on the
+    // fallback) — a :latest app moves when its image-check date is bumped
+    // after vetting, never as a side effect of a code deploy (§750).
+    // Best-effort: updateAllInstalledApps never throws, it logs a per-app
+    // failure and moves on. Last, after the frontend restart, so the Update
+    // page's fixed step order holds whichever process runs them.
+    // When the backend is rebuilt too, the apps wait for it: recreated now, the
+    // old code would render their env, so a setting the new code adds came out
+    // empty (Mealie's OIDC_ADMIN_GROUP at 0.173.26, plan.md §940). The run
+    // records them and the new process recreates them on its first boot
+    // (reconcileDanglingSelfUpdateRun).
+    const deferApps = willTouchApps && scope.backend;
+    let appResults: Awaited<ReturnType<typeof updateAllInstalledApps>> = [];
+    if (deferApps) {
+      await updateRun(runId, { pendingApps: scope.apps === null ? 'all' : [...scope.apps] });
+    } else if (willTouchApps) {
+      await enter('updating_apps');
+      appResults = await updateAllInstalledApps(userId, scope.apps, (label) => updateRun(runId, { detail: label }));
+      // Recorded on the run, so a run that landed with some apps failed no
+      // longer reads as a plain "Up to date" (plan.md §835).
+      await updateRun(runId, { detail: null, appsFailed: appResults.filter((r) => !r.ok).map((r) => r.serviceName) });
+      const appsFailed = appResults.filter((r) => !r.ok);
+      if (appsFailed.length) {
+        logger.warn(`Self-update: ${appsFailed.length}/${appResults.length} app(s) failed to update`, {
+          failed: appsFailed.map((r) => r.serviceName),
+        });
+      }
+      await pruneDockerCruft('updating_apps');
+    }
+    const appsFailed = appResults.filter((r) => !r.ok);
+
     // After the images are rebuilt, so a recreated sidecar adopts the new
     // backend image. A failure here must not fail an update that already landed.
     await ensureCoreSidecars().catch((error: Error) =>
@@ -676,6 +705,7 @@ async function runSelfUpdateSequence(
         scope: { build: buildTargets, apps: scope.apps === null ? 'all' : [...scope.apps] },
         appsUpdated: appResults.length - appsFailed.length,
         appsFailed: appsFailed.map((r) => r.serviceName),
+        ...(deferApps ? { appsDeferred: scope.apps === null ? 'all' : [...scope.apps] } : {}),
       },
     });
 
@@ -759,6 +789,18 @@ export async function reconcileDanglingSelfUpdateRun(): Promise<void> {
   }
 
   if (actualCommit && latest.toCommit && actualCommit === latest.toCommit) {
+    const pending = latest.pendingApps;
+    // Only from restarting_backend: a run found dangling in updating_apps was
+    // already handed over and this is a second restart mid-recreate — redoing
+    // the batch could restart-loop on whatever killed the first (§295), and
+    // any app it failed is retried from the page anyway.
+    if (latest.state === 'restarting_backend' && (pending === 'all' || pending.length)) {
+      await updateRun(latest.id, { state: 'updating_apps', reopen: true, pendingApps: [] });
+      // Not awaited: this runs inside the boot schema step, and pulling and
+      // recreating apps takes minutes the API should not wait for.
+      void finishDeferredApps(latest, pending);
+      return;
+    }
     await updateRun(latest.id, { state: 'done', ...(latest.finishedAt ? {} : { finished: true }) });
     logger.info('Self-update completed — running commit matches this run\'s target', {
       runId: latest.id,
@@ -791,3 +833,24 @@ export async function reconcileDanglingSelfUpdateRun(): Promise<void> {
   });
 }
 
+/** The second half of a run that restarted the backend: its apps, on the new code (plan.md §940). */
+async function finishDeferredApps(run: SelfUpdateRunRow, pending: string[] | 'all'): Promise<void> {
+  try {
+    const results = await updateAllInstalledApps(null, pending === 'all' ? null : new Set(pending), (label) =>
+      updateRun(run.id, { detail: label })
+    );
+    const appsFailed = results.filter((r) => !r.ok).map((r) => r.serviceName);
+    await updateRun(run.id, { state: 'done', detail: null, appsFailed, finished: true });
+    await pruneDockerCruft('updating_apps');
+    await writeAuditLog({
+      userId: null,
+      action: 'self_update_complete',
+      resource: run.toCommit ?? undefined,
+      metadata: { fromCommit: run.fromCommit, toCommit: run.toCommit, appsUpdated: results.length - appsFailed.length, appsFailed },
+    });
+  } catch (error) {
+    const message = (error as Error).message || 'Updating the apps failed.';
+    await updateRun(run.id, { state: 'error', errorMessage: message, failedPhase: 'updating_apps', finished: true });
+    logger.error('Self-update: updating apps after the backend restart failed', { runId: run.id, error: message });
+  }
+}

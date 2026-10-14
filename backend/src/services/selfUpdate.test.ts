@@ -24,6 +24,7 @@ const db = vi.hoisted(() => {
     detail: string | null;
     failed_phase: string | null;
     apps_failed: string | null;
+    pending_apps: string | null;
     started_at: Date;
     finished_at: Date | null;
   }
@@ -41,6 +42,7 @@ const db = vi.hoisted(() => {
         detail: null,
         failed_phase: null,
         apps_failed: null,
+        pending_apps: null,
         started_at: new Date(),
         finished_at: null,
       };
@@ -48,7 +50,7 @@ const db = vi.hoisted(() => {
       return { rows: [row] };
     }
     if (sql.startsWith('UPDATE')) {
-      const [id, state, toCommit, errorMessage, detailFlag, detailValue, finished, failedPhase, appsFailed, fromCommit] = params as [
+      const [id, state, toCommit, errorMessage, detailFlag, detailValue, finished, failedPhase, appsFailed, fromCommit, pendingApps, reopen] = params as [
         number,
         string | null,
         string | null,
@@ -59,6 +61,8 @@ const db = vi.hoisted(() => {
         string | null,
         string | null,
         string | null,
+        string | null,
+        boolean,
       ];
       const row = rows.find((r) => r.id === id);
       if (row) {
@@ -70,6 +74,8 @@ const db = vi.hoisted(() => {
         if (failedPhase) row.failed_phase = failedPhase;
         if (appsFailed) row.apps_failed = appsFailed;
         if (fromCommit) row.from_commit = fromCommit;
+        if (pendingApps) row.pending_apps = pendingApps;
+        if (reopen) row.finished_at = null;
       }
       return { rows: [] };
     }
@@ -233,9 +239,10 @@ describe('triggerSelfUpdate', () => {
         metadata: expect.objectContaining({ fromCommit: 'old111', toCommit: 'new222' }),
       })
     );
-    // The managed-app update batch ran as part of the same sequence (§209).
-    // `null` scope = "diff unavailable, recreate everything" (§343 C).
-    expect(executor.updateAllInstalledApps).toHaveBeenCalledWith(7, null, expect.any(Function));
+    // The managed-app batch (§209) is left to the new backend, since this run
+    // restarts it (§940); `'all'` = "diff unavailable, recreate everything" (§343 C).
+    expect(executor.updateAllInstalledApps).not.toHaveBeenCalled();
+    expect(status.latestRun?.pendingApps).toBe('all');
     // Never a `down` — every compose call is `up -d`, `build`, or a prune.
     const composeCalls = backup.runCommand.mock.calls.filter(([cmd]) => cmd === 'docker');
     expect(composeCalls.length).toBeGreaterThan(0);
@@ -419,7 +426,7 @@ describe('triggerSelfUpdate', () => {
   });
 
   it('continues past a failed app update and records the summary in the audit metadata', async () => {
-    mockAnUpdateFrom('old111', 'new222', 1);
+    mockAnUpdateFrom('old111', 'new222', 1, ['apps/guacamole/docker-compose.yml']);
     executor.updateAllInstalledApps.mockResolvedValue([
       { serviceName: 'nextcloud', ok: true },
       { serviceName: 'guacamole', ok: false, error: 'pull failed' },
@@ -429,7 +436,7 @@ describe('triggerSelfUpdate', () => {
     await flush();
 
     const status = await getSelfUpdateStatus();
-    expect(status.latestRun).toMatchObject({ state: 'restarting_backend' });
+    expect(status.latestRun).toMatchObject({ state: 'done' });
     expect(audit.writeAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'self_update_trigger',
@@ -645,6 +652,74 @@ describe('triggerSelfUpdate', () => {
     });
   });
 
+  // An update that restarts the backend used to recreate the changed apps
+  // first, so the *old* backend rendered their env: Mealie came up with an
+  // empty OIDC_ADMIN_GROUP at 0.173.26 (plan.md §940). The new backend has to
+  // do it, on its first boot.
+  describe('apps changed alongside the backend (plan.md §940)', () => {
+    it('leaves the changed apps to the new backend instead of recreating them first', async () => {
+      mockAnUpdateFrom('old111', 'new222', 1, ['backend/src/config/services.ts', 'apps/mealie/docker-compose.yml']);
+
+      await triggerSelfUpdate(7);
+      await flush();
+
+      expect(executor.updateAllInstalledApps).not.toHaveBeenCalled();
+      expect((await getSelfUpdateStatus()).latestRun).toMatchObject({
+        state: 'restarting_backend',
+        pendingApps: ['mealie'],
+      });
+    });
+
+    it('recreates them once the new backend boots, then finishes the run', async () => {
+      mockAnUpdateFrom('old111', 'new222', 1, ['backend/src/config/services.ts', 'apps/mealie/docker-compose.yml']);
+      await triggerSelfUpdate(7);
+      await flush();
+      let during: unknown;
+      executor.updateAllInstalledApps.mockImplementation(async () => {
+        during = (await getSelfUpdateStatus()).latestRun;
+        return [{ serviceName: 'mealie', ok: false, error: 'pull failed' }];
+      });
+
+      await reconcileDanglingSelfUpdateRun();
+      await flush();
+
+      expect(executor.updateAllInstalledApps).toHaveBeenCalledWith(null, new Set(['mealie']), expect.any(Function));
+      // In progress while it runs, so the page shows it and a second press is refused.
+      expect(during).toMatchObject({ state: 'updating_apps', finishedAt: null });
+      const run = (await getSelfUpdateStatus()).latestRun;
+      expect(run).toMatchObject({ state: 'done', appsFailed: ['mealie'], pendingApps: [] });
+      expect(run?.finishedAt).not.toBeNull();
+    });
+
+    it('defers every app when the diff could not be read', async () => {
+      mockAnUpdateFrom('old111', 'new222', 1);
+      await triggerSelfUpdate(7);
+      await flush();
+      expect((await getSelfUpdateStatus()).latestRun?.pendingApps).toBe('all');
+
+      await reconcileDanglingSelfUpdateRun();
+      await flush();
+
+      expect(executor.updateAllInstalledApps).toHaveBeenCalledWith(null, null, expect.any(Function));
+    });
+
+    it('does not redo the apps if the backend restarts again while they run', async () => {
+      mockAnUpdateFrom('old111', 'new222', 1, ['backend/src/index.ts', 'apps/mealie/docker-compose.yml']);
+      await triggerSelfUpdate(7);
+      await flush();
+      executor.updateAllInstalledApps.mockImplementation(() => new Promise(() => {}));
+      await reconcileDanglingSelfUpdateRun();
+      await flush();
+      executor.updateAllInstalledApps.mockClear();
+
+      await reconcileDanglingSelfUpdateRun();
+      await flush();
+
+      expect(executor.updateAllInstalledApps).not.toHaveBeenCalled();
+      expect((await getSelfUpdateStatus()).latestRun?.state).toBe('done');
+    });
+  });
+
   it('prunes dangling images and build cache after the build and after updating apps', async () => {
     mockAnUpdateFrom('old111', 'new222', 1);
 
@@ -655,8 +730,8 @@ describe('triggerSelfUpdate', () => {
     const kinds = pruneCalls.map(([, args]) => args.join(' '));
     expect(kinds).toContain('image prune -f');
     expect(kinds).toContain('builder prune -f');
-    // Runs after `build` and again after the app-update batch, both times
-    // strictly before the frontend/backend restart that follows.
+    // Runs after `build`, before the frontend/backend restart that follows
+    // (the app batch, and its prune, wait for the new backend here, §940).
     const buildIdx = kinds.findIndex((k) => k.startsWith('compose -f') && k.includes('build'));
     const firstPruneIdx = kinds.findIndex((k) => k === 'image prune -f');
     const restartFrontendIdx = kinds.findIndex((k) => k.includes('up -d') && k.includes('frontend'));
@@ -683,7 +758,7 @@ describe('triggerSelfUpdate', () => {
   });
 
   it('reports which image is building and which app is recreating via `detail`, clearing it after each phase', async () => {
-    mockAnUpdateFrom('old111', 'new222', 1);
+    mockAnUpdateFrom('old111', 'new222', 1, ['frontend/src/main.ts', 'apps/mealie/docker-compose.yml']);
     executor.updateAllInstalledApps.mockImplementation(async (_userId, _only, onProgress) => {
       await onProgress?.('mealie (1/2)');
       await onProgress?.('paperless (2/2)');
@@ -696,7 +771,7 @@ describe('triggerSelfUpdate', () => {
     const detailUpdates = db.query.mock.calls
       .filter(([sql, params]) => (sql as string).startsWith('UPDATE') && (params as unknown[])[4])
       .map(([, params]) => (params as unknown[])[5] as string | null);
-    expect(detailUpdates).toEqual(['frontend', 'backend', null, 'mealie (1/2)', 'paperless (2/2)', null]);
+    expect(detailUpdates).toEqual(['frontend', null, 'mealie (1/2)', 'paperless (2/2)', null]);
   });
 
   it('creates a `checking` row before any network call, so a slow/unreachable remote is visible instead of stalling the trigger', async () => {
@@ -749,7 +824,8 @@ describe('reconcileDanglingSelfUpdateRun', () => {
   });
 
   it('logs completion for a row left in restarting_backend, proving the new process booted', async () => {
-    mockAnUpdateFrom('old111', 'new222', 1);
+    // Backend only: no apps left for the new process, so booting finishes the run.
+    mockAnUpdateFrom('old111', 'new222', 1, ['backend/src/index.ts']);
     await triggerSelfUpdate(7);
     await flush();
 
