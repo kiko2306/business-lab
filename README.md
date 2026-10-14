@@ -327,23 +327,13 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
       label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
       no row of buttons overflows. At 1280px nothing looks different from before.
+- [ ] **Map an Authelia group to Mealie admin (plan.md §938)** — Mealie's compose sets no `OIDC_ADMIN_GROUP`,
+      so every Authelia sign-in lands as a non-admin (`mat` was created `admin: false` on 2026-10-14) and only
+      the dashboard's own `mealie-local-admin` reaches Mealie's admin pages. Render `OIDC_ADMIN_GROUP` into
+      Mealie's `.env` from the same Authelia admins group the other OIDC apps use (§270), and decide what happens
+      to an account Mealie already created as non-admin.
 - [ ] **Beta-test the translated rate-limit message (plan.md §933)** — hard to provoke by hand (200 API
       calls per 15 min); if a 429 shows up in pt-PT it reads "Demasiados pedidos em pouco tempo…".
-- [ ] **Beta-test the AI key messages in pt-PT (plan.md §937)** — Settings → Chaves de API de IA → Google →
-      Testar chave reads "A chave funciona.".
-- [ ] **Beta-test Mealie writing again (plan.md §937)** — on `beta` after the update, Parar then Iniciar
-      Mealie from Apps (the fix runs before a start). Then: "Iniciar sessão com Authelia" lands in Mealie,
-      a recipe imports by URL, and its admin AI settings show the "AI Provider (dashboard-managed)" row on
-      Google's endpoint with `gemini-3.5-flash-lite`.
-- [ ] **Beta-test AI drafts on the new Gemini model (plan.md §930)** — on `beta` after the update
-      rebuilds the backend: Content → Gerar a rascunho with the stored Google key produces a draft
-      (now `gemini-3.6-flash`, §936); Settings → Testar chave on Google succeeds; a Mealie URL import still
-      parses. If Google refuses a model, the error names it instead of a bare "HTTP 404". *2026-10-14 at
-      0.173.21: no 404 — Google answered "This model is currently experiencing high demand" three times
-      in three minutes (its message now reaches the log), and again at 10:42. Drafts then worked: 11:47 on
-      `gemini-3.8-flash` (0.173.21) and 11:53 on `gemini-3.6-flash` (0.173.23), both sensible pt-PT.
-      Testar chave on Google: "Google API key verified." (English on a pt-PT page). Left: a Mealie URL
-      import — blocked, Mealie cannot write (item above).*
 - [ ] **Beta-test the Utils critique fixes (plan.md §841)** — *2026-10-14 at 0.173.4, pt-PT laptop:
       (1) Home's Saúde do servidor sentence, four rows with Bem and "Verificado às"; (2) Enter on
       Encontrar dispositivos keeps focus on it, "A procurar…" then "Encontrados 10 dispositivos." are

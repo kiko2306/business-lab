@@ -38831,3 +38831,11 @@ Not done, rejected:
 - Proposed fix: Twenty's §371 pattern — pre-start `chmod 0777` of `apps/mealie/data` in `executor.ts`. Not done by hand: a manual chmod would vanish on the next fresh clone.
 - Fix: `twentyStorage.ts` → `writableDataDir.ts`, one map `{ twenty: 'data/storage', mealie: 'data' }`, `chmod 0777` before every start (same EPERM tolerance). Test: an existing `0775` Mealie `data/` comes out `0777`; other apps untouched; Twenty's §371 cases kept. Proof needs a Mealie stop/start on `beta` — README item.
 - Key row text: success → `settings.ai.keyWorks`, refusal → `settings.ai.keyRefused` keeping the provider's reason, save → `settings.toast.aiKeySaved` (was the backend's English `message`).
+
+## 938. Beta proof at 0.173.25: Mealie writes, AI on Gemini end to end
+
+[x] done. Owner updated and restarted Mealie.
+- `apps/mealie/data` now `drwxrwxrwx` (911:911 after Mealie's own start). Backend log: "Mealie AI sync: managed Google (Gemini) provider is in place and set as the group default" — a DB write, so the fix holds.
+- Authelia sign-in lands in Mealie: `/api/users/self` 200, `mat`, `authMethod: OIDC`. URL import of an allrecipes page saved "Best Chocolate Chip Cookies". "Importar com IA" saved "Banana Banana Bread" with Mealie calling `generativelanguage.googleapis.com/v1beta/openai/chat/completions` → 200 — the dashboard-managed provider row works end to end. (The auto "Analisar ingredientes" after import used Mealie's built-in parser; no Google call.)
+- Testar chave reads "A chave funciona.". §930 and both §937 beta items deleted.
+- Found: no `OIDC_ADMIN_GROUP` for Mealie — `mat` created non-admin; new README item. Two test recipes and two Content drafts left for the owner.
