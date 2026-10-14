@@ -44,9 +44,10 @@ export const AI_PROVIDERS: AiProviderDefinition[] = [
     id: 'google',
     label: 'Google (Gemini)',
     openAiCompatBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-    // Google serves the 2.5 models only to projects that used them before (§930);
-    // these are its picks for new projects.
-    generateModel: 'gemini-3.8-flash',
+    // Google serves the 2.5 models only to projects that used them before (§930).
+    // Drafts use 3.6-flash, not Google's newest 3.8-flash: that one answered "high
+    // demand" to every draft for over half an hour on 2026-10-14 (§936).
+    generateModel: 'gemini-3.6-flash',
     parseModel: 'gemini-3.5-flash-lite',
   },
   {

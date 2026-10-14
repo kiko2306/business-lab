@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.23] — 2026-10-14
+
+### Changed
+
+- Content drafts on a Google key use gemini-3.6-flash, which answers when the newer 3.8-flash is overloaded
+
 ## [0.173.22] — 2026-10-14
 
 ### Fixed

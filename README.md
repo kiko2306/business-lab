@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.22** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.23** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -331,7 +331,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       calls per 15 min); if a 429 shows up in pt-PT it reads "Demasiados pedidos em pouco tempo…".
 - [ ] **Beta-test AI drafts on the new Gemini model (plan.md §930)** — on `beta` after the update
       rebuilds the backend: Content → Gerar a rascunho with the stored Google key produces a draft
-      (now `gemini-3.8-flash`); Settings → Testar chave on Google succeeds; a Mealie URL import still
+      (now `gemini-3.6-flash`, §936); Settings → Testar chave on Google succeeds; a Mealie URL import still
       parses. If Google refuses a model, the error names it instead of a bare "HTTP 404". *2026-10-14 at
       0.173.21: no 404 — Google answered "This model is currently experiencing high demand" three times
       in three minutes (its message now reaches the log), and again at 10:42. Retry later; Testar chave not read yet.*

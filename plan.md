@@ -38815,3 +38815,7 @@ Not done, rejected:
 - Pass, notes updated: §926 chip corner/bottom/right toggle (first click was off-screen at 390×844 — not a failure); §925 unsubscribe with backend stopped (~25 s) → "Não foi possível contactar o servidor…".
 - Open: §930 Gemini draft — no 404 now, Google answered "high demand" three times in three minutes. Its message now reaches the log; the UI's "Tente novamente daqui a pouco" is right for it.
 - Found: ntfy hint showed literal backticks around subscriber — fixed next commit.
+
+## 936. Gemini drafts moved to 3.6-flash
+
+[x] done. Owner's call after §935: `gemini-3.8-flash` answered "high demand" to every draft from 10:11 to 10:42 (free-tier key; Google's status page renders client-side, so no incident could be confirmed). Drafts → `gemini-3.6-flash` (still served, no shutdown announced); recipe parsing stays on `gemini-3.5-flash-lite`. Model ID is config with no unit-test surface; the §930 README beta item is the proof.
