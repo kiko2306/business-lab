@@ -403,39 +403,19 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       "signed in as", Request access pressable when empty and names what is missing, focus on the
       confirmation after sending, "Sign in with a different account" signs out (Authelia's own
       session stays).
-- [ ] **Beta-test the Account critique fixes (plan.md §819)** — *2026-10-14 at 0.173.4, pt-PT at
-      390px as `claude-test`: (1) Desativar asks only for a code, then a confirm; a wrong code is
-      refused in Portuguese and 2FA stays on. (2) wrong enrol and disable codes show their message and
-      keep the cursor in the field. (3) "Guarde-os agora" first, no green alert, "Já os guardei" greyed
-      until the tick box. (4) panel open, no TOTP wording. (5) authenticator link, Copiar chave, focus
-      on the step heading, the starts-over line. A valid code then turns it off and
-      focus lands on the "Inativo" status line. Left: focus after Cancel and Done, EN.* All five done; this item is now
-      only the `beta` look. (1) §820 — on `beta`, Turn it off asks for a code or recovery code (no
-      password field), then a confirm; a wrong code is refused and 2FA stays on; (2) §821 — a wrong
-      enrol code and a wrong disable code each show a message under their own field (in pt-PT too)
-      and put the cursor back in it; (3) §822 — after Activate: "Save these now" first, no green
-      alert or toast, Done greyed until Copy, Download or the tick box; (4) §823 — the panel opens
-      by default, no "TOTP"/"enrolment"; (5) §825 — **on a phone**: the setup step has an "Open in
-      your authenticator app" link and a Copy key button, focus lands on the step's heading, then on
-      the status line after Cancel, Done and turning it off, and a line says leaving starts over.
-      Run the full journey (set up, wrong code, activate, recovery codes, disable) on a phone.
-- [ ] **Beta-test the sign-in flow critique fixes (plan.md §827)** — *2026-10-14 at 0.173.4, pt-PT
-      at 390px, login page only: "Sem acesso?" closed; the code step's "Perdeu a aplicação…?" names
-      `./start.sh recover disable-2fa`; a wrong password and a wrong code each raise a Portuguese
-      `role=alert` and return the cursor with the text selected; a Mostrar button, cursor starts in
-      the first field, 48px inputs, card 12px from each edge. Left: "Sem acesso?" text, setup, a used
-      invite link, `/recovery`, EN.* All five done; this item is now
-      only the `beta` look. On a phone, in EN and pt-PT, on login, setup, a used invite link and
-      `/recovery`: (1) §829 — login has a closed "Locked out?" line naming the Users page and
-      `./start.sh recover reset-password`, the code step has "Lost your authenticator?" naming
-      `disable-2fa`, `/recovery` shows the commands in a blue notice with its buttons off; (2) §828 —
-      a wrong password and a wrong code read in your language, are announced, and the cursor returns
-      to the field with its text selected; (3) §830 — a used link says to ask whoever invited you and
-      has a full-width Back to sign in, a refused password shows inside the card, setup's mismatch is
-      under the confirm field; (4) §831 — each password field has a Show button, "At least 8
-      characters." is under new passwords, the cursor starts in the first field, `/recovery` inputs
-      are 44px; (5) §832 — the card is centred (equal space either side at every width) and all four
-      pages look like the same card, `/recovery` included.
+- [ ] **Beta-test the sign-in flow critique fixes (plan.md §827)** — *2026-10-14 at 0.173.26, EN and
+      pt-PT, 390px and 1280px (plan.md §945): login, the code step, a used invite link and `/recovery`
+      all pass. Left: the two pages a live box cannot show.* Setup (only on a box with no admin yet:
+      mismatch under the confirm field, "At least 8 characters.", Show on both fields, cursor in the
+      first field) and set-password from a fresh invite (cursor in the password, a refused password
+      shown inside the card, Show on both fields), each on a phone in EN and pt-PT.
+- [ ] **"Locked out?" does not open on the first tap (plan.md §945)** — on `/login` the cursor starts in
+      the username field. Pressing "Locked out?" blurs it, the field's "required" error appears, the
+      line moves down, and the release lands on another element, so no click happens. A second tap
+      works. Same on the code step ("Lost your authenticator?") with the code field. Seen in Chromium,
+      desktop click and phone tap. Test first (a spec that presses the summary with the field focused
+      and empty, and expects it open), then fix — e.g. do not mark the field touched on a blur that
+      goes to the summary, or keep the error's space reserved.
 - [ ] **Beta-test the Updates page critique fixes (plan.md §834)** — *2026-10-13 at 0.173.4, EN
       and pt-PT laptop: panel open, one "Up to date"/"Atualizado" badge at 13px, Update now blue. 2026-10-14,
       6 behind: the confirm (pt-PT at 1280/390px, EN at 1280px) has a blue Atualizar/Update, says
