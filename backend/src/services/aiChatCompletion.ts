@@ -47,8 +47,10 @@ export async function callOpenAiCompatChat(req: ChatCompletionRequest): Promise<
 
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    const detail =
-      (body as { error?: { message?: string } } | null)?.error?.message || `HTTP ${response.status}`;
+    // Gemini's OpenAI-compatible endpoint wraps its error in a one-element array,
+    // unlike Anthropic and Groq — without unwrapping, a retired model read as a bare "HTTP 404".
+    const errorBody = (Array.isArray(body) ? body[0] : body) as { error?: { message?: string } } | null;
+    const detail = errorBody?.error?.message || `HTTP ${response.status}`;
     throw new AiChatCompletionError(`AI provider request failed: ${detail}`);
   }
 

@@ -95,7 +95,7 @@ describe('syncMealieAiProvider', () => {
         name: 'AI Provider (dashboard-managed)',
         base_url: 'https://api.groq.com/openai/v1/',
         api_key: 'gsk_test',
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
       })
     );
   });

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.7** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.8** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -375,12 +375,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Name this server in the device scan (plan.md §929)** — Definições → Encontrar dispositivos:
       the first row has the Este servidor badge but reads "Desconhecido" for name and maker. The box
       knows its own hostname; fill it in (principle 3).
-- [ ] **Fix Content → Gerar failing with HTTP 404 (plan.md §929)** — 2026-10-14, Generate gives
-      "Não foi possível escrever o rascunho" (frontend 502); the backend logs "AI provider request
-      failed: HTTP 404". Likely cause: `aiSettings.ts` asks Anthropic for `generateModel:
-      'claude-opus-5'`, which is not a current model ID (current: `claude-opus-5-5`,
-      `claude-haiku-5-5`) — confirm which provider is selected, check every provider's model IDs
-      against its live model list, and make a 404 from the provider say the model is unavailable.
+- [ ] **Beta-test AI drafts on the new Gemini model (plan.md §930)** — on `beta` after the update
+      rebuilds the backend: Content → Gerar a rascunho with the stored Google key produces a draft
+      (now `gemini-3.8-flash`); Settings → Testar chave on Google succeeds; a Mealie URL import still
+      parses. If Google refuses a model, the error names it instead of a bare "HTTP 404".
 - [ ] **Drop the stale "Unpin" wording (plan.md §928)** — the generated override header in
       `composeOverride.ts` (and comments in `status.ts`, `requireCapability.ts`, `auth.service.ts`)
       still point at an "Unpin" button on the app card that no longer exists.

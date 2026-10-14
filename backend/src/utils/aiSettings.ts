@@ -44,15 +44,18 @@ export const AI_PROVIDERS: AiProviderDefinition[] = [
     id: 'google',
     label: 'Google (Gemini)',
     openAiCompatBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-    generateModel: 'gemini-2.5-pro',
-    parseModel: 'gemini-2.5-flash',
+    // Google serves the 2.5 models only to projects that used them before (§930);
+    // these are its picks for new projects.
+    generateModel: 'gemini-3.8-flash',
+    parseModel: 'gemini-3.5-flash-lite',
   },
   {
     id: 'groq',
     label: 'Groq',
     openAiCompatBaseUrl: 'https://api.groq.com/openai/v1/',
-    generateModel: 'llama-3.3-70b-versatile',
-    parseModel: 'llama-3.1-8b-instant',
+    // Groq shut both Llama models down on 2026-08-16 (§930); these are its named replacements.
+    generateModel: 'openai/gpt-oss-120b',
+    parseModel: 'openai/gpt-oss-20b',
   },
 ];
 

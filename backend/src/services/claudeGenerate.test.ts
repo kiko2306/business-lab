@@ -46,7 +46,7 @@ describe('generateSocialPost', () => {
     await generateSocialPost('x');
 
     expect(mockedCallChat).toHaveBeenCalledWith(
-      expect.objectContaining({ baseUrl: 'https://api.groq.com/openai/v1/', apiKey: 'gsk_test', model: 'llama-3.3-70b-versatile' })
+      expect.objectContaining({ baseUrl: 'https://api.groq.com/openai/v1/', apiKey: 'gsk_test', model: 'openai/gpt-oss-120b' })
     );
   });
 });

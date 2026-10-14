@@ -54,6 +54,13 @@ describe('callOpenAiCompatChat', () => {
     await expect(callOpenAiCompatChat(baseRequest)).rejects.toThrow(/invalid api key/);
   });
 
+  it('reads the message from Gemini\'s array-wrapped error body', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(404, [{ error: { code: 404, message: 'models/gemini-2.5-pro is not found', status: 'NOT_FOUND' } }])
+    );
+    await expect(callOpenAiCompatChat(baseRequest)).rejects.toThrow(/gemini-2\.5-pro is not found/);
+  });
+
   it('throws when the response has no text', async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, { choices: [{ message: {} }] }));
     await expect(callOpenAiCompatChat(baseRequest)).rejects.toBeInstanceOf(AiChatCompletionError);

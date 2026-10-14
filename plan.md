@@ -38769,3 +38769,12 @@ Not done, rejected:
 - Rate limit: ~45 min of scripted checks spent `apiLimiter`'s 200/15 min per IP, which also blocks the owner's tab on that IP. Paced after that.
 - Tried and rejected: contexts made with `browser.newContext()` over CDP die when the script disconnects — each isolated login is one script. Element matching by `/SSO/i` hit "acesso"; `/Atualiz/` missed "A atualizar…" — reran with exact checks before recording.
 - Ran: Samba stop/start, IT Tools stop/start ×2, ntfy CrowdSec switch off/on (restarts n8n + CrowdSec each time), one subscriber added/removed, one Miniflux snapshot left in place.
+
+## 930. AI drafts 404: withdrawn Gemini and Groq models
+
+[x] done. Found §929: Content → Gerar → backend "AI provider request failed: HTTP 404".
+- Cause: only `ai_api_key_google` is stored, both features point at Google. Google now serves `gemini-2.5-*` only to projects that used them before; a new key gets 404. Groq shut `llama-3.3-70b-versatile` / `llama-3.1-8b-instant` 2026-08-16 — same break for anyone on Groq.
+- Bare "HTTP 404": Gemini's OpenAI-compat endpoint returns `[{error:{…}}]`, parser read `body.error` only. Now unwraps a one-element array.
+- Models: Google `gemini-3.8-flash` / `gemini-3.5-flash-lite` (Google's picks for new projects); Groq `openai/gpt-oss-120b` / `openai/gpt-oss-20b` (Groq's named replacements). Anthropic unchanged — `claude-opus-5` / `claude-haiku-4-5` still served.
+- Rejected: my §929 guess (Anthropic `claude-opus-5` retired) — wrong, it is a current ID, and no Anthropic key is stored anyway. Rejected bumping Anthropic to 5.5 in the same change: nothing broken there, and Opus 5.5 can't disable thinking, which the plain chat-completions call never budgeted for — its own item if wanted.
+- Test: array error body surfaces the message; registry names none of the four withdrawn IDs. Live proof is the README beta item (needs the real key).

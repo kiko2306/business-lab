@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.8] — 2026-10-14
+
+### Fixed
+
+- Content drafts and Mealie recipe parsing work again with a Gemini or Groq key: both providers' withdrawn models are replaced, and a provider error now shows its real message
+
 ## [0.173.7] — 2026-10-13
 
 ### Fixed

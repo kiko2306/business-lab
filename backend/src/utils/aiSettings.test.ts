@@ -46,6 +46,20 @@ describe('isValidProviderId', () => {
   });
 });
 
+describe('AI_PROVIDERS models', () => {
+  // Each answered 404 from its provider on 2026-10-14 (plan.md §930): Groq shut the two
+  // Llama models down on 2026-08-16, and Google serves the 2.5 models only to projects
+  // that used them before, so a freshly created key gets "not found".
+  const unavailable = ['gemini-2.5-pro', 'gemini-2.5-flash', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+
+  it('names no model its provider has withdrawn', () => {
+    for (const provider of AI_PROVIDERS) {
+      expect(unavailable).not.toContain(provider.generateModel);
+      expect(unavailable).not.toContain(provider.parseModel);
+    }
+  });
+});
+
 describe('getAiApiKey', () => {
   it('returns the trimmed stored value for that provider', async () => {
     mockedQuery.mockResolvedValue({ rows: [{ value: '  sk-ant-xyz  ' }] } as never);
