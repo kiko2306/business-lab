@@ -38819,3 +38819,4 @@ Not done, rejected:
 ## 936. Gemini drafts moved to 3.6-flash
 
 [x] done. Owner's call after §935: `gemini-3.8-flash` answered "high demand" to every draft from 10:11 to 10:42 (free-tier key; Google's status page renders client-side, so no incident could be confirmed). Drafts → `gemini-3.6-flash` (still served, no shutdown announced); recipe parsing stays on `gemini-3.5-flash-lite`. Model ID is config with no unit-test surface; the §930 README beta item is the proof.
+- Proof at 0.173.23: Content → Gerar → `POST /api/social/drafts` 201, draft in pt-PT. A run at 11:47 on 0.173.21 (`gemini-3.8-flash`) had also succeeded — I first reported it as failed because I searched the log only for failure lines (success is not logged). So 3.8-flash's overload had passed by then; 3.6-flash stays (owner's call, works, less contended). Two test drafts left on the Content page for the owner to keep or delete.

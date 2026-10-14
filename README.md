@@ -334,7 +334,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       (now `gemini-3.6-flash`, §936); Settings → Testar chave on Google succeeds; a Mealie URL import still
       parses. If Google refuses a model, the error names it instead of a bare "HTTP 404". *2026-10-14 at
       0.173.21: no 404 — Google answered "This model is currently experiencing high demand" three times
-      in three minutes (its message now reaches the log), and again at 10:42. Retry later; Testar chave not read yet.*
+      in three minutes (its message now reaches the log), and again at 10:42. Drafts then worked: 11:47 on
+      `gemini-3.8-flash` (0.173.21) and 11:53 on `gemini-3.6-flash` (0.173.23), both sensible pt-PT.
+      Left: Testar chave on Google, a Mealie URL import.*
 - [ ] **Beta-test the Utils critique fixes (plan.md §841)** — *2026-10-14 at 0.173.4, pt-PT laptop:
       (1) Home's Saúde do servidor sentence, four rows with Bem and "Verificado às"; (2) Enter on
       Encontrar dispositivos keeps focus on it, "A procurar…" then "Encontrados 10 dispositivos." are
