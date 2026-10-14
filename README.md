@@ -368,8 +368,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       (or the running container), and have the log line confirm the row count dropped. The old
       `nginx` row (no `@ip`) is not matched by `NPM_BOUNCER_COPY` either.
 - [ ] **Grey out an ntfy row's Test while its switch is off, and show saving (plan.md §929)** —
-      Settings → Alertas ntfy: the template binds Test to `!alertSettings.enabled[...]`, but after
-      turning CrowdSec off its Test stayed enabled. Each toggle restarts n8n and CrowdSec (~30 s) with
+      Settings → Alertas ntfy: Test is bound to the saved `alertSettings.enabled[...]`, so for the
+      whole save after turning CrowdSec off its Test stayed enabled; bind it to the switch. Each toggle restarts n8n and CrowdSec (~30 s) with
       every switch silently disabled and no message; show "A guardar…" and the result. The hint
       under each topic ("anyone who knows it can read") is stale since ntfy reads need a token (§425).
 - [ ] **Drop the stale "Unpin" wording (plan.md §928)** — the generated override header in
@@ -880,8 +880,9 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
 
 - [ ] **Beta-test the ntfy panel regrouping (§609/§615)** — *2026-10-14 at 0.173.4: all four rows
       show `homelab-alerts` (the default, but reads need a token: anonymous `GET` is 403). Turning a
-      switch off saves and survives a reload. FAILS: Test stays enabled on the off row. Left:
-      CrowdSec bans still 403 at NPM.* One grouped row
+      switch off saves and survives a reload. Test stayed enabled on the off row for the
+      ~30 s save (not rechecked after it); fix item below. Left: Test greyed once saved, CrowdSec
+      bans still 403 at NPM.* One grouped row
       per category (switch + topic + Test) replaced the old shared-default-topic
       + single CrowdSec switch + separate Enforcement switch. On `beta`: open
       Settings → ntfy alerts and confirm all four rows show a real topic (the
