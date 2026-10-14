@@ -330,7 +330,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       characters" appears, typing stops at 4000; the wait line shows while generating; a failed
       generate (Gemini "high demand", 502) says "The draft could not be written. Try again in a moment.",
       keeps the text and the focus; Delete asks first and announces "Draft deleted."; pt-PT phone has no
-      English and no sideways scroll. Left: after a successful generate — Drafts opens with the cursor
+      English and no sideways scroll. Retried 14:19 (§952): Gemini still "high demand". Left: after a successful generate — Drafts opens with the cursor
       in the new draft; Copy, Save (cursor stays), Email to subscribers' dialog; Delete puts the cursor
       in the request box; the public form.* 16/40, all six done. Decided 2026-10-06:
       Content is a **post generator**, and **subscribers are managed on the same page**. In order,
@@ -389,11 +389,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       mismatch under the confirm field, "At least 8 characters.", Show on both fields, cursor in the
       first field) and set-password from a fresh invite (cursor in the password, a refused password
       shown inside the card, Show on both fields), each on a phone in EN and pt-PT.
-- [ ] **Beta-test "Lost your authenticator?" on the first press (plan.md §946)** — *login page passed
-      on `beta` at 0.173.29 (plan.md §949): opens on the first click (1280px, EN) and tap (390px,
-      pt-PT), no error under the empty username, typed-and-left still flagged.* Left: the code step
-      (needs an account with 2FA on) — press "Lost your authenticator?" once with the code field empty:
-      it opens and no error appears.
 - [ ] **Beta-test the Updates page critique fixes (plan.md §834)** — *2026-10-13 at 0.173.4, EN
       and pt-PT laptop: panel open, one "Up to date"/"Atualizado" badge at 13px, Update now blue. 2026-10-14,
       6 behind: the confirm (pt-PT at 1280/390px, EN at 1280px) has a blue Atualizar/Update, says

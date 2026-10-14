@@ -36799,3 +36799,9 @@ Rejected: rewriting the code comments in three `theme.css` files — anchors fix
 ## 951. §948/§949 passed on `beta` at 0.173.30
 
 [x] done. README item deleted. Playwright as `claude-test`, EN at 1280px and pt-PT at 390px, nothing saved (no backup write requests). With WebDAV saved the main box reads "WebDAV server" / "Servidor WebDAV"; main → Disk drops the extra entry and the Advanced box goes blank (no stale WebDAV); Advanced → WebDAV moves the main box to it; main → SFTP closes Advanced and blanks it; Advanced → FTP moves the main box to "FTP server". The main box only ever shows Disk, SMB, S3, SFTP plus the kind in use. iOS Safari not tried (the `disabled` half of §949 is for it).
+
+## 952. §946 code step passed; Content retry blocked by Gemini again (2026-10-14, 0.173.30)
+
+[x] done. Playwright as `claude-test`.
+- **"Lost your authenticator?" (§946):** turned 2FA on, signed in to the code step at 1280px EN and 390px pt-PT: cursor starts in `#code`, the line opens on the first click / tap, no field error appears, text names recovery codes and `./start.sh recover disable-2fa`. 2FA turned off again. README item deleted — §946 is fully proven live.
+- **Content (§950):** one more generate at 14:19 → 502, backend "This model is currently experiencing high demand" — third in ~10 minutes. The page's failure state is right (message, brief kept, focus on the button). The draft steps stay in the README item.
