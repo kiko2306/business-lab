@@ -370,8 +370,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       every switch silently disabled and no message; show "A guardar…" and the result. The hint
       under each topic ("anyone who knows it can read") is stale since ntfy reads need a token (§425).
 - [ ] **Bring Tally's day-view tabs and counters toggle to 44px (plan.md §929)** — shop view at
-      390px: the Mesas / Artigos vendidos `nav-link` buttons are 42px tall and "▸ Contadores do dia" is
-      19px, under the 44px rule the rest of the app now meets (§824).
+      390px: the Mesas / Artigos vendidos `nav-link` buttons are 42px tall, and "▸ Contadores do dia"
+      and "← Todas as lojas" are 19px, under the 44px rule the rest of the app now meets (§824).
 - [ ] **Drop the stale "Unpin" wording (plan.md §928)** — the generated override header in
       `composeOverride.ts` (and comments in `status.ts`, `requireCapability.ts`, `auth.service.ts`)
       still point at an "Unpin" button on the app card that no longer exists.
@@ -503,6 +503,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       updates, the warning goes away, and a third press says "Already up to date". Also after a build
       failure (§835) pressing Update now rebuilds instead of saying up to date.
 - [ ] **Beta-test Tally: the hero figure and the comparison (plan.md §806, items 1-2)** —
+      *2026-10-14 at 0.173.4, Mat Laptop shop (sample day 27/07/2026), 390px pt-PT: the 40px
+      takings figure is the largest thing, "▲ 929,39 € acima de segunda-feira da semana passada até às
+      19:00" under it, counters collapsed and open in one tap. Left: a day with no last-week data.*
       on `beta`, open a shop's day view on a phone: today's takings must be the
       largest thing on the page, readable at arm's length, with "€X more/less
       than last <weekday>" under it. Check a day where last week's same weekday
@@ -533,14 +536,18 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       header `entrydate` archived, which can put a "by 14:00" comparison's two
       sides in different hours), and whether stale `wsir_vnd_pedidos` rows inflate
       Forecast. Any disagreement is a defect in what the owner is told.
-- [ ] **Beta-test Tally: the fourth critique's web fixes (plan.md §810)** — on `beta`, on a
+- [ ] **Beta-test Tally: the fourth critique's web fixes (plan.md §810)** — *2026-10-14 at 0.173.4, Mat Laptop shop (sample day 27/07/2026), 390px pt-PT: 
+      Items shows ten rows and "Mostrar todos (101)"; a past day's hero names its date. Left: refresh
+      on return to the app, tapping a chart column, a shop with no tables, the till PC off.* On `beta`, on a
       phone: switch away from the app for a few minutes and back — the figures must
       refresh on return, not on the next 30 s tick; tap a column of the hourly
       chart and read its figure; on a closed day the hero names the date; a shop
       with no tables opens on Items with no empty Tables tab; the items table
       shows ten rows with "Show all"; with the till PC switched off, the panel
       says to check it and recovers on its own — also while viewing a past day.
-- [ ] **Beta-test Tally: the third critique's fixes (plan.md §806.8)** — on `beta`: shortly
+- [ ] **Beta-test Tally: the third critique's fixes (plan.md §806.8)** — *2026-10-14 at 0.173.4, Mat Laptop shop (sample day 27/07/2026), 390px pt-PT: 
+      "Faturado em 27/07", "…até às 19:00", "segunda-feira da semana passada"; a typed 2030 date is
+      refused. Left: "Last seen" with the till offline, a Saturday, a €10,000+ open tab at 360px.* On `beta`: shortly
       after midnight (or any time the shop's trading day is not today's date)
       the hero must say "Taken on dd/MM", not "today"; mid-afternoon the
       comparison must read "…by HH:00" with the hour a complete one; unplug the
@@ -556,7 +563,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       "← All shops" link, and the browser back button must not bounce between the
       two. Then as an admin with one shop, and as a non-admin with two, confirm
       the list and the link are both still there.
-- [ ] **Beta-test Tally: clarity wording and the quiet-day view (plan.md §806.7)** — on
+- [ ] **Beta-test Tally: clarity wording and the quiet-day view (plan.md §806.7)** — *2026-10-14 at 0.173.4, Mat Laptop shop (sample day 27/07/2026), 390px pt-PT: 
+      "Faturado mais contas abertas", "Ainda por pagar", and a closed day's sentence has no hour.
+      Left: a running day, before the first sale, a closed day with no sales.* On
       `beta`, mid-morning on a running day the sentence under the hero must end
       "by this hour" ("a esta hora"); on a closed day it must not. Before the
       first sale only the one-sentence card, Tables in use and Here now show —
@@ -577,11 +586,18 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       The hotel apps (admin, check-in, pulse) share this theme; open one in
       each mode and confirm nothing reads washed out or too dark.
 - [ ] **Beta-test Tally: touch targets, titles and the tables-in-use count (plan.md §806.6)** —
+      *2026-10-14 at 0.173.4, Mat Laptop shop (sample day 27/07/2026), 390px pt-PT: title "Mat Laptop ·
+      Tally" passes; FAILS: the back link and the counters heading are 19px (item below). Left: tables
+      awaiting payment in the count.*
       on `beta`, on a phone: the day-counters heading, a table's number and the
       back link must each be easy to hit (44px); the tab title reads "<shop> ·
       Tally"; and with some tables awaiting payment, "Tables in use" must count
       them (e.g. 6 seated + 4 waiting shows 10, with "4 waiting to pay").
-- [ ] **Beta-test Tally: URL state, refresh feedback and offline (plan.md §806.5)** — on
+- [ ] **Beta-test Tally: URL state, refresh feedback and offline (plan.md §806.5)** — *2026-10-14 at 0.173.4, Mat Laptop shop (sample day 27/07/2026), 390px pt-PT: 
+      a past day lands at `?date=` and survives a reload; Refresh reads "A atualizar…" disabled
+      until it lands; Tables ↔ Items fetches only `tables`/`sold-items`; offline shows "Sem ligação…"
+      and clears; a polite live region reads "Atualizado às…"; the hourly chart is one `role=img`.
+      Left: the silent 30 s refresh with a screen reader.* On
       `beta`, pick a past day on a phone, reload: you must land on that day, and
       the address must carry `?date=`. Press Refresh: it must read "Refreshing…"
       and be disabled until it lands. Switch Tables ↔ Items and confirm no
@@ -589,10 +605,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       offline: "You are offline" must appear, and clear on reconnect. With a
       screen reader, Refresh announces "Updated at HH:MM" and the 30 s refresh
       stays silent; each chart reads as one graphic, not one line per bar.
-- [ ] **Beta-test Tally: contrast and touch targets (plan.md §806, item 4)** — on `beta`,
-      in both light and dark, confirm every stat-card label is readable on a
-      phone in daylight, and that Refresh, the theme toggle, the language select
-      and the date input are all at least 44px tall on a touch device.
 - [ ] **Beta-test the single settings writer (plan.md §799)** — *2026-10-07, over the API on
       the box: general (timezone, update branch), backup schedule, backup target, mail (+ its
       Test), alerts and exposure (blank password; Test passes for NPM and Cloudflare) all come back
