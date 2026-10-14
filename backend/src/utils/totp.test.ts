@@ -18,7 +18,7 @@ describe('generateTotpSecret / totpKeyUri', () => {
 
     const uri = totpKeyUri('alice', secret);
     expect(uri.startsWith('otpauth://totp/')).toBe(true);
-    expect(uri).toContain('issuer=Homelab%20Management');
+    expect(uri).toContain('issuer=Business%20Lab');
     expect(uri).toContain(`secret=${secret}`);
     expect(uri).toContain('alice');
   });

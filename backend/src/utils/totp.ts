@@ -8,7 +8,9 @@ import { authenticator } from 'otplib';
 import QRCode from 'qrcode';
 
 // Shown in the authenticator app's account list.
-const ISSUER = 'Homelab Management';
+// Only new enrolments pick it up; the issuer is a label, not part of the secret,
+// so authenticators set up under the old name keep working.
+const ISSUER = 'Business Lab';
 
 // Accept the current 30s step plus one on each side: a phone clock that is a
 // little off, or a code typed just as it rolls over, still validates. Wider

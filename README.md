@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.10** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.11** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -338,9 +338,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       user: ticking Administrador shows no Features block or presets until the role is saved and the
       row re-opened, because `showFeatures()` reads the saved `user.roles`, not the draft. Read the
       draft so features can be picked in the same edit, as the Add user form already allows.
-- [ ] **Name authenticator entries Business Lab (plan.md §929)** — the 2FA setup's `otpauth://` link
-      and QR use the issuer "Homelab Management", so the entry in the phone's authenticator app
-      carries the old product name.
+- [ ] **Beta-test the authenticator name (plan.md §932)** — on `beta`, set up 2FA on a test account:
+      the authenticator app lists it as "Business Lab". An entry set up before keeps working.
 - [ ] **Translate the API rate-limit message (plan.md §929)** — in pt-PT, a 429 from `apiLimiter`
       (`backend/src/index.ts`, 200 requests per 15 min per IP) shows "Too many requests, please try
       again later" in English under the 2FA field. Map 429 to a translated string in the frontend, as

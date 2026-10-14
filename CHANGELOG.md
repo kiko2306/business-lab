@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.11] — 2026-10-14
+
+### Fixed
+
+- New two-factor set-ups appear as "Business Lab" in the authenticator app, not the old "Homelab Management"
+
 ## [0.173.10] — 2026-10-14
 
 ### Removed
