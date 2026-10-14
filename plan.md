@@ -34390,6 +34390,9 @@ stripped its list semantics; the counters toggle has `aria-controls`.
 **Not done.** Single-shop owners landing on the admin table (a product call — a redirect also
 makes "← All shops" loop), the first hour's card-wide bar, and remembering the counters fold.
 
+
+**§806.9** — never written inside §806. The dashboard semantic-colour work it names was recorded as §807 ("this is §806.9"). Kept as an anchor because the hotel apps' `theme.css` cite it.
+
 ## 807. The dashboard's semantic colours: measured, and the shared theme fixed (this is §806.9)
 
 The README item left by §806.6 — "the dashboard almost certainly has the same dark-mode outline-
@@ -34686,7 +34689,7 @@ Snapshot in `.impeccable/critique/` (not committed). Nothing fixed yet.
 4. **P1 — the page hides itself.** Two collapsed panels, then 11+ checkboxes per admin row.
 5. **P2 — jargon.** "SSO user", "Webmaster" and eight raw Features; presets with one-line
    descriptions would replace them.
-6. **P2 — not Users-specific, measured.** Focus rings 1.3–2.2:1 (Bootstrap's translucent ring),
+6. **§813.6** **P2 — not Users-specific, measured.** Focus rings 1.3–2.2:1 (Bootstrap's translucent ring),
    unchecked checkbox and input borders 1.3–1.5:1 (WCAG 1.4.11), 16px checkboxes, every button
    ≤31px tall. This is the shared theme (§807's family), so it is fixed there once, not on Users.
 
@@ -36501,9 +36504,9 @@ Rejected: `matches` regex (Business plan+ only; free zones would 400). Blocking 
 
 [x] done. Owner asked: run every host-verify item agent can reach — SSH to home-srv-01, API as throwaway `admin` `claude-test`, `docker`, `curl`. Browser/phone/Windows/real-mail halves stay owner's.
 
-Passed, items deleted: §897 (backend recreate: 502 for <2 s, then login 200; `/ws/services` 101 through nginx), §905 (`/hostfs` = `os-release` only; `system` disk row 11%), §884.3 (502 then clean 200, no missing-table error; `ensureSchema` logs nothing on a no-op boot, so no "schema lines" — order checked in `index.ts`), §884.5 (WS ok; 100 KB save = JSON 413 "That request was too large"; >1 MB hits nginx's HTML 413 first, no real field gets there), §805 (Authelia `network disconnect` = error naming 10100 within 20 s, back to running on reconnect, no other app flips), §717 (one `Starting service` line per click), §879.3 (dup email and case variant 409; access-edit to taken email 409), §873.2 (422 names field; audit IP = LAN `192.168.1.138`, public = real client IPv6), §800 (ntfy TZ save + restart keeps `NTFY_PORT=10290`; NPM fields all port/hidden), §785 (blank IDs resolved — proven by restoring from a bogus override; override wins), §901 (ITFlow admin/password/mail-cron/billing `ok:true`; Uptime Kuma monitors reconciled), §637 (`hotel-core` 302 to Authelia, `/agent` bypass answers 404 from app, check-in/pulse 200, Authelia healthy).
+Passed, items deleted: §897 (backend recreate: 502 for <2 s, then login 200; `/ws/services` 101 through nginx), §905 (`/hostfs` = `os-release` only; `system` disk row 11%), §884 item 3 (502 then clean 200, no missing-table error; `ensureSchema` logs nothing on a no-op boot, so no "schema lines" — order checked in `index.ts`), §884 item 5 (WS ok; 100 KB save = JSON 413 "That request was too large"; >1 MB hits nginx's HTML 413 first, no real field gets there), §805 (Authelia `network disconnect` = error naming 10100 within 20 s, back to running on reconnect, no other app flips), §717 (one `Starting service` line per click), §879 item 3 (dup email and case variant 409; access-edit to taken email 409), §873 item 2 (422 names field; audit IP = LAN `192.168.1.138`, public = real client IPv6), §800 (ntfy TZ save + restart keeps `NTFY_PORT=10290`; NPM fields all port/hidden), §785 (blank IDs resolved — proven by restoring from a bogus override; override wins), §901 (ITFlow admin/password/mail-cron/billing `ok:true`; Uptime Kuma monitors reconciled), §637 (`hotel-core` 302 to Authelia, `/agent` bypass answers 404 from app, check-in/pulse 200, Authelia healthy).
 
-Partial, items trimmed to remainder: §873.1, §879.4, §774, §913, §914, §912 ×3, §911, §718, §884.1, §915 (checklist says `missing-permission` — token lacks Zone WAF: Edit; owner adds it).
+Partial, items trimmed to remainder: §873 item 1, §879 item 4, §774, §913, §914, §912 ×3, §911, §718, §884 item 1, §915 (checklist says `missing-permission` — token lacks Zone WAF: Edit; owner adds it).
 
 Four bugs found, new README items:
 - [ ] `watchdog-docker-proxy` still `:latest` — self-update recreates only backend/frontend/`CORE_SIDECARS`.
@@ -36711,3 +36714,13 @@ Not done, rejected:
 [x] 59 sections, §14–§793; plan.md 2.33 MB to 2.23 MB (~4.4 %). Small yield, as §736 predicted: kept conclusions cost most of a section, and plan.md size is not what costs tokens (the index is, §733).
 
 Rejected: caveman-compress of the whole file (~2.3 MB rewrite, large token cost, risk to quoted detail and anchors).
+
+## 943. The last 9 dangling citations fixed (2026-10-14)
+
+[x] done. `plan-citations.py`: 9 to 0.
+
+- §873.1/.2, §879.3/.4, §884.1/.3/.5 — §917 cited numbered list items that have no headings. Reworded to `§873 item 1` etc.; the section resolves.
+- §813.6 — item 6 of §813's findings (cited 21 times: hotel `theme.css`, §818, §824). Anchor `**§813.6**` added on that item.
+- §806.9 — never written inside §806; the work is §807 ("this is §806.9"). Labelled anchor at the end of §806, same pattern as §649.1 (§735).
+
+Rejected: rewriting the code comments in three `theme.css` files — anchors fix every citer at once and leave app code alone.
