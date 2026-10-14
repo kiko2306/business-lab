@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.28** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.29** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -333,11 +333,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       `settings:manage` sees no Find devices panel and gets 403 from `POST /api/network/scan`; with the
       box's network unplugged, a scan's failure shows beside the button; Home and Settings in pt-PT on a
       phone.
-- [ ] **Backups: the main Destination box is blank when an advanced kind is set (plan.md §947)** —
-      `backupKind` and `backupKindMore` (`backups.component.html`) share one `kind` control, and the
-      main select has no option for an advanced kind, so with WebDAV configured it shows an empty box
-      above "Advanced: more destination kinds". Seen at 0.173.26. Show the configured kind in the main
-      box (e.g. an option "Other — see below" or the kind's own label), test first.
+- [ ] **Beta-test the Backups Destination box (plan.md §948)** — on `beta`, open Backups with WebDAV
+      saved as the destination: the main Destination box reads "WebDAV server" (pt-PT: its Portuguese
+      name), not blank; picking Disk there hides that extra entry and switching back via "Advanced: more
+      destination kinds" brings it back. Saving unchanged keeps WebDAV.
 - [ ] **Beta-test the Content critique fixes (plan.md §845, §847)** — *2026-10-14 at 0.173.4, pt-PT:
       (2) adding an address with Enter announces "… adicionado." and keeps focus in the box; Remover
       asks first, names the address, and the row goes. (5) cannot run: a key is set, and Generate

@@ -36767,3 +36767,12 @@ Rejected: rewriting the code comments in three `theme.css` files — anchors fix
 - **Utils (§841), EN phone passed:** health read blocked → "Could not read the server's health." + Try again, which recovers once unblocked; Find devices (Enter and click) keeps focus on the button, announces "Scanning your network…" then "Found 10 devices.", Name/Device maker/Address, This server first, Not recognised group. Left: `apps:control`-only 403, unplugged network, pt-PT phone.
 - **Red herring:** the first scan runs looked hung. Playwright's `waitForFunction` is refused by the page's strict CSP (`unsafe-eval`), so the wait failed at once and read the "Scanning…" state. Direct API scan: 200 in 4 s; `waitForResponse` in the page: 200 in 5 s. Use `waitForResponse`/locators, never `waitForFunction`, against this app.
 - **Found → README item:** Backups' main Destination select is blank when WebDAV (an advanced kind) is set — both selects bind one `kind` control and the main one has no matching option.
+
+## 948. Backups: the main Destination box names an Advanced kind (§947)
+
+[x] done, 0.173.29. [ ] beta look — README item.
+
+- Cause: `#backupKind` (Disk/SMB/S3/SFTP) and `#backupKindMore` (NFS/WebDAV/FTP/FTPS) share one `kind` control (§786); with an Advanced kind saved the main select had no matching option, so it showed an empty box.
+- Fix (`backups.component.html`): while `isMoreKind(kind)`, the main select gets one extra option for that kind, labelled from the existing `backups.target.kind.*` keys. It disappears when a main kind is picked, so the four-kind list (§786) stays as it was.
+- Rejected: listing all eight in the main select — undoes §786's "four up front"; a placeholder like "Other — see below" — names nothing, when the kind in use is known.
+- Test: 1 in `backups.component.spec.ts` (failed first: `selectedIndex` -1). Frontend 614, build clean.

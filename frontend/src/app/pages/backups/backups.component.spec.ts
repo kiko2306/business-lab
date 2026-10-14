@@ -453,6 +453,18 @@ describe('BackupsComponent', () => {
       expect(component['backupTargetForm'].controls.kind.value).toBe('ftp');
     });
 
+    // plan.md §948: with WebDAV saved, the main select had no matching option and showed an empty box.
+    it('names an Advanced kind in the main select instead of showing it blank', async () => {
+      component['backupTargetForm'].patchValue({ kind: 'webdav' });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const main = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('#backupKind')!;
+
+      expect(main.selectedIndex).toBeGreaterThan(-1);
+      expect(main.options[main.selectedIndex]?.textContent?.trim()).toBe('WebDAV server');
+    });
+
     it('has no extra-flags field at all for Disk', () => {
       expect((fixture.nativeElement as HTMLElement).querySelector('.backup-options-advanced')).toBeNull();
     });

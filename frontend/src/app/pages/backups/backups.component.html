@@ -195,6 +195,11 @@
               <option value="smb">{{ 'backups.target.kind.smb' | t }}</option>
               <option value="s3">{{ 'backups.target.kind.s3' | t }}</option>
               <option value="sftp">{{ 'backups.target.kind.sftp' | t }}</option>
+              <!-- Shares `kind` with the select below: with no option for an Advanced kind this box
+              showed blank once one was saved, so name the one in use (plan.md §948). -->
+              @if (isMoreKind(backupTargetForm.controls.kind.value)) {
+                <option [value]="backupTargetForm.controls.kind.value">{{ 'backups.target.kind.' + backupTargetForm.controls.kind.value | t }}</option>
+              }
             </select>
           </div>
           <!-- Four less-common kinds, out from under foot until asked for. Bound to the
