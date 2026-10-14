@@ -36787,3 +36787,11 @@ Rejected: rewriting the code comments in three `theme.css` files — anchors fix
 - **Cause, second attempt:** first guess was timing (the `@if` option appearing after Angular wrote the value); moved to always-present options, `[hidden]` + `[disabled]` unless in use — the new spec still failed. Real cause: two `formControlName="kind"` on one control; a view change calls `setValue(…, {emitModelToViewChange: false})`, so no accessor, the other select included, is written. The same left the Advanced box showing WebDAV after Disk was picked. §786's design hid it: nothing showed both until §948.
 - **Fix:** `(change)="syncKind()"` on both selects re-sets `kind` with model-to-view on. The always-present hidden/disabled options stay: the option must exist when the write lands. Disabled because iOS Safari ignores `hidden` on `<option>`.
 - Tests: 1 new in `backups.component.spec.ts` (failed with the live symptom, "Another disk on this machine"); the "only four in the main select" spec now counts visible options. Frontend 615, build clean.
+
+## 950. Browser beta pass: Content (§845, §847), 2026-10-14
+
+[x] done at 0.173.29, Playwright as `claude-test`; nothing emailed.
+
+- Passed: first visit (generate box open, "What should the post say?", no "Brief"/"Claude"); brief counter "3600 / 4000 characters", typing capped at 4000; "Writing your draft…" while generating; a failed generate shows "The draft could not be written. Try again in a moment.", keeps the brief, focus stays on the button; Delete confirms and announces "Draft deleted."; pt-PT at 390px: no English, no sideways scroll.
+- Generate worked once (the draft was created), but my script waited on `/social/generate`; the route is `POST /social/drafts`, so it never saw the reply and skipped the draft steps and the cleanup. The next run deleted that leftover first (draft 3). The two retries then hit Gemini's "This model is currently experiencing high demand" (backend: "Generating a social draft failed", 502). Stopped after two rather than keep calling a paid API.
+- Left (README item): the steps after a successful generate — focus in the new draft, Copy, Save, the Email-to-subscribers dialog, Delete's focus — and the public form.

@@ -330,10 +330,16 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       more destination kinds" — the main box follows to "WebDAV server"; pick SFTP in the main box —
       the Advanced box no longer shows WebDAV. On a phone (iOS too) the main box lists only Disk, SMB,
       S3, SFTP and the kind in use.
-- [ ] **Beta-test the Content critique fixes (plan.md §845, §847)** — *2026-10-14 at 0.173.4, pt-PT:
+- [ ] **Beta-test the Content critique fixes (plan.md §845, §847, §950)** — *2026-10-14 at 0.173.4, pt-PT:
       (2) adding an address with Enter announces "… adicionado." and keeps focus in the box; Remover
-      asks first, names the address, and the row goes. (5) cannot run: a key is set, and Generate
-      fails (item below). Left: everything needing a draft, the public form, a phone.* 16/40, all six done. Decided 2026-10-06:
+      asks first, names the address, and the row goes. 2026-10-14 at 0.173.29 (§950), EN laptop and
+      pt-PT phone: first visit opens "What should the post say?", no "Brief"/"Claude"; "3600 / 4000
+      characters" appears, typing stops at 4000; the wait line shows while generating; a failed
+      generate (Gemini "high demand", 502) says "The draft could not be written. Try again in a moment.",
+      keeps the text and the focus; Delete asks first and announces "Draft deleted."; pt-PT phone has no
+      English and no sideways scroll. Left: after a successful generate — Drafts opens with the cursor
+      in the new draft; Copy, Save (cursor stays), Email to subscribers' dialog; Delete puts the cursor
+      in the request box; the public form.* 16/40, all six done. Decided 2026-10-06:
       Content is a **post generator**, and **subscribers are managed on the same page**. In order,
       test first, one commit and version bump each: (1) done (§846) — on `beta`, edit a draft and
       press Email to subscribers without Save: the dialog says your changes are saved first, and the email that
