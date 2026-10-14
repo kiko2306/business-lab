@@ -200,7 +200,7 @@
                   <div class="form-text mt-1">{{ 'users.cannotChangeOwnRoles' | t }}</div>
                 }
               </td>
-              <td [attr.data-label]="'users.table.created' | t">{{ user.created_at | date:'dd/MM/yyyy':undefined:translate.locale() }}</td>
+              <td class="users-created" [attr.data-label]="'users.table.created' | t">{{ user.created_at | date:'dd/MM/yyyy':undefined:translate.locale() }}</td>
               <td [attr.data-label]="'users.table.actions' | t" class="text-end">
                 <div class="btn-group btn-group-sm">
                   @if (user.active === false) {

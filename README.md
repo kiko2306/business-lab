@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.20** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.21** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -326,11 +326,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
       label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
       no row of buttons overflows. At 1280px nothing looks different from before.
-- [ ] **Stop Users rows wrapping mid-word at 1280px (plan.md §928)** — at a 1280px viewport the
-      Users table squeezes the Created column so dates break inside the number ("08/09/2" / "026"),
-      and the Actions buttons break inside words ("Elimin" / "ar", "Repor palavra-" / "passe").
-      Keep dates and button labels on one line (`text-nowrap`), and let the table scroll or stack
-      the buttons instead.
+- [ ] **Beta-test the Users table at 1280px (plan.md §934)** — on `beta`, Users at a 1280px window, pt-PT:
+      dates read "08/09/2026" on one line and Eliminar / Repor palavra-passe stay whole; at 390px the rows still stack.
 - [ ] **Beta-test the translated start/stop message (plan.md §933)** — on `beta` in pt-PT, stop and start
       Samba: the toasts read "Samba parou." and "Samba está a funcionar.".
 - [ ] **Beta-test promoting an App user to Admin (plan.md §933)** — on `beta`, Users → Edit roles on

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.21] — 2026-10-14
+
+### Fixed
+
+- On a laptop the Users table no longer splits dates and action buttons mid-word
+
 ## [0.173.20] — 2026-10-14
 
 ### Removed

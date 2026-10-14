@@ -38805,3 +38805,4 @@ Not done, rejected:
 
 [x] done.
 - **Unpin leftovers.** No route used `requireWebmaster` since the Unpin button went — deleted with its tests. Override-file header now says the next app update replaces it (it does: `clearImagePins` before pull); comments in `status.ts`, `composeOverride.ts`, `auth.service.ts` follow.
+- **Users table at 1280px.** `overflow-wrap: anywhere` on every cell (§813, for a 70-char email) also split dates and button labels. Above md: `.users-created` and action `.btn` get `nowrap`; the email column keeps `anywhere`. Spec measures text height vs line-height at 1280px (en, pt-PT) — checked red with the rule off (14 wraps), green with it; the §813 no-overflow specs at 1280/390 still pass. First try counted `getClientRects` lines — flagged one-word "Delete"; a `td` is as tall as its row, so dates are measured by their text range.

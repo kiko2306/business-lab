@@ -117,6 +117,49 @@ describe('Users table fits the screen (plan.md §813)', () => {
   }
 });
 
+// At 1280px the table squeezed the Created column to "08/09/2" / "026" and the
+// action buttons to "Elimin" / "ar" (plan.md §928, §934).
+function wrapped(doc: Document): string[] {
+  const failures: string[] = [];
+  // Text taller than one and a half lines has wrapped.
+  const lines = (el: HTMLElement) => {
+    const cs = getComputedStyle(el);
+    const lineHeight = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.5;
+    const text = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    return text > lineHeight * 1.5 ? 2 : 1;
+  };
+  doc.querySelectorAll<HTMLElement>('tbody .btn-group button').forEach((button) => {
+    if (lines(button) > 1) failures.push(`button "${button.textContent?.trim()}" wraps`);
+  });
+  // A cell is as tall as its row, so measure the date's own text box.
+  doc.querySelectorAll<HTMLElement>('tbody td.users-created').forEach((cell) => {
+    const range = doc.createRange();
+    range.selectNodeContents(cell);
+    const lineHeight = parseFloat(getComputedStyle(cell).lineHeight) || parseFloat(getComputedStyle(cell).fontSize) * 1.5;
+    if (range.getBoundingClientRect().height > lineHeight * 1.5) failures.push(`date "${cell.textContent?.trim()}" wraps`);
+  });
+  return failures;
+}
+
+describe('Users table keeps words whole on a laptop (plan.md §934)', () => {
+  beforeEach(() => localStorage.clear());
+  afterEach(() => localStorage.clear());
+
+  for (const locale of ['en', 'pt-PT'] as const) {
+    it(`breaks no date or button label at 1280px in ${locale}`, async () => {
+      localStorage.setItem('locale', locale);
+      const { doc, clean } = await mountUsersAt(1280);
+      try {
+        expect(doc.querySelectorAll('tbody td.users-created').length).toBeGreaterThan(0);
+        expect(wrapped(doc)).toEqual([]);
+        expect(overflowing(doc)).toEqual([]);
+      } finally {
+        clean();
+      }
+    });
+  }
+});
+
 // The app-access chips are taller than their label (a two-line hostname, rows
 // of equal height), and only a tap on the label text used to tick the box —
 // the chip's empty corner did nothing (plan.md §926).

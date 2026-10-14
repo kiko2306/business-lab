@@ -8,6 +8,17 @@
   overflow-wrap: anywhere;
 }
 
+/* …but `anywhere` also split a date into "08/09/2" / "026" and an action into
+   "Elimin" / "ar" at 1280px (plan.md §934). Above the phone stack (md), keep
+   those whole; the email column, which has the slack, still gives way. */
+@media (min-width: 768px) {
+  .table td.users-created,
+  .table td .btn {
+    overflow-wrap: normal;
+    white-space: nowrap;
+  }
+}
+
 /* A role's plain name ("Utilizador de aplicações") is longer than the old badge
    text, and Bootstrap's `.badge { white-space: nowrap }` held a phone's cell
    open at 312px in a 259px box (plan.md §826). Let a badge wrap in a cell. */
