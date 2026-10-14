@@ -497,7 +497,7 @@ export async function getServiceStatus(
       dependsOn: service.dependsOn,
       requires: service.requires,
       // Non-empty pinnedImages means the app is frozen on a specific build
-      // until "Unpin" (§209); versionPinned is a tag in the base compose file
+      // until its next update (§209, §934); versionPinned is a tag in the base compose file
       // itself (compat, not self-update) — an informational badge only.
       pinnedImages: disk.pinnedImages,
       versionPinned: disk.versionPinned,

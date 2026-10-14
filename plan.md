@@ -38800,3 +38800,8 @@ Not done, rejected:
 - **Save configuration** not rendered when no field is visible (was disabled).
 - **ntfy switch** updates `alertSettings.enabled` before the save (Test greys at once), shows `settings.ntfy.saving`, reloads stored state on error. Topic hint rewritten: reads need the `subscriber` login (§425).
 - **Edit roles** `showFeatures` reads the draft roles while editing; `capDraft` exists for every row; Save roles also saves picked features when the result is admin. The row's feature count stays on saved roles.
+
+## 934. Last §928/§929 fixes, and one finding retracted
+
+[x] done.
+- **Unpin leftovers.** No route used `requireWebmaster` since the Unpin button went — deleted with its tests. Override-file header now says the next app update replaces it (it does: `clearImagePins` before pull); comments in `status.ts`, `composeOverride.ts`, `auth.service.ts` follow.

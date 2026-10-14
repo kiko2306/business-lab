@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.19** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.20** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -360,9 +360,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       rebuilds the backend: Content → Gerar a rascunho with the stored Google key produces a draft
       (now `gemini-3.8-flash`); Settings → Testar chave on Google succeeds; a Mealie URL import still
       parses. If Google refuses a model, the error names it instead of a bare "HTTP 404".
-- [ ] **Drop the stale "Unpin" wording (plan.md §928)** — the generated override header in
-      `composeOverride.ts` (and comments in `status.ts`, `requireCapability.ts`, `auth.service.ts`)
-      still point at an "Unpin" button on the app card that no longer exists.
 - [ ] **Beta-test the readable settings-dialog chips (plan.md §927)** — on `beta`, light mode:
       open NetBird VPN → Settings. "Installed: …", "Has an Android app" and "Has an iPhone/iPad
       app" read as dark text on the pale chip; in dark mode they still read light on dark.

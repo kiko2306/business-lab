@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.20] — 2026-10-14
+
+### Removed
+
+- A webmaster-only route guard left unused since the Unpin button went, and wording that still pointed at that button
+
 ## [0.173.19] — 2026-10-14
 
 ### Fixed
