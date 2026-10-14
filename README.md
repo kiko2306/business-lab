@@ -228,8 +228,8 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
       all 10 pages load, login without 2FA works, no CSP violation or `NG0*` in the console, live
       status updates. On the public URL the service worker is active and, after two hard reloads,
       serves the same `main-*.js` as the server's `index.html`. 2026-10-14: Settings → General and
-      Users → Edit access save unchanged values with a success toast, no console error. Left: the other
-      pages' forms, login with 2FA.* On `beta`, after the update rebuilds the frontend: every
+      Users → Edit access save unchanged values with a success toast, no console error. 2026-10-14: login with 2FA
+      (claude-test) lands on Home. Left: the other pages' forms.* On `beta`, after the update rebuilds the frontend: every
       page loads and its forms work (Home, Apps, Backups, Users, Settings, Update, Account, Audit log,
       login with and without 2FA); the service worker updates rather than serving a stale shell (hard
       reload twice, check the new bundle hash loads); the browser console reports no CSP violation
@@ -341,6 +341,13 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       user: ticking Administrador shows no Features block or presets until the role is saved and the
       row re-opened, because `showFeatures()` reads the saved `user.roles`, not the draft. Read the
       draft so features can be picked in the same edit, as the Add user form already allows.
+- [ ] **Name authenticator entries Business Lab (plan.md §929)** — the 2FA setup's `otpauth://` link
+      and QR use the issuer "Homelab Management", so the entry in the phone's authenticator app
+      carries the old product name.
+- [ ] **Translate the API rate-limit message (plan.md §929)** — in pt-PT, a 429 from `apiLimiter`
+      (`backend/src/index.ts`, 200 requests per 15 min per IP) shows "Too many requests, please try
+      again later" in English under the 2FA field. Map 429 to a translated string in the frontend, as
+      the other errors are. Seen after ~45 min of scripted checks from one IP.
 - [ ] **Drop the stale "Unpin" wording (plan.md §928)** — the generated override header in
       `composeOverride.ts` (and comments in `status.ts`, `requireCapability.ts`, `auth.service.ts`)
       still point at an "Unpin" button on the app card that no longer exists.
@@ -415,7 +422,13 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       "signed in as", Request access pressable when empty and names what is missing, focus on the
       confirmation after sending, "Sign in with a different account" signs out (Authelia's own
       session stays).
-- [ ] **Beta-test the Account critique fixes (plan.md §819)** — all five done; this item is now
+- [ ] **Beta-test the Account critique fixes (plan.md §819)** — *2026-10-14 at 0.173.4, pt-PT at
+      390px as `claude-test`: (1) Desativar asks only for a code, then a confirm; a wrong code is
+      refused in Portuguese and 2FA stays on. (2) wrong enrol and disable codes show their message and
+      keep the cursor in the field. (3) "Guarde-os agora" first, no green alert, "Já os guardei" greyed
+      until the tick box. (4) panel open, no TOTP wording. (5) authenticator link, Copiar chave, focus
+      on the step heading, the starts-over line. Left: focus after Cancel/Done/turn-off, a successful
+      turn-off (blocked by the rate limit, item below), EN.* All five done; this item is now
       only the `beta` look. (1) §820 — on `beta`, Turn it off asks for a code or recovery code (no
       password field), then a confirm; a wrong code is refused and 2FA stays on; (2) §821 — a wrong
       enrol code and a wrong disable code each show a message under their own field (in pt-PT too)
@@ -425,7 +438,12 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       your authenticator app" link and a Copy key button, focus lands on the step's heading, then on
       the status line after Cancel, Done and turning it off, and a line says leaving starts over.
       Run the full journey (set up, wrong code, activate, recovery codes, disable) on a phone.
-- [ ] **Beta-test the sign-in flow critique fixes (plan.md §827)** — all five done; this item is now
+- [ ] **Beta-test the sign-in flow critique fixes (plan.md §827)** — *2026-10-14 at 0.173.4, pt-PT
+      at 390px, login page only: "Sem acesso?" closed; the code step's "Perdeu a aplicação…?" names
+      `./start.sh recover disable-2fa`; a wrong password and a wrong code each raise a Portuguese
+      `role=alert` and return the cursor with the text selected; a Mostrar button, cursor starts in
+      the first field, 48px inputs, card 12px from each edge. Left: "Sem acesso?" text, setup, a used
+      invite link, `/recovery`, EN.* All five done; this item is now
       only the `beta` look. On a phone, in EN and pt-PT, on login, setup, a used invite link and
       `/recovery`: (1) §829 — login has a closed "Locked out?" line naming the Users page and
       `./start.sh recover reset-password`, the code step has "Lost your authenticator?" naming
