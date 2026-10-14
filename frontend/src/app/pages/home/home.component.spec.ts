@@ -158,6 +158,19 @@ describe('HomeComponent', () => {
     expect(badge?.textContent).toContain('3');
   });
 
+  // plan.md §933: "Backed up today" wore the same yellow as "Update available",
+  // so good news read as a warning. Backups run daily; two days means one was missed.
+  it('shows a backup from today as good news', () => {
+    setUp('all', { lastSuccessfulAppData: { at: new Date().toISOString(), result: 'success', dumped: 5, failed: 0, trigger: 'schedule', failures: [] } });
+    expect(el.querySelector('a[href="/backups"] .menu-tile__badge')?.classList).toContain('menu-tile__badge--ok');
+  });
+
+  it('keeps the warning colour for a backup days old', () => {
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    setUp('all', { lastSuccessfulAppData: { at: threeDaysAgo, result: 'success', dumped: 5, failed: 0, trigger: 'schedule', failures: [] } });
+    expect(el.querySelector('a[href="/backups"] .menu-tile__badge')?.classList).not.toContain('menu-tile__badge--ok');
+  });
+
   it('does not badge Backups when there is no successful backup yet', () => {
     setUp('all', { lastSuccessfulAppData: null });
     expect(el.querySelector('a[href="/backups"] .menu-tile__badge')).toBeNull();

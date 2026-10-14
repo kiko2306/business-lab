@@ -31,7 +31,7 @@
           <span class="menu-tile__badge">{{ 'home.badge.updateAvailable' | t }}</span>
         }
         @if (tile.badgeFor === 'backups' && lastBackupDaysAgo !== null) {
-          <span class="menu-tile__badge">
+          <span class="menu-tile__badge" [class.menu-tile__badge--ok]="lastBackupDaysAgo <= 1">
             {{ (lastBackupDaysAgo === 0 ? 'home.badge.backupToday' : 'home.badge.backupDaysAgo') | t:{ days: lastBackupDaysAgo } }}
           </span>
         }

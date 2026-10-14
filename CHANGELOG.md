@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.15] — 2026-10-14
+
+### Fixed
+
+- Home's backup badge is green when the last backup is recent, yellow only when one was missed
+
 ## [0.173.14] — 2026-10-14
 
 ### Fixed

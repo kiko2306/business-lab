@@ -83,6 +83,12 @@
   color: var(--bs-warning-text-emphasis, #664d03);
 }
 
+/* Backups run daily, so today or yesterday is good news; yellow is kept for a missed day (plan.md §933). */
+.menu-tile__badge--ok {
+  background: var(--bs-success-bg-subtle, #d1e7dd);
+  color: var(--bs-success-text-emphasis, #0a3622);
+}
+
 /* The box's state sits where the subtitle was: calm by default, red only when an app needs the owner. */
 .home-status__link {
   color: inherit;

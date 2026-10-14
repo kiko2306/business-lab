@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.14** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.15** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -341,9 +341,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       the authenticator app lists it as "Business Lab". An entry set up before keeps working.
 - [ ] **Beta-test the translated rate-limit message (plan.md §933)** — hard to provoke by hand (200 API
       calls per 15 min); if a 429 shows up in pt-PT it reads "Demasiados pedidos em pouco tempo…".
-- [ ] **Colour Home's backup badge by age (plan.md §929)** — the Backups tile's "Copiado hoje" uses
-      the same yellow `menu-tile__badge` as "Atualização disponível" and as a weeks-old backup, so good
-      news reads as a warning. Neutral/green when recent, yellow only when old.
+- [ ] **Beta-test the Home backup badge colour (plan.md §933)** — on `beta`, Home: "Copiado hoje" is
+      green in light and dark; it turns yellow only once the last backup is two days old.
 - [ ] **Beta-test the stop confirm button label (plan.md §931)** — on `beta`, Stop an exposed app
       (IT Tools): the red button reads "Parar IT Tools" / "Stop IT Tools". Cancel it.
 - [ ] **Say why Back up now did nothing (plan.md §929)** — IT Tools → Definições → "Fazer cópia
