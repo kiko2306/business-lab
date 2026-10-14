@@ -1017,6 +1017,7 @@ export const en: Record<string, string> = {
   'serviceCard.backups.title': 'Backups',
   'serviceCard.backups.description': 'A local snapshot of this app’s data and database — a quick rollback point, kept separate from the scheduled off-site backup.',
   'serviceCard.backups.backUpNowButton': 'Back up now',
+  'serviceCard.backups.noData': '{{label}} keeps no data of its own, so there is nothing to back up.',
   'serviceCard.backups.noSnapshots': 'No snapshots yet.',
   'serviceCard.backups.downloadButton': 'Download',
   'serviceCard.backups.restoreButton': 'Restore',

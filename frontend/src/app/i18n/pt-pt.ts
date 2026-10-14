@@ -1017,6 +1017,7 @@ export const ptPT: Record<string, string> = {
   'serviceCard.backups.title': 'Cópias de segurança',
   'serviceCard.backups.description': 'Uma captura local dos dados e da base de dados desta aplicação — um ponto de recuperação rápido, mantido separado da cópia de segurança externa agendada.',
   'serviceCard.backups.backUpNowButton': 'Fazer cópia agora',
+  'serviceCard.backups.noData': '{{label}} não guarda dados próprios, por isso não há nada para copiar.',
   'serviceCard.backups.noSnapshots': 'Ainda não há capturas.',
   'serviceCard.backups.downloadButton': 'Transferir',
   'serviceCard.backups.restoreButton': 'Restaurar',

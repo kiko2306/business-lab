@@ -72,7 +72,12 @@ export class AppBackupsPanelComponent implements OnInit {
           }
           this.load();
         },
-        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.backupFailed', { label: this.service.label }))),
+        error: (error) =>
+          this.toast.error(
+            error?.error?.reason === 'no_data'
+              ? this.translate.t('serviceCard.backups.noData', { label: this.service.label })
+              : extractErrorMessage(error, this.translate.t('serviceCard.errors.backupFailed', { label: this.service.label }))
+          ),
       });
   }
 

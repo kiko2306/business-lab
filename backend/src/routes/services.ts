@@ -191,7 +191,7 @@ router.post(
           : `Backed up ${serviceName}.`,
       });
     } catch (error) {
-      const httpError = error as HttpError;
+      const httpError = error as HttpError & { reason?: string };
       logger.error(`Per-app backup failed: ${serviceName}`, { userId, error: httpError.message });
       await writeAuditLog({
         userId,
@@ -204,6 +204,7 @@ router.post(
         error: 'Failed to back up the app',
         service: serviceName,
         message: httpError.message,
+        reason: httpError.reason,
       });
     }
   }

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.15** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.16** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -345,10 +345,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       green in light and dark; it turns yellow only once the last backup is two days old.
 - [ ] **Beta-test the stop confirm button label (plan.md §931)** — on `beta`, Stop an exposed app
       (IT Tools): the red button reads "Parar IT Tools" / "Stop IT Tools". Cancel it.
-- [ ] **Say why Back up now did nothing (plan.md §929)** — IT Tools → Definições → "Fazer cópia
-      agora" goes busy for 0.3 s and stops: the API answers 400 "it-tools has no data directory to
-      back up." but the dialog shows no message. Show the error, or hide the backup section for apps
-      with no data directory.
+- [ ] **Beta-test Back up now on an app with no data (plan.md §933)** — on `beta` in pt-PT, IT Tools →
+      Definições → Fazer cópia agora: the error reads "IT Tools não guarda dados próprios…".
 - [ ] **Hide "Guardar configuração" when there is nothing to save (plan.md §929)** — an app with no
       configurable settings (IT Tools) says so and still shows the Save button.
 - [ ] **Grey out an ntfy row's Test while its switch is off, and show saving (plan.md §929)** —

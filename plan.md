@@ -38796,3 +38796,4 @@ Not done, rejected:
 - **429 text.** `extractErrorMessage` (60 callers, no injector) returns `errors.tooManyRequests` in the language TranslateService sets on `<html>`. Rejected: translating each limiter's backend text — six limiters, still English to any other client.
 - **Start/stop toast** built from `serviceState.done.<action>` with the app's label, not the backend's English `message`.
 - **Home backup badge** green (`--ok`, success-subtle tokens) when the last backup is today or yesterday; yellow from two days, since backups run daily.
+- **Back up now on a stateless app.** Not silent after all — §929's selector missed the toast; it read the backend's English "Failed to back up the app". `backupOneApp` now sets `reason: 'no_data'`, the route passes it, the panel words it.

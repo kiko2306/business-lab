@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Subject, of } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AppBackupsPanelComponent } from './app-backups-panel.component';
 import { ConfirmService } from '../../core/confirm.service';
 import { OperationsService } from '../../core/operations.service';
@@ -105,5 +106,35 @@ describe('AppBackupsPanelComponent', () => {
     const el: HTMLElement = fixture.nativeElement;
     expect(el.textContent).not.toContain('No snapshots yet');
     expect(el.querySelectorAll('li').length).toBe(1);
+  });
+});
+
+// plan.md §933: IT Tools keeps no data, and Back up now answered only the
+// backend's English "Failed to back up the app".
+describe('AppBackupsPanelComponent on an app with no data', () => {
+  it('says there is nothing to back up, in the page language', async () => {
+    const operations = jasmine.createSpyObj('OperationsService', ['listAppBackups', 'createAppBackup']);
+    operations.listAppBackups.and.returnValue(of({ items: [] }));
+    operations.createAppBackup.and.returnValue(
+      throwError(() => new HttpErrorResponse({ status: 400, error: { error: 'Failed to back up the app', reason: 'no_data' } }))
+    );
+    const toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
+    await TestBed.configureTestingModule({
+      imports: [AppBackupsPanelComponent],
+      providers: [
+        { provide: OperationsService, useValue: operations },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
+        { provide: ToastService, useValue: toast },
+        { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
+      ],
+    }).compileComponents();
+    TestBed.inject(TranslateService).setLocale('en');
+    const fixture = TestBed.createComponent(AppBackupsPanelComponent);
+    fixture.componentRef.setInput('service', { ...paperless, label: 'IT Tools' });
+    fixture.detectChanges();
+
+    fixture.componentInstance.create();
+
+    expect(toast.error).toHaveBeenCalledWith('IT Tools keeps no data of its own, so there is nothing to back up.');
   });
 });

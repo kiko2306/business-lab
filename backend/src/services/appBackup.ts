@@ -229,8 +229,10 @@ export async function backupOneApp(name: string): Promise<AppBackupResult> {
   try {
     await fs.access(dataDir);
   } catch {
-    const err = new Error(`${name} has no data directory to back up.`) as Error & { statusCode?: number };
+    const err = new Error(`${name} has no data directory to back up.`) as Error & { statusCode?: number; reason?: string };
     err.statusCode = 400;
+    // A code the dashboard can word in the user's language (plan.md §933).
+    err.reason = 'no_data';
     throw err;
   }
 

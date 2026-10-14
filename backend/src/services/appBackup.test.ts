@@ -109,6 +109,14 @@ describe('resolveAppBackupPath', () => {
 });
 
 describe('backupOneApp', () => {
+  // plan.md §933: the dashboard needs a code, not English, to say why.
+  it('refuses an app with no data directory with reason no_data', async () => {
+    fs.mkdirSync(srcAppDir('it-tools'), { recursive: true });
+    getService.mockImplementation(() => ({}));
+    resolveComposeFile.mockImplementation((name: string) => ({ appDir: srcAppDir(name), composeFile: `${srcAppDir(name)}/docker-compose.yml` }));
+    await expect(mod.backupOneApp('it-tools')).rejects.toMatchObject({ statusCode: 400, reason: 'no_data' });
+  });
+
   it('dumps, archives data minus the live DB dirs, and writes a manifest sidecar', async () => {
     dumpOneApp.mockResolvedValue({
       outcomes: [
