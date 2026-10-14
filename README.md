@@ -278,12 +278,13 @@ Surfaces never critiqued. Per item: `/impeccable critique` against a real render
 score in a new plan section, then fix one page at a time, test first, own commit and version
 bump. Delete the item when its fixes land (a fix still needing a `beta` look gets its own item).
 
-- [ ] **Beta-test that an update applies new app settings without a restart (plan.md §944)** — on `beta`,
-      the first update that rebuilds the backend *and* changes an app (any `apps/<name>/` file): during the
-      run the Update page reaches "Restarting backend", then shows "Updating apps" (step 5 of 5) after the
-      dashboard comes back, then "Up to date". The changed app's container must be younger than
-      `business-lab-backend-1`, and its env must carry what the new code renders, with no manual
-      Parar/Iniciar. Audit log: one `self_update_complete` with `appsUpdated`.
+- [ ] **Beta-test that an update applies new app settings without a restart (plan.md §944)** — *2026-10-14,
+      run 151 (0.173.30 → 0.173.31, plan.md §958): classified `apps: [tally]`, `build: [backend]`; the
+      trigger audit row says `appsDeferred: ["tally"]`; the new backend (created 15:17:31) recreated
+      `tally-tally-1` at 15:20:51 and the run closed with `self_update_complete`, `appsUpdated: 1`,
+      `pendingApps: []` — the mechanism is proven.* Left: on a release that adds a dashboard-rendered
+      setting, see it in the app's env with no Parar/Iniciar, and watch the Update page show "Updating
+      apps" (step 5 of 5) after the dashboard comes back.
 - [ ] **Beta-test the translated rate-limit message (plan.md §933)** — hard to provoke by hand (200 API
       calls per 15 min); if a 429 shows up in pt-PT it reads "Demasiados pedidos em pouco tempo…".
 - [ ] **Beta-test the Utils critique fixes (plan.md §841)** — *2026-10-14 at 0.173.30 (plan.md §955): Home and Settings in pt-PT at 390px: no English, no sideways scroll.* *pt-PT laptop passed (2026-10-14 at
@@ -418,11 +419,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       header `entrydate` archived, which can put a "by 14:00" comparison's two
       sides in different hours), and whether stale `wsir_vnd_pedidos` rows inflate
       Forecast. Any disagreement is a defect in what the owner is told.
-- [ ] **Beta-test Tally keeping a past day on reload (plan.md §957)** — on `beta`, after the update
-      rebuilds Tally: on the Mat Laptop shop (running day 27/07/2026) pick 02/08/2025 in the date
-      picker, then reload — the page briefly loads the running day and then shows 02/08/2025
-      (6 830,22 €), with the address keeping `?date=2025-08-02`. A day before the picker's floor
-      (`?date=2025-07-01`) still opens on the running day and is never sent to the shop.
 - [ ] **Beta-test Tally: the fourth critique's web fixes (plan.md §810)** — *2026-10-14 at 0.173.30 (plan.md §956): a `visibilitychange` back to the page fetched `overview` and `tables` at once; tapping an hourly column reads "14:00 · 434,00 €". Left: a shop with no tables, the till PC off.* *2026-10-14 at 0.173.4, Mat Laptop shop (sample day 27/07/2026), 390px pt-PT: 
       Items shows ten rows and "Mostrar todos (101)"; a past day's hero names its date. Left: refresh
       on return to the app, tapping a chart column, a shop with no tables, the till PC off.* On `beta`, on a
