@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.30** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.31** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -251,10 +251,6 @@ The security remainder of the same review, four items, each its own commit and v
       over an hour and confirm it still works (the same refresh, on the normal hourly schedule),
       sign in once with 2FA, and use **Sign out** and confirm the next page load asks for a
       password.
-- [ ] **Beta-test the live-status stream after the ticket change (plan.md §879 item 2)** — on
-      `beta`, open the Apps page: the cards flip to Running within ~15 s of a start without a
-      manual refresh (that is the WebSocket, or the SSE fallback, authenticating with a ticket).
-      Start an app and watch its startup log stream to the end. Both in two tabs at once.
 - [ ] **Beta-test that recovery mode still works (plan.md §879 item 4)** — *2026-10-13: over the
       public hostname `/api/recovery/status` is `available:false`.* Left: on the host,
       `./start.sh recover reset-password <user>` still resets a password (Claude's run was refused
@@ -359,6 +355,12 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       should the post say?", with Drafts open too once there are drafts, and no "Brief" or "Claude"
       anywhere, in pt-PT too. All six are done (plus two minor findings, §908: trailing-whitespace dirty check, brief counter — on `beta`, paste 3600+ characters into the brief box: a "N / 4000 characters" line appears, typing stops at 4000); this item is now only the `beta` looks. On `beta`, after each: open Content on a phone and
       a laptop, EN and pt-PT.
+- [ ] **Beta-test the busy-provider fallback (plan.md §953)** — on `beta`, with keys for two providers
+      in Settings → AI API Keys, generate a draft while the chosen one is overloaded (Gemini's "high
+      demand" happens on its own; or save a deliberately wrong base model only if the code ever allows
+      it — it does not, so wait for a real spike): the draft still arrives, and the backend log shows
+      "AI provider busy while generating a social draft" with `next` naming the provider that wrote it.
+      With only one key, a busy spell costs one quiet retry (about 1.5 s) before the usual message.
 - [ ] **Beta-test the small pages' fixes (plan.md §855-§862)** — *2026-10-13 at 0.173.4, Audit
       logs in Chrome: Result first, actions as sentences with the code on hover, "21–40 of 9735",
       the 30-day/Europe/Lisbon line, Enter on a no-match filter gives Clear filters, a long probe

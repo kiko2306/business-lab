@@ -7,7 +7,16 @@
  * key and model are known — no per-provider SDK.
  */
 
-export class AiChatCompletionError extends Error {}
+export class AiChatCompletionError extends Error {
+  /**
+   * The provider was busy or failing (HTTP 429/5xx), not refusing this request: worth a retry or
+   * another provider (plan.md §953). A bad key, a retired model or a timeout is not — retrying a
+   * timeout would also outlast the proxy's 60 s in front of the API.
+   */
+  constructor(message: string, readonly temporary = false) {
+    super(message);
+  }
+}
 
 export interface ChatCompletionRequest {
   /** OpenAI-compatible base URL, trailing slash — "chat/completions" is appended. */
@@ -51,7 +60,7 @@ export async function callOpenAiCompatChat(req: ChatCompletionRequest): Promise<
     // unlike Anthropic and Groq — without unwrapping, a retired model read as a bare "HTTP 404".
     const errorBody = (Array.isArray(body) ? body[0] : body) as { error?: { message?: string } } | null;
     const detail = errorBody?.error?.message || `HTTP ${response.status}`;
-    throw new AiChatCompletionError(`AI provider request failed: ${detail}`);
+    throw new AiChatCompletionError(`AI provider request failed: ${detail}`, response.status === 429 || response.status >= 500);
   }
 
   const text = (body as { choices?: { message?: { content?: string } }[] } | null)?.choices?.[0]?.message?.content;

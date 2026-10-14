@@ -36805,3 +36805,14 @@ Rejected: rewriting the code comments in three `theme.css` files — anchors fix
 [x] done. Playwright as `claude-test`.
 - **"Lost your authenticator?" (§946):** turned 2FA on, signed in to the code step at 1280px EN and 390px pt-PT: cursor starts in `#code`, the line opens on the first click / tap, no field error appears, text names recovery codes and `./start.sh recover disable-2fa`. 2FA turned off again. README item deleted — §946 is fully proven live.
 - **Content (§950):** one more generate at 14:19 → 502, backend "This model is currently experiencing high demand" — third in ~10 minutes. The page's failure state is right (message, brief kept, focus on the button). The draft steps stay in the README item.
+
+## 953. Live status in two tabs (§879 item 2); drafts survive a busy AI provider
+
+[x] done, 0.173.31. [ ] beta look — README item.
+
+- **§879 item 2 passed, item deleted** (0.173.30, Playwright, Apps page in two tabs of one session, both on `ws://…/ws/services`): stopping Dozzle flipped the cards in 1.4–1.6 s and 8.1–8.4 s, starting in 0–3.7 s and 5.7–14.6 s. The startup log streamed "Waiting for output…", "Attaching to dozzle logs…", the container's lines, then "running", and closed itself 2.5 s later (`startupAutoCloseTimer`) — a first run missed it by waiting on the second tab. Dozzle was stopped twice for under a minute each; it is running.
+- **Fallback (new, the owner asked after §950/§952):** Gemini answered "This model is currently experiencing high demand" three times in ten minutes and the Content page could only say "try again".
+  - `AiChatCompletionError.temporary`: true for HTTP 429 and 5xx. Not for 4xx (bad key, retired model — switching would hide a broken setup) nor a timeout (a retry after 60 s would outlast the proxy's 60 s in front of the API).
+  - `generateSocialPost`: on a temporary error, wait 1.5 s and try the same provider once more, then each other provider that has a key (registry order), once each; a non-temporary error is thrown at once; if all fail, the first error is thrown, so the page and log read as before. Each switch logs `AI provider busy while generating a social draft` with `provider` and `next`.
+  - Rejected: falling back when the chosen provider has *no* key (that is a setup choice, keep `AiKeyMissingError`); doing it inside `callOpenAiCompatChat` (it knows one provider only); Mealie (calls its provider itself, nothing to wrap here).
+- Tests: 1 in `aiChatCompletion.test.ts` (429/500/503 temporary, 401/404 not), 4 in `claudeGenerate.test.ts` (retry same, switch, all busy → first error, bad key → no retry); 5 failed first. Backend 1570, typecheck clean.

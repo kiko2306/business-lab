@@ -66,6 +66,16 @@ describe('callOpenAiCompatChat', () => {
     await expect(callOpenAiCompatChat(baseRequest)).rejects.toBeInstanceOf(AiChatCompletionError);
   });
 
+  // plan.md §953: an overloaded or rate-limited provider is worth retrying or replacing; a bad key is not.
+  it('marks 429 and 5xx answers as temporary, and others as not', async () => {
+    for (const [status, temporary] of [[429, true], [500, true], [503, true], [401, false], [404, false]] as const) {
+      fetchMock.mockResolvedValueOnce(jsonResponse(status, [{ error: { message: 'busy' } }]));
+      const error = await callOpenAiCompatChat(baseRequest).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(AiChatCompletionError);
+      expect((error as AiChatCompletionError).temporary).toBe(temporary);
+    }
+  });
+
   it('wraps a network failure', async () => {
     fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
     await expect(callOpenAiCompatChat(baseRequest)).rejects.toThrow(/Unable to reach the AI provider/);

@@ -7,8 +7,9 @@
  * turns a prompt into text.
  */
 
-import { callOpenAiCompatChat } from './aiChatCompletion';
-import { getActiveProviderKey, getProviderDefinition } from '../utils/aiSettings';
+import { AiChatCompletionError, callOpenAiCompatChat } from './aiChatCompletion';
+import { AI_PROVIDER_IDS, AiProviderId, getActiveProviderKey, getAiApiKey, getProviderDefinition } from '../utils/aiSettings';
+import logger from '../utils/logger';
 
 const SYSTEM_PROMPT =
   'You write social media posts. Given the user\'s brief, return exactly one ' +
@@ -17,6 +18,10 @@ const SYSTEM_PROMPT =
   'emoji only if the brief asks for them.';
 
 const MAX_TOKENS = 2000;
+
+// Long enough for a momentary spike to pass, short enough that a retry plus two other providers
+// stays well inside the proxy's 60 s (plan.md §953).
+const RETRY_DELAY_MS = 1500;
 
 export class AiKeyMissingError extends Error {
   constructor() {
@@ -31,10 +36,38 @@ export async function generateSocialPost(prompt: string): Promise<string> {
     throw new AiKeyMissingError();
   }
 
-  const definition = getProviderDefinition(active.provider);
+  // A busy provider gets one more try, then each other provider with a key gets one: Gemini said
+  // "high demand" three times in ten minutes and the owner was only told to try again (plan.md §953).
+  const attempts: { provider: AiProviderId; key: string }[] = [active, active];
+  for (const provider of AI_PROVIDER_IDS) {
+    if (provider === active.provider) continue;
+    const key = await getAiApiKey(provider);
+    if (key) attempts.push({ provider, key });
+  }
+
+  let firstError: unknown;
+  for (const [i, attempt] of attempts.entries()) {
+    try {
+      return await callWith(attempt.provider, attempt.key, prompt);
+    } catch (error) {
+      firstError ??= error;
+      if (!(error instanceof AiChatCompletionError && error.temporary)) throw error;
+      logger.warn('AI provider busy while generating a social draft', {
+        provider: attempt.provider,
+        next: attempts[i + 1]?.provider ?? null,
+        error: error.message,
+      });
+      if (i === 0) await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    }
+  }
+  throw firstError;
+}
+
+function callWith(provider: AiProviderId, apiKey: string, prompt: string): Promise<string> {
+  const definition = getProviderDefinition(provider);
   return callOpenAiCompatChat({
     baseUrl: definition.openAiCompatBaseUrl,
-    apiKey: active.key,
+    apiKey,
     model: definition.generateModel,
     systemPrompt: SYSTEM_PROMPT,
     userPrompt: prompt,

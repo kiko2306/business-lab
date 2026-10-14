@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.31] — 2026-10-14
+
+### Fixed
+
+- Content: when the AI provider is busy, a draft is retried once and then written by another provider that has a key, instead of failing straight away.
+
 ## [0.173.30] — 2026-10-14
 
 ### Fixed
