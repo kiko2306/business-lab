@@ -372,13 +372,22 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Bring Tally's day-view tabs and counters toggle to 44px (plan.md §929)** — shop view at
       390px: the Mesas / Artigos vendidos `nav-link` buttons are 42px tall, and "▸ Contadores do dia"
       and "← Todas as lojas" are 19px, under the 44px rule the rest of the app now meets (§824).
+- [ ] **Name this server in the device scan (plan.md §929)** — Definições → Encontrar dispositivos:
+      the first row has the Este servidor badge but reads "Desconhecido" for name and maker. The box
+      knows its own hostname; fill it in (principle 3).
 - [ ] **Drop the stale "Unpin" wording (plan.md §928)** — the generated override header in
       `composeOverride.ts` (and comments in `status.ts`, `requireCapability.ts`, `auth.service.ts`)
       still point at an "Unpin" button on the app card that no longer exists.
 - [ ] **Beta-test the readable settings-dialog chips (plan.md §927)** — on `beta`, light mode:
       open NetBird VPN → Settings. "Installed: …", "Has an Android app" and "Has an iPhone/iPad
       app" read as dark text on the pale chip; in dark mode they still read light on dark.
-- [ ] **Beta-test the Utils critique fixes (plan.md §841)** — 20/40. In order, test first, one
+- [ ] **Beta-test the Utils critique fixes (plan.md §841)** — *2026-10-14 at 0.173.4, pt-PT laptop:
+      (1) Home's Saúde do servidor sentence, four rows with Bem and "Verificado às"; (2) Enter on
+      Encontrar dispositivos keeps focus on it, "A procurar…" then "Encontrados 10 dispositivos." are
+      announced, table Nome/Fabricante/Endereço; (3) `/utils` lands on Home, no Utils in nav, seven tiles
+      in even rows with Apps and Backups wide, the Settings tile mentions devices; (4) this server first
+      with Este servidor, a Não reconhecidos group. Left: phone, EN, backend-blocked Try again, the
+      `apps:control`-only 403, the network-unplugged failure.* 20/40. In order, test first, one
       commit and version bump each. Decided 2026-10-06: **fold** `/utils` away — health moves onto
       Home, the scan into a Settings panel, then the route, nav item and tile go and `/utils`
       redirects to `/home`. Order: (1) done (§842) — on `beta`, Home shows "Server health": a sentence
@@ -752,14 +761,6 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       it and for no other app) and the run takes minutes, not a sweep. Best done
       the next time a real "check if X can update" comes up.
 
-- [ ] **Beta-test Navidrome's Authelia sign-in (plan.md §749)** — checks (2)
-      and (3) are **confirmed** (2026-09-29, at 0.153.8): the LAN
-      `Remote-User` request to `:10570/api/album` is 401, and a forged header
-      on the public `getAlbumList2.view` still gets "Wrong username or
-      password". What is left needs a browser: (1) an Authelia login lands
-      **straight in the library** with no Navidrome login screen, as the
-      Authelia admin; and a non-admin Authelia user is auto-created in
-      Navidrome as a non-admin.
 
 - [ ] **Beta-test Nextcloud's 34→35 major upgrade (plan.md §711)** — the
       upgrade itself is **confirmed** (2026-09-28, over SSH at 0.151.5): the
@@ -789,7 +790,9 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       `theme-init.js` loading.
       Also check the Hotel admin, check-in and feedback (pulse) pages the same
       way (plan.md §697) — a guest link on a phone is the one that matters.
-- [ ] **Beta-test Tally's language switch (plan.md §688)** — on `beta`, after
+- [ ] **Beta-test Tally's language switch (plan.md §688)** — *2026-10-14: Português survives a
+      reload; Shops list and a shop page have no English UI words, dates dd/MM, money `9 640,16 €`.
+      Left: the Manage panel.* On `beta`, after
       pulling (Tally rebuilds), open `tally.<domain>`: the navbar select should
       switch English ⇄ Português, the choice should survive a reload, and in
       Português the Shops list, a shop page (stat cards, chart, Tables and Items
@@ -817,7 +820,9 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       backend": no red "Something went wrong" / "Unable to reach the backend"
       toasts should appear (from the status poll or the resource strip), and
       the panel should end on the "up to date" success toast.
-- [ ] **Beta-test the new Outline app (plan.md §666)** — on `beta`, after
+- [ ] **Beta-test the new Outline app (plan.md §666)** — *2026-10-14: Outline is at `wiki.<domain>`,
+      healthy 7 days; `mat` is in with Invite people; `claude-test` signed in through Authelia with no
+      invite and landed in TurnkeyBox. Left: an image upload persisting.* On `beta`, after
       pulling, start Outline from the Apps page (it needs Authelia running
       and the app exposed — Outline has no local login). Confirm: the
       `outline-init` chown runs and `outline` reaches healthy (first boot
