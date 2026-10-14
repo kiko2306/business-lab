@@ -36719,7 +36719,7 @@ Rejected: caveman-compress of the whole file (~2.3 MB rewrite, large token cost,
 
 [x] done. `plan-citations.py`: 9 to 0.
 
-- §873.1/.2, §879.3/.4, §884.1/.3/.5 — §917 cited numbered list items that have no headings. Reworded to `§873 item 1` etc.; the section resolves.
+- Items 1–2 of §873, 3–4 of §879, 1/3/5 of §884 — §917 cited them as `§N.M`, but they are numbered list items that have no headings. Reworded to `§873 item 1` etc.; the section resolves.
 - §813.6 — item 6 of §813's findings (cited 21 times: hotel `theme.css`, §818, §824). Anchor `**§813.6**` added on that item.
 - §806.9 — never written inside §806; the work is §807 ("this is §806.9"). Labelled anchor at the end of §806, same pattern as §649.1 (§735).
 
