@@ -234,7 +234,10 @@ its fix lands (a fix still needing a `beta` look leaves its own beta item behind
       login with and without 2FA); the service worker updates rather than serving a stale shell (hard
       reload twice, check the new bundle hash loads); the browser console reports no CSP violation
       and no `NG0100` error on Home; live status (WebSocket) still updates.
-- [ ] **Beta-test the app workspaces on Angular 21 (plan.md §906)** — on `beta`, after the update
+- [ ] **Beta-test the app workspaces on Angular 21 (plan.md §906)** — *2026-10-14 at 0.173.4: Hotel
+      admin loads with its data, Tally lists the shop and its day view loads, the language select flips
+      it to English and back; no console errors. Left: Check-in submit and Pulse (guest links), Hotel
+      sign-in.* On `beta`, after the update
       rebuilds Hotel and Tally: open Check-in (guest form submits), Pulse and Hotel admin (each
       loads, signs in, shows data), and the Tally web app (day view, language switch). No console
       errors; the pages look unchanged.
@@ -314,17 +317,11 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       tick the boxes, the chosen one shows pressed, editing a box shows Custom, and nothing changes until
       Save; the same in the Add user form and in pt-PT, with no sideways scroll on a phone. The P2 focus-ring and control-border contrast belongs to the shared theme and
       is its own item below. On `beta`, after each: open Users on a phone with a long email.
-- [ ] **Beta-test the shared theme's focus ring and control edges (plan.md §818)** — *2026-10-14
-      at 0.173.4: Tab through Users (16 stops), Settings (31) and Backups (33), light and dark — every
-      stop has a ring, a mouse-clicked button has none, all 37 Settings inputs/selects/boxes have an
-      edge at 3:1 or more. Left: a Tally shop view.* On `beta`,
-      Tab through Users, Settings and Backups in dark and light: every control shows a solid blue
-      ring (no mouse-click ring on buttons), and inputs, selects and unticked boxes have a visible
-      edge. Open a Tally shop view and check the same there.
 - [ ] **Beta-test touch targets on a phone (plan.md §824)** — *2026-10-13 at 0.173.4, 390px in
       Chrome: Users, Backups, Settings, Apps, Home, Updates have no button under 44px and no
       sideways scroll. Role and feature checkbox rows toggle from anywhere on the row; the app-access
-      rows did not, fixed in §926 — recheck their empty corner. Left: a Tally shop view (`claude-test` has no shops). 2026-10-14
+      rows did not, fixed in §926 — recheck their empty corner. Tally shop view (Mat Laptop) at 390px: no
+      sideways scroll, but two buttons are under 44px (item below). Left: the app-access recheck. 2026-10-14
       at 1280px: no page scrolls sideways; Users wraps mid-word (item below).* On `beta`, at 390px wide (browser
       device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
       label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
@@ -372,6 +369,9 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       whole save after turning CrowdSec off its Test stayed enabled; bind it to the switch. Each toggle restarts n8n and CrowdSec (~30 s) with
       every switch silently disabled and no message; show "A guardar…" and the result. The hint
       under each topic ("anyone who knows it can read") is stale since ntfy reads need a token (§425).
+- [ ] **Bring Tally's day-view tabs and counters toggle to 44px (plan.md §929)** — shop view at
+      390px: the Mesas / Artigos vendidos `nav-link` buttons are 42px tall and "▸ Contadores do dia" is
+      19px, under the 44px rule the rest of the app now meets (§824).
 - [ ] **Drop the stale "Unpin" wording (plan.md §928)** — the generated override header in
       `composeOverride.ts` (and comments in `status.ts`, `requireCapability.ts`, `auth.service.ts`)
       still point at an "Unpin" button on the app card that no longer exists.
@@ -567,7 +567,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Beta-test the shared theme's semantic colours (plan.md §807)** — *2026-10-14 at 0.173.4:
       every text-warning/danger/success/info, button, badge and alert on Home, Apps (all categories
       open, 231), Backups and Settings meets 4.5:1 (3:1 large) in light and dark; a hovered outline
-      button is white on rgb(10,88,202). Left: the hotel apps.* On `beta`,
+      button is white on rgb(10,88,202). Hotel admin and a Tally shop view: every text node passes in
+      both modes. Left: Check-in and Pulse (guest links).* On `beta`,
       look at the dashboard in both light and dark: the Start/Stop/Settings
       buttons on Apps, the red failure text on Backups and Settings, the green
       "OK" states, and any outline button must all be clearly readable — the
@@ -764,7 +765,8 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
 
 - [ ] **Beta-test light/dark mode (plan.md §696)** — *2026-10-14 at 0.173.4, dashboard: follows
       an OS light/dark switch, `theme-init.js` runs sync in `<head>`, the header toggle flips it and
-      survives a reload. Left: walking each page by eye, Tally, the Hotel pages.* On `beta`, after pulling
+      survives a reload. Tally and Hotel admin follow an OS switch. Left: walking each page by eye,
+      the Hotel guest pages on a phone.* On `beta`, after pulling
       (dashboard and Tally rebuild), open the dashboard and `tally.<domain>`
       with the OS set to light: both should load light with no dark flash, and
       with the OS set to dark, dark. The ☀/☾ button in the header/navbar should
