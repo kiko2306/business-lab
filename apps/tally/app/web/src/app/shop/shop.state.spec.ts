@@ -70,6 +70,35 @@ describe('ShopComponent state, feedback and announcements (plan.md §806.5)', ()
       expect(fixture.componentInstance.date).toBe('');
     });
 
+    // plan.md §957: the floor was counted from today before the running day was known, so on a
+    // shop whose running day lags today a picked day was dropped on reload and the running day shown.
+    describe('when the shop’s running day lags today', () => {
+      const lagging = (_id: string, day?: string) =>
+        of(day ? overview({ businessDate: day, archive: true }) : overview({ businessDate: '2026-07-27' })) as never;
+
+      it('keeps a day the picker allows, once the running day is known', async () => {
+        await build({ date: '2025-08-02' });
+        api.overview.and.callFake(lagging);
+        fixture.destroy();
+        fixture = TestBed.createComponent(ShopComponent);
+        fixture.detectChanges();
+
+        expect(api.overview).toHaveBeenCalledWith('abc', '2025-08-02');
+        expect(fixture.componentInstance.date).toBe('2025-08-02');
+      });
+
+      it('still never relays a day before the picker’s floor', async () => {
+        await build({ date: '2025-07-01' });
+        api.overview.and.callFake(lagging);
+        fixture.destroy();
+        fixture = TestBed.createComponent(ShopComponent);
+        fixture.detectChanges();
+
+        expect(api.overview).not.toHaveBeenCalledWith('abc', '2025-07-01');
+        expect(fixture.componentInstance.date).toBe('');
+      });
+    });
+
     it('never opens Tables on a closed day', async () => {
       await build({ date: '2026-09-26', tab: 'tables' });
       expect(fixture.componentInstance.tab).toBe('items');

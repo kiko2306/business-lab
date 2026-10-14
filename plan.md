@@ -36843,3 +36843,12 @@ Rejected: rewriting the code comments in three `theme.css` files — anchors fix
 - **Data-limited:** no day without last-week data (archive reaches past the one-year floor), no table awaiting payment, no live running day (the sample agent's running day is 27/07/2026, so the hero reads "Faturado em 27/07 … até às 19:00").
 - **Bug found → README item:** a `?date=` between the two floors is dropped on reload. `readStateFromUrl` → `dayAllowed` uses `earliestDate`, which falls back to `today` minus a year while `runningDate` is still null; the picker's `min` uses the running day. Overview API for 2025-07-27 returns the right archive day (3540,96 €); the page showed 9640,16 €. Picking the same day in the picker works.
 - Script note: first run waited on fixed timeouts after `goto(?date=…)`, which is how the dropped date surfaced.
+
+## 957. Tally keeps a past day on reload when the running day lags today (§956)
+
+[x] done. [ ] beta look — README item. `apps/tally` only — no dashboard version bump (rebuilt by the self-update, §673).
+
+- Cause: `readStateFromUrl` ran `dayAllowed` before any overview, so `earliestDate` fell back to today minus a year; the picker's `min` is the running day minus a year. A day between the two was dropped and the running day shown under a URL still carrying the date.
+- Fix (`shop.component.ts`): a URL day that fails *only* that floor while `runningDate` is unknown is held in `pendingDate`; when the first running-day overview sets `runningDate`, it is re-checked and, if allowed, loaded through `pickDate` (the running answer is dropped). A day below the real floor is still never relayed to the shop. `isRealDay` moved to `clock.ts` (shape + round-trip check, shared by both paths).
+- Rejected: dropping the floor check on load (relays any typed past date to the till PC — what §806.8 closed); a fixed slack on the floor (the lag is unbounded: 79 days on the sample shop); fetching the running day first on every dated load (one extra relay for every link, to fix an edge case).
+- Tests: 2 in `shop.state.spec.ts` — lagging running day keeps `2025-08-02` (failed on the old code: `date` was ''), and never relays `2025-07-01` (guard). Local `node_modules` was Angular 18 against a 21 `package.json`, so 110 specs failed to compile until `npm ci`; then 141/141, build clean.

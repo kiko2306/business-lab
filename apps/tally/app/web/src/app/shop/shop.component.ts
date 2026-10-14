@@ -7,7 +7,7 @@ import { ApiService } from '../api.service';
 import { BarChartComponent, BarDatum } from '../charts/bar-chart.component';
 import { HourlyChartComponent } from '../charts/hourly-chart.component';
 import { TPipe, numberLocale, t } from '../i18n';
-import { Clock, localDay } from '../clock';
+import { Clock, isRealDay, localDay } from '../clock';
 import { ConnectionService } from '../connection';
 import { describeFailure } from '../errors';
 import { isSoleShopViewer } from '../access';
@@ -50,6 +50,8 @@ export class ShopComponent implements OnInit, OnDestroy {
   date = '';
   /** The running day, learned from the first response for it; also the latest day the picker allows. */
   runningDate: string | null = null;
+  /** A `?date=` that waits for the running day before it can be checked — see readStateFromUrl. */
+  private pendingDate = '';
   loading = true;
   /** Set when the shop's agent is not connected — a distinct state from an error. */
   offline = false;
@@ -174,10 +176,7 @@ export class ShopComponent implements OnInit, OnDestroy {
    * Windows machine in the shop to come back empty.
    */
   private dayAllowed(day: string): boolean {
-    // Round-trips rather than trusting Date.parse, which rolls 2026-02-30 forward to 2 March.
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
-    const parsed = new Date(`${day}T00:00:00Z`);
-    if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== day) return false;
+    if (!isRealDay(day)) return false;
     const tomorrow = new Date(this.clock.now());
     tomorrow.setDate(tomorrow.getDate() + 1);
     return day >= this.earliestDate && day <= (this.runningDate ?? localDay(tomorrow));
@@ -195,6 +194,11 @@ export class ShopComponent implements OnInit, OnDestroy {
     const date = query?.get('date') ?? '';
     if (this.dayAllowed(date)) {
       this.date = date;
+    } else if (!this.runningDate && isRealDay(date) && date < this.earliestDate) {
+      // Below a floor counted from today, because the running day is not known yet: on a shop
+      // whose running day lags today the picker allows it, and a reload dropped it (plan.md §957).
+      // Held, and re-checked once the first overview names the running day.
+      this.pendingDate = date;
     }
     const tab = query?.get('tab');
     if (tab === 'tables' || tab === 'items') {
@@ -288,6 +292,15 @@ export class ShopComponent implements OnInit, OnDestroy {
         if (day !== this.date) return;
         this.overview = overview;
         if (!overview.archive && overview.businessDate) this.runningDate = overview.businessDate;
+        if (this.pendingDate && this.runningDate) {
+          const pending = this.pendingDate;
+          this.pendingDate = '';
+          if (this.dayAllowed(pending)) {
+            // This answer is the running day's; the URL asked for another, which now loads instead.
+            this.pickDate(pending);
+            return;
+          }
+        }
         this.offline = false;
         this.overviewError = '';
         this.loading = false;

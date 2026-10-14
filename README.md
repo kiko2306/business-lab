@@ -418,14 +418,11 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       header `entrydate` archived, which can put a "by 14:00" comparison's two
       sides in different hours), and whether stale `wsir_vnd_pedidos` rows inflate
       Forecast. Any disagreement is a defect in what the owner is told.
-- [ ] **Tally drops a valid `?date=` on reload when the running day lags today (plan.md §956)** —
-      `readStateFromUrl` runs before `runningDate` is known, so `dayAllowed` measures the one-year
-      floor from today's real date instead of from the running day the picker uses. On the sample
-      shop (running day 27/07/2026, today 14/10/2026) any day between 27/07/2025 and 14/10/2025 can be
-      picked, but a reload or shared link for it silently shows the running day's figures while the
-      address still carries the date. Real shops only hit it while the agent is days behind. Test
-      first (reload with a date between the two floors); re-check the date once `runningDate` is known
-      instead of dropping it up front.
+- [ ] **Beta-test Tally keeping a past day on reload (plan.md §957)** — on `beta`, after the update
+      rebuilds Tally: on the Mat Laptop shop (running day 27/07/2026) pick 02/08/2025 in the date
+      picker, then reload — the page briefly loads the running day and then shows 02/08/2025
+      (6 830,22 €), with the address keeping `?date=2025-08-02`. A day before the picker's floor
+      (`?date=2025-07-01`) still opens on the running day and is never sent to the shop.
 - [ ] **Beta-test Tally: the fourth critique's web fixes (plan.md §810)** — *2026-10-14 at 0.173.30 (plan.md §956): a `visibilitychange` back to the page fetched `overview` and `tables` at once; tapping an hourly column reads "14:00 · 434,00 €". Left: a shop with no tables, the till PC off.* *2026-10-14 at 0.173.4, Mat Laptop shop (sample day 27/07/2026), 390px pt-PT: 
       Items shows ten rows and "Mostrar todos (101)"; a past day's hero names its date. Left: refresh
       on return to the app, tapping a chart column, a shop with no tables, the till PC off.* On `beta`, on a
