@@ -38758,3 +38758,14 @@ Not done, rejected:
 - Found: start/stop toast shows backend English `message` in pt-PT. New README item.
 - Tried and rejected: resizing the real window to 1280 CSS px (display scaling caps it at 929); `setViewportSize` emulation used instead — its full-page screenshots clip the right edge, so overflow was measured in-page, not by eye.
 - Samba stopped/started once (~30 s), back healthy.
+
+## 929. More browser beta checks, 2026-10-14 (0.173.4)
+
+[x] done. Same CDP Chrome as §928. Owner logged in as `mat`; `claude-test` password reset from Users for a second login (lives only in the session scratchpad). 2FA enrolled on `claude-test`, exercised, then turned off again.
+- Deleted (all steps pass): §818 focus ring (Users/Settings/Backups both themes + Tally shop + Hotel admin), §808 OnPush service card (IT Tools stop/start popup streams, auto-closes 2.5 s after running; Miniflux Back up now → 7 KB snapshot; language switch), §806 item 4 Tally contrast/targets, §749 Navidrome (admin lands in library; `claude-test` auto-created `regular`).
+- Partial passes noted in README: §813 Users, §834 Updates confirm (box 6 behind), §819 Account 2FA journey, §827 sign-in, §898 2FA login, §807 colours, §696 theme, §788 Home badges, §906 workspaces, §806.5–.8/§810 Tally, §688 Tally pt-PT, §666 Outline (`wiki.<domain>`, second user no invite), §841 Utils, §845 Content subscribers.
+- Failed: §912 bouncer prune (logs removal, rows stay in live `cscli bouncers list`); §615 ntfy Test enabled during the ~30 s save; §806.6 Tally back link/counters 19px.
+- New README items: stop confirm "{{label}}", silent Back up now 400 on stateless app, Save button with no settings, Home backup badge colour, Edit roles hides Features until saved, authenticator issuer "Homelab Management", English 429 text, bouncer prune, ntfy saving state + stale hint, Tally 44px, device scan "Desconhecido" for this server, Content Generate 404 (likely `claude-opus-5` model ID).
+- Rate limit: ~45 min of scripted checks spent `apiLimiter`'s 200/15 min per IP, which also blocks the owner's tab on that IP. Paced after that.
+- Tried and rejected: contexts made with `browser.newContext()` over CDP die when the script disconnects — each isolated login is one script. Element matching by `/SSO/i` hit "acesso"; `/Atualiz/` missed "A atualizar…" — reran with exact checks before recording.
+- Ran: Samba stop/start, IT Tools stop/start ×2, ntfy CrowdSec switch off/on (restarts n8n + CrowdSec each time), one subscriber added/removed, one Miniflux snapshot left in place.
