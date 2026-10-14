@@ -292,7 +292,13 @@ export class SettingsComponent implements OnInit {
   }
 
   toggleCategoryEnabled(category: AlertCategory, enabled: boolean): void {
+    // Show the switch's new state now: the save restarts n8n and CrowdSec (~30 s),
+    // and until then Test stayed live on a switch that read off (plan.md §933).
+    if (this.alertSettings) {
+      this.alertSettings = { ...this.alertSettings, enabled: { ...this.alertSettings.enabled, [category]: enabled } };
+    }
     this.saveAlertSettings({ enabled: { [category]: enabled } });
+    this.alertsFeedback = { type: 'info', message: this.translate.t('settings.ntfy.saving') };
   }
 
   testAlertSource(source: string): void {
@@ -337,6 +343,8 @@ export class SettingsComponent implements OnInit {
             type: 'danger',
             message: extractErrorMessage(error, this.translate.t('settings.errors.saveAlerts')),
           };
+          // A switch flipped ahead of the save goes back to what is stored.
+          this.loadAlertSettings();
         },
       });
   }

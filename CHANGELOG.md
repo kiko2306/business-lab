@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.18] — 2026-10-14
+
+### Fixed
+
+- ntfy alert switches grey out Test at once and say they are saving; the topic hint no longer claims anyone can read it
+
 ## [0.173.17] — 2026-10-14
 
 ### Fixed

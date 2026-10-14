@@ -38798,3 +38798,4 @@ Not done, rejected:
 - **Home backup badge** green (`--ok`, success-subtle tokens) when the last backup is today or yesterday; yellow from two days, since backups run daily.
 - **Back up now on a stateless app.** Not silent after all — §929's selector missed the toast; it read the backend's English "Failed to back up the app". `backupOneApp` now sets `reason: 'no_data'`, the route passes it, the panel words it.
 - **Save configuration** not rendered when no field is visible (was disabled).
+- **ntfy switch** updates `alertSettings.enabled` before the save (Test greys at once), shows `settings.ntfy.saving`, reloads stored state on error. Topic hint rewritten: reads need the `subscriber` login (§425).
