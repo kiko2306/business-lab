@@ -321,7 +321,7 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       Chrome: Users, Backups, Settings, Apps, Home, Updates have no button under 44px and no
       sideways scroll. Role and feature checkbox rows toggle from anywhere on the row; the app-access
       rows did not, fixed in §926 — recheck their empty corner. Tally shop view (Mat Laptop) at 390px: no
-      sideways scroll, but two buttons are under 44px (item below). Left: the app-access recheck. 2026-10-14
+      sideways scroll; with touch emulated every control is 44px. Left: the app-access recheck. 2026-10-14
       at 1280px: no page scrolls sideways; Users wraps mid-word (item below).* On `beta`, at 390px wide (browser
       device mode): Users, Backups, Settings and a Tally shop view. Every button is 44px tall with its
       label centred, tapping anywhere on a checkbox's row toggles it, no page scrolls sideways and
@@ -348,9 +348,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Beta-test the ntfy switches (plan.md §933)** — on `beta`, Settings → Alertas ntfy: turn CrowdSec
       off — its Testar greys at once and "A guardar…" shows until the ~30 s save lands; turn it back on.
       The line under each topic no longer says anyone can read it.
-- [ ] **Bring Tally's day-view tabs and counters toggle to 44px (plan.md §929)** — shop view at
-      390px: the Mesas / Artigos vendidos `nav-link` buttons are 42px tall, and "▸ Contadores do dia"
-      and "← Todas as lojas" are 19px, under the 44px rule the rest of the app now meets (§824).
 - [ ] **Beta-test the server's name in Find devices (plan.md §932)** — on `beta`, Settings →
       Encontrar dispositivos: the Este servidor row reads `home-srv-01`, not Desconhecido.
 - [ ] **Beta-test AI drafts on the new Gemini model (plan.md §930)** — on `beta` after the update
@@ -578,8 +575,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       each mode and confirm nothing reads washed out or too dark.
 - [ ] **Beta-test Tally: touch targets, titles and the tables-in-use count (plan.md §806.6)** —
       *2026-10-14 at 0.173.4, Mat Laptop shop (sample day 27/07/2026), 390px pt-PT: title "Mat Laptop ·
-      Tally" passes; FAILS: the back link and the counters heading are 19px (item below). Left: tables
-      awaiting payment in the count.*
+      Tally" passes; with touch emulated (`pointer: coarse`) the back link, counters heading and both
+      tabs are 44px. Left: tables awaiting payment in the count.*
       on `beta`, on a phone: the day-counters heading, a table's number and the
       back link must each be easy to hit (44px); the tab title reads "<shop> ·
       Tally"; and with some tables awaiting payment, "Tables in use" must count
