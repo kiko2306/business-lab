@@ -325,30 +325,19 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       Parar/Iniciar. Audit log: one `self_update_complete` with `appsUpdated`.
 - [ ] **Beta-test the translated rate-limit message (plan.md §933)** — hard to provoke by hand (200 API
       calls per 15 min); if a 429 shows up in pt-PT it reads "Demasiados pedidos em pouco tempo…".
-- [ ] **Beta-test the Utils critique fixes (plan.md §841)** — *2026-10-14 at 0.173.4, pt-PT laptop:
-      (1) Home's Saúde do servidor sentence, four rows with Bem and "Verificado às"; (2) Enter on
-      Encontrar dispositivos keeps focus on it, "A procurar…" then "Encontrados 10 dispositivos." are
-      announced, table Nome/Fabricante/Endereço; (3) `/utils` lands on Home, no Utils in nav, seven tiles
-      in even rows with Apps and Backups wide, the Settings tile mentions devices; (4) this server first
-      with Este servidor, a Não reconhecidos group. Left: phone, EN, backend-blocked Try again, the
-      `apps:control`-only 403, the network-unplugged failure.* 20/40. In order, test first, one
-      commit and version bump each. Decided 2026-10-06: **fold** `/utils` away — health moves onto
-      Home, the scan into a Settings panel, then the route, nav item and tile go and `/utils`
-      redirects to `/home`. Order: (1) done (§842) — on `beta`, Home shows "Server health": a sentence
-      ("Everything is running normally." or one per problem), a row each for business data, disk,
-      memory and server load with Fine / Needs attention beside each bar, and "Checked HH:MM"; the
-      disk and memory figures match the header strip's units; in pt-PT no English; on a phone the rows
-      stack with no sideways scroll; block the API (stop the backend) before first load and Try
-      again appears; (2) done (§843) — on `beta`, Settings shows "Find devices on your network" (to `settings:manage`);
-      press Find devices with the keyboard: focus stays on the button, "Scanning your network…" is read
-      out, then "Found N devices." and the table with Name / Device maker / Address; an account with
-      `apps:control` but not `settings:manage` no longer sees the panel and gets 403 from the API
-      unplug the box's network and scan: the failure shows beside the button; (3) done (§844) — on `beta`,
-      the nav and Home have no Utils, Home has seven tiles in even rows (two wide: Apps, Backups),
-      the Settings tile's text mentions finding devices, and opening `/utils` by hand lands on Home;
-      (4) done (§864) — on `beta`, press Find devices: the first row is this server with a "This server" badge,
-      named devices follow, devices with no name or maker sit under "Not recognised".
-      On `beta`, open Home and Settings on a phone and a laptop, EN and pt-PT.
+- [ ] **Beta-test the Utils critique fixes (plan.md §841)** — *pt-PT laptop passed (2026-10-14 at
+      0.173.4); EN on a phone passed (2026-10-14 at 0.173.26, plan.md §947): Server health rows, Try again
+      when the health read fails and recovery after it, Find devices by keyboard and click with focus
+      kept, "Scanning your network…" then "Found 10 devices." announced, This server first, Not
+      recognised group, no sideways scroll.* Left: an account with `apps:control` but not
+      `settings:manage` sees no Find devices panel and gets 403 from `POST /api/network/scan`; with the
+      box's network unplugged, a scan's failure shows beside the button; Home and Settings in pt-PT on a
+      phone.
+- [ ] **Backups: the main Destination box is blank when an advanced kind is set (plan.md §947)** —
+      `backupKind` and `backupKindMore` (`backups.component.html`) share one `kind` control, and the
+      main select has no option for an advanced kind, so with WebDAV configured it shows an empty box
+      above "Advanced: more destination kinds". Seen at 0.173.26. Show the configured kind in the main
+      box (e.g. an option "Other — see below" or the kind's own label), test first.
 - [ ] **Beta-test the Content critique fixes (plan.md §845, §847)** — *2026-10-14 at 0.173.4, pt-PT:
       (2) adding an address with Enter announces "… adicionado." and keeps focus in the box; Remover
       asks first, names the address, and the row goes. (5) cannot run: a key is set, and Generate
@@ -576,30 +565,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       own. Finally check an app with a pinned image still shows its pin badge
       after the pin is cleared from the Updates page (the compose YAML is now
       memoised on mtime, so a stale badge would be the bug).
-- [ ] **Beta-test Home's new badges (plan.md §788)** — *2026-10-07: the data behind both is right
-      (`/backups/last-successful` is dated today; `/self-update/check` reports `commitsBehind: 1`
-      when `beta` is ahead). Still to do: how the two tiles render, and the failed-read case.* *2026-10-14 at 0.173.4, 6
-      behind: Home shows "Atualização disponível" on Updates and "Copiado hoje" on Backups, no toast.
-      Left: the failed-read case.* On `beta`, with a
-      successful app-data backup on record, confirm the Backups tile shows
-      its age ("Backed up Nd ago" / "Backed up today"), and that the Updates
-      tile shows "Update available" only once `beta` is genuinely behind
-      `origin/beta` (it won't be, right after a pull — check right before the
-      next commit lands, or watch it clear after updating). Confirm neither
-      badge triggers an error toast if you can make one of the two reads fail
-      (e.g. stop the backend's DB briefly) — the tile should just show no
-      badge, not an error.
-
-### Audit findings, the other 12 pages (plan.md §790, §791)
-
-`/impeccable audit` extended past the original four (login, setup, recovery,
-set-password, access-denied, unsubscribe, content, utils, audit-logs, users, updates,
-account). A raw Joi validation leak on set-password/unsubscribe, the theme toggle's
-icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§790,
-§791). One deferred, deliberately not folded into that fix:
-
-### Apps page (impeccable critique, plan.md §761)
-
 - [ ] **Beta-test "Show details" and Try again after a real failed start (plan.md §774, §921)** —
       *2026-10-13 at 0.173.4, over the API: a start on a held 10490 fails with the compose text and
       leaves no container; after freeing it, Start → running, healthy, 10490 published and serving.*
@@ -694,20 +659,12 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       web UI, open a document and confirm the OnlyOffice editor actually
       launches, and complete one SAML login.
 
-- [ ] **Beta-test light/dark mode (plan.md §696)** — *2026-10-14 at 0.173.4, dashboard: follows
-      an OS light/dark switch, `theme-init.js` runs sync in `<head>`, the header toggle flips it and
-      survives a reload. Tally and Hotel admin follow an OS switch. Left: walking each page by eye,
-      the Hotel guest pages on a phone.* On `beta`, after pulling
-      (dashboard and Tally rebuild), open the dashboard and `tally.<domain>`
-      with the OS set to light: both should load light with no dark flash, and
-      with the OS set to dark, dark. The ☀/☾ button in the header/navbar should
-      flip the page and the choice should survive a reload. Walk Home, Apps
-      (open a service card and its logs), Backups, Settings and Tally's shop
-      page in light: look for unreadable text, dark-on-dark panels and shadows
-      that look muddy. The strict-CSP e2e (`csp.spec.ts`) covers the external
-      `theme-init.js` loading.
-      Also check the Hotel admin, check-in and feedback (pulse) pages the same
-      way (plan.md §697) — a guest link on a phone is the one that matters.
+- [ ] **Beta-test light/dark mode (plan.md §696)** — *dashboard done: OS switch, `theme-init.js`,
+      the toggle and reload (2026-10-14 at 0.173.4); every page walked in light with all panels open
+      and a service card's settings dialog, 390px and 1280px, no text under 4.5:1 and no sideways
+      scroll (2026-10-14 at 0.173.26, plan.md §947).* Left: Tally's shop page in light, and the Hotel
+      admin, check-in and feedback (pulse) pages (plan.md §697) — a guest link on a phone is the one
+      that matters. Look for unreadable text, dark-on-dark panels and muddy shadows.
 - [ ] **Beta-test Tally's language switch (plan.md §688)** — *2026-10-14: Português survives a
       reload; Shops list and a shop page have no English UI words, dates dd/MM, money `9 640,16 €`.
       Left: the Manage panel.* On `beta`, after

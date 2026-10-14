@@ -36757,3 +36757,13 @@ Rejected: rewriting the code comments in three `theme.css` files — anchors fix
 - Rejected: `mousedown.preventDefault()` on the summary — fixes only that one control, and every other button below a field (Show, "Use a recovery code", "Start over") has the same geometry; reserving space under each field — adds empty gaps to every form for a rare message.
 - Cost: an empty, never-typed field shows no error; the disabled Sign in button and two empty boxes say enough on a two-field form. Setup and set-password keep `touched` (more fields, rules worth showing); same hazard there only if a field above a press target is left empty — not seen, not filed.
 - Tests: 3 in `login.component.spec.ts` (2 failed first: error shown, line moved 704 vs 679; 1 guards typed-and-left). Frontend 613, build clean, E2E 12 passed / 3 skipped.
+
+## 947. Browser beta pass: light mode (§696), Home badges (§788), Utils (§841), 2026-10-14
+
+[x] done at 0.173.26, LAN URL, Playwright (Chromium) as `claude-test`, read-only on the box; failed reads faked in the browser with `page.route`.
+
+- **Light (§696), dashboard part passed:** Home, Apps, Backups, Settings, Users, Updates, Account, Audit logs at 390px and 1280px with `colorScheme: light`, every panel opened, plus a service card's settings dialog. Automated scan (text vs first opaque background, 4.5:1 / 3:1 large): nothing under; no sideways scroll; screenshots read by eye. Startup logs not opened (needs a start). Left: Tally, Hotel pages.
+- **Home badges (§788), failed read passed:** `/backups/last-successful` and `/self-update/check` answered 500 — no toast, no alert, both tiles render without a badge, EN and pt-PT. README item deleted (render half passed 2026-10-14).
+- **Utils (§841), EN phone passed:** health read blocked → "Could not read the server's health." + Try again, which recovers once unblocked; Find devices (Enter and click) keeps focus on the button, announces "Scanning your network…" then "Found 10 devices.", Name/Device maker/Address, This server first, Not recognised group. Left: `apps:control`-only 403, unplugged network, pt-PT phone.
+- **Red herring:** the first scan runs looked hung. Playwright's `waitForFunction` is refused by the page's strict CSP (`unsafe-eval`), so the wait failed at once and read the "Scanning…" state. Direct API scan: 200 in 4 s; `waitForResponse` in the page: 200 in 5 s. Use `waitForResponse`/locators, never `waitForFunction`, against this app.
+- **Found → README item:** Backups' main Destination select is blank when WebDAV (an advanced kind) is set — both selects bind one `kind` control and the main one has no matching option.
