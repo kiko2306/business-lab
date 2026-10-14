@@ -74,60 +74,11 @@ export async function ensureCrowdsecDashboardMachine(serviceName: string): Promi
   }
 }
 
-export interface BouncerRow {
-  name: string;
-  ip_address: string;
-  last_pull: string | null;
-}
-
-// CrowdSec names a bouncer `<name>@<ip>` when a known key shows up from a new
-// IP, and NPM gets a new IP on every recreate — so each one leaves a dead row
-// behind (plan.md §912). The digits-only match is also what makes the name
-// safe to put on a cscli command line.
-const NPM_BOUNCER_COPY = /^nginx@[0-9a-f.:]+$/i;
-const STALE_BOUNCER_MS = 3 * 24 * 60 * 60 * 1000;
-
-/**
- * The `nginx@<ip>` rows that have not pulled for days. Never the bare
- * `nginx`/`cloudflare` rows (CrowdSec re-creates those from BOUNCER_KEY_* on
- * every start), and never the most recent copy, so NPM being down a while
- * does not cost it its registration.
- */
-export function pickStaleBouncers(rows: BouncerRow[], nowMs: number): string[] {
-  const copies = rows.filter((row) => NPM_BOUNCER_COPY.test(row.name) && row.last_pull);
-  const newest = copies.reduce<BouncerRow | null>(
-    (best, row) => (!best || Date.parse(row.last_pull!) > Date.parse(best.last_pull!) ? row : best),
-    null
-  );
-  return copies
-    .filter((row) => row !== newest && nowMs - Date.parse(row.last_pull!) > STALE_BOUNCER_MS)
-    .map((row) => row.name);
-}
-
 function cscliRun(resolved: NonNullable<ReturnType<typeof resolveComposeFile>>, args: string): Promise<string> {
   const script = `cscli -c /staging/etc/crowdsec/config.yaml ${args}`;
   return runShell(
     composeRunCommand(resolved, `--entrypoint /bin/sh ${CROWDSEC_SERVICE} -c "${pipedScript(script, '/bin/sh')}"`)
   );
-}
-
-/** Post-start hook: delete the dead NPM bouncer rows. Never blocks the start. */
-export async function pruneStaleCrowdsecBouncers(serviceName: string): Promise<string[]> {
-  if (serviceName !== CROWDSEC_SERVICE) return [];
-  const resolved = resolveComposeFile(CROWDSEC_SERVICE);
-  if (!resolved?.composeFile) return [];
-  try {
-    const rows = JSON.parse(await cscliRun(resolved, 'bouncers list -o json')) as BouncerRow[] | null;
-    const stale = pickStaleBouncers(rows ?? [], Date.now());
-    if (stale.length) {
-      await cscliRun(resolved, `bouncers delete ${stale.join(' ')}`);
-      logger.info('CrowdSec: removed stale NPM bouncer registrations', { bouncers: stale });
-    }
-    return stale;
-  } catch (error) {
-    logger.warn('CrowdSec: could not prune stale bouncers', { error: (error as Error).message });
-    return [];
-  }
 }
 
 async function joinLapiNetwork(): Promise<void> {

@@ -38782,3 +38782,8 @@ Not done, rejected:
 ## 931. Stop confirm button showed a raw {{label}}
 
 [x] done. Found §929 (IT Tools stop → "Parar {{label}}"). `stopConfirmation()` passed `{ label }` to title and message but not to `confirmStopExposed.confirmText`. Spec now asserts the button names the app. Swept every `translate.t('key')` without params and every `'key' | t` in templates against en.ts keys holding `{{`: no other case.
+
+## 932. Backend fixes from §929: bouncer prune removed, 2FA issuer, scan names the server
+
+[x] done.
+- **Bouncer prune (§912) removed.** Traced the live backend's own `pruneStaleCrowdsecBouncers` (node in the container, `exec` wrapped): the delete's stderr is `bouncer 'nginx@10.201.17.3' is auto-created and cannot be deleted, delete parent bouncer nginx instead`, exit 0 — so it logged "removed" every CrowdSec start and the row (created 2026-09-23) never went. Ruled out first, with throwaway `claude-probe-*` bouncers: one-off `compose run` writes the live DB (host and backend container, and racing a `--force-recreate`). Rejected fixes: delete parent `nginx` (cuts the live NPM bouncer until the next CrowdSec start re-registers it); `cscli bouncers prune -d` (also takes `nginx`, last pull 09-23). The copies are harmless rows; §912 only called them dead weight. Reconciler count 29 → 28.

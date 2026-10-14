@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.9** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.10** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -356,12 +356,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       with no data directory.
 - [ ] **Hide "Guardar configuração" when there is nothing to save (plan.md §929)** — an app with no
       configurable settings (IT Tools) says so and still shows the Save button.
-- [ ] **Make the CrowdSec bouncer prune actually delete (plan.md §929)** — `pruneStaleCrowdsecBouncers`
-      (`crowdsecBans.ts`) runs `cscli … bouncers delete` in a one-off `compose run` container with
-      `-c /staging/etc/crowdsec/config.yaml` and logs success, but the live container's
-      `cscli bouncers list` keeps the rows (seen 2026-10-14). Run it against the live LAPI database
-      (or the running container), and have the log line confirm the row count dropped. The old
-      `nginx` row (no `@ip`) is not matched by `NPM_BOUNCER_COPY` either.
 - [ ] **Grey out an ntfy row's Test while its switch is off, and show saving (plan.md §929)** —
       Settings → Alertas ntfy: Test is bound to the saved `alertSettings.enabled[...]`, so for the
       whole save after turning CrowdSec off its Test stayed enabled; bind it to the switch. Each toggle restarts n8n and CrowdSec (~30 s) with
@@ -714,13 +708,6 @@ icon, and Utils/Updates' top-level jargon were all fixed live in that pass (§79
       restarted from the dashboard comes back healthy.* Left: on the next CVE alert
       (`crowdsecurity/CVE-*`, `http-cve-probing`), Settings → CrowdSec bans shows ~24h left for
       that IP, not ~4h; crawl/probe bans still 4h.
-- [ ] **Beta-test stale CrowdSec bouncer prune (plan.md §912)** — *2026-10-13: after a CrowdSec
-      restart the backend logged "removed stale NPM bouncer registrations" for
-      `nginx@10.201.17.3`, and Settings → CrowdSec bans still loads.* Left: a new probe still gets
-      banned (so `nginx@10.201.17.5` still enforces). *2026-10-14: FAILS — the backend logged the same
-      removal again at 09:03:47, yet `cscli bouncers list` in the live container still shows
-      `nginx@10.201.17.3` (last pull 2026-10-07) and `nginx` @10.201.17.2 (2026-09-23). Live
-      `nginx@10.201.17.5` pulled at 09:04. Fix item below.*
 - [ ] **Beta-test 7-day ntfy history (plan.md §912)** — *2026-10-13: `ntfy-ntfy-1` has
       `NTFY_CACHE_DURATION=168h`.* Left: a day later, yesterday's CrowdSec/backup notifications
       are still in the ntfy app history.

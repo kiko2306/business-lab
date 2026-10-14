@@ -122,12 +122,12 @@ describe('POST_UP_RECONCILERS', () => {
     }
   });
 
-  // The old flat list had 28 entries, plus §912's CrowdSec bouncer prune; losing
-  // one in a regrouping would silently stop an app's first-admin bootstrap.
-  it('still holds all 29 reconcilers, none twice', () => {
+  // The old flat list had 28 entries (§912's bouncer prune came and went, §932);
+  // losing one in a regrouping would silently stop an app's first-admin bootstrap.
+  it('still holds all 28 reconcilers, none twice', () => {
     const all = Object.values(POST_UP_RECONCILERS).flat();
-    expect(all).toHaveLength(29);
-    expect(new Set(all).size).toBe(29);
+    expect(all).toHaveLength(28);
+    expect(new Set(all).size).toBe(28);
   });
 
   // The ordering constraints from the old list's doc comment, now within one service.

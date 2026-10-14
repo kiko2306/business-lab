@@ -20,7 +20,7 @@ import { reconcileMeshcentralFirstAdmin } from './meshcentralAdminBootstrap';
 import { ensureNocodbInviteOnlySignup } from './nocodbUserProvisioning';
 import { reconcileUptimeKumaFirstAdmin } from './uptimeKumaAdminBootstrap';
 import { ensureNtfySubscriberToken } from './ntfyAuthBootstrap';
-import { ensureCrowdsecDashboardMachine, pruneStaleCrowdsecBouncers } from './crowdsecBans';
+import { ensureCrowdsecDashboardMachine } from './crowdsecBans';
 import { reconcileUptimeKumaMailNotification } from './uptimeKumaMailNotification';
 import { ensureCriticalServiceMonitors } from './uptimeKumaCriticalMonitors';
 import { reconcileHomeAssistantFirstAdmin } from './homeAssistantAdminBootstrap';
@@ -206,8 +206,6 @@ export const POST_UP_RECONCILERS: Record<string, ((serviceName: string) => Promi
     // lift bans (§540). Throwaway run against its data volume, so after `up`;
     // no-op otherwise.
     ensureCrowdsecDashboardMachine,
-    // Drop the `nginx@<ip>` bouncer rows each NPM recreate leaves (§912).
-    pruneStaleCrowdsecBouncers,
   ],
 };
 
