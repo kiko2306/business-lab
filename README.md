@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.8** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.9** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -348,10 +348,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Colour Home's backup badge by age (plan.md §929)** — the Backups tile's "Copiado hoje" uses
       the same yellow `menu-tile__badge` as "Atualização disponível" and as a weeks-old backup, so good
       news reads as a warning. Neutral/green when recent, yellow only when old.
-- [ ] **Fill the app name into the stop confirm button (plan.md §929)** — stopping an exposed app
-      (IT Tools) shows a confirm whose red button reads "Parar {{label}}" / "Stop {{label}}":
-      `service-card.component.ts` `stopConfirmation()` translates `confirmStopExposed.confirmText`
-      without passing `{ label }`. Pass it, and add a spec that the button names the app.
+- [ ] **Beta-test the stop confirm button label (plan.md §931)** — on `beta`, Stop an exposed app
+      (IT Tools): the red button reads "Parar IT Tools" / "Stop IT Tools". Cancel it.
 - [ ] **Say why Back up now did nothing (plan.md §929)** — IT Tools → Definições → "Fazer cópia
       agora" goes busy for 0.3 s and stops: the API answers 400 "it-tools has no data directory to
       back up." but the dialog shows no message. Show the error, or hide the backup section for apps

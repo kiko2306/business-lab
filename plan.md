@@ -38778,3 +38778,7 @@ Not done, rejected:
 - Models: Google `gemini-3.8-flash` / `gemini-3.5-flash-lite` (Google's picks for new projects); Groq `openai/gpt-oss-120b` / `openai/gpt-oss-20b` (Groq's named replacements). Anthropic unchanged — `claude-opus-5` / `claude-haiku-4-5` still served.
 - Rejected: my §929 guess (Anthropic `claude-opus-5` retired) — wrong, it is a current ID, and no Anthropic key is stored anyway. Rejected bumping Anthropic to 5.5 in the same change: nothing broken there, and Opus 5.5 can't disable thinking, which the plain chat-completions call never budgeted for — its own item if wanted.
 - Test: array error body surfaces the message; registry names none of the four withdrawn IDs. Live proof is the README beta item (needs the real key).
+
+## 931. Stop confirm button showed a raw {{label}}
+
+[x] done. Found §929 (IT Tools stop → "Parar {{label}}"). `stopConfirmation()` passed `{ label }` to title and message but not to `confirmStopExposed.confirmText`. Spec now asserts the button names the app. Swept every `translate.t('key')` without params and every `'key' | t` in templates against en.ts keys holding `{{`: no other case.

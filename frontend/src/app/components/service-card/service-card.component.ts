@@ -210,7 +210,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       return {
         title: this.translate.t('serviceCard.confirmStopExposed.title', { label }),
         message: this.translate.t('serviceCard.confirmStopExposed.message', { label, hostname: this.service.exposedHostname }),
-        confirmText: this.translate.t('serviceCard.confirmStopExposed.confirmText'),
+        confirmText: this.translate.t('serviceCard.confirmStopExposed.confirmText', { label }),
         danger: true,
       };
     }

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.9] — 2026-10-14
+
+### Fixed
+
+- The confirm before stopping a public app names the app on its button instead of a raw {{label}}
+
 ## [0.173.8] — 2026-10-14
 
 ### Fixed

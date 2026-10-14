@@ -716,6 +716,9 @@ describe('ServiceCardComponent stop confirmation', () => {
     const options = confirm.ask.calls.mostRecent().args[0];
     expect(options.message).toContain('paperless.example.com');
     expect(options.danger).toBeTrue();
+    // The red button named a raw "{{label}}" on the live box (plan.md §931).
+    expect(options.confirmText).toContain('paperless');
+    expect(options.confirmText).not.toContain('{{');
 
     confirm.ask.and.resolveTo(true);
     await component.requestAction('stop');
