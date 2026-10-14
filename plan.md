@@ -269,46 +269,7 @@ built.
 
 ## 14. Implementation Tasks
 
-### Phase A: Infrastructure and Containerization
-- [x] Create a root `docker-compose.yml` for frontend, backend, and database. **Priority: P0** — **Estimate: L**
-- [x] Add Dockerfiles for the Angular app and Node.js API. **Priority: P0** — **Estimate: M**
-- [x] Define persistent volumes for the database and configuration data. **Priority: P0** — **Estimate: M**
-- [x] Add container networking so the frontend can reach the API and the API can reach the database. **Priority: P0** — **Estimate: S**
-- [x] Add environment variable handling for secrets, API URLs, and database connection settings. **Priority: P0** — **Estimate: M**
-
-### Phase B: Database and Auth Foundation
-- [x] Design the database schema for users, roles, settings, and service definitions. **Priority: P0** — **Estimate: M**
-- [x] Implement the first-admin bootstrap flow. **Priority: P0** — **Estimate: L**
-- [x] Add JWT login, logout, and route protection. **Priority: P0** — **Estimate: L**
-- [x] Create middleware for checking whether setup mode is still enabled. **Priority: P0** — **Estimate: M**
-
-### Phase C: Service Management Backend
-- [x] Create an allowlisted service registry. **Priority: P0** — **Estimate: M**
-- [x] Implement start/stop endpoints using asynchronous `child_process` execution. **Priority: P0** — **Estimate: L**
-- [x] Add status aggregation logic for Docker container state and service metadata. **Priority: P0** — **Estimate: L**
-- [x] Normalize error handling and return consistent API responses. **Priority: P1** — **Estimate: S**
-- [x] Add structured logging for service operations. **Priority: P1** — **Estimate: M**
-
-### Phase D: Frontend Dashboard
-- [x] Build the login and first-time setup pages. **Priority: P0** — **Estimate: L**
-- [x] Build the dashboard shell and service grid. **Priority: P0** — **Estimate: L**
-- [x] Add start/stop buttons with loading states. **Priority: P0** — **Estimate: M**
-- [x] Add status indicators and refresh behavior. **Priority: P0** — **Estimate: M**
-- [x] Create the Cloudflare token settings panel. **Priority: P0** — **Estimate: M**
-- [x] Add admin user management screens. **Priority: P1** — **Estimate: L**
-
-### Phase E: Operational Features
-- [x] Add audit logging. **Priority: P1** — **Estimate: M**
-- [x] Add backup and restore workflows. **Priority: P1** — **Estimate: L**
-- [x] Add optional health checks. **Priority: P2** — **Estimate: L**
-- [x] Add WebSocket or SSE support for live updates. **Priority: P2** — **Estimate: XL**
-- [x] Add recovery mode and admin reset tooling. **Priority: P2** — **Estimate: M**
-
-### Phase F: Hardening and Delivery
-- [x] Add validation and security checks for all inputs. **Priority: P0** — **Estimate: M**
-- [x] Test Dockerized deployment end-to-end. **Priority: P0** — **Estimate: L**
-- [x] Document setup, deployment, and recovery steps. **Priority: P1** — **Estimate: M**
-- [x] Add smoke tests for the startup flow and service control APIs. **Priority: P1** — **Estimate: M**
+[x] All original phases done (compacted 2026-10-14): A — root compose, Dockerfiles, volumes, networking, env handling; B — schema, first-admin bootstrap, JWT auth, setup-mode middleware; C — allowlisted registry, async start/stop, status aggregation, consistent errors, structured logging; D — login/setup pages, dashboard grid, start/stop with loading, status refresh, Cloudflare token panel, user admin; E — audit log, backup/restore, health checks, live updates, recovery/admin reset; F — input validation, Docker end-to-end test, docs, smoke tests.
 
 ## 15. Acceptance Criteria
 - [x] A new installation can create its first admin account safely.
@@ -1721,82 +1682,13 @@ all 36 originals, adds one, and leaves exactly one catch-all in last position.
 
 ## 61. Pre-VPS audit of the fresh-install path
 
-`start.sh` grew a great deal in one session — port allocation, Authelia's
-forward-auth upstream, the dashboard's own hostname, Tailscale prompting and
-startup, Funnel enablement, the wetty key, `exposure_npm_api_url` seeding. None
-of it had run on a clean install. A static read of the ordering, plus a real
-run against a stripped copy of `apps/`, found three defects that a VPS run
-would have hit.
+(Compacted 2026-10-14.) Static read plus a run against a stripped `apps/` copy found three `start.sh` defects a VPS would hit:
 
-### 61.1 Ordering: two blocks read ports before they were allocated
+- **Ordering.** Authelia forward-auth rewrite and `exposure_npm_api_url` seeding read `AUTHELIA_PORT` / `NPM_ADMIN_PORT` before the allocator ran. Fresh install would fall back to defaults and reproduce §59.3/§59.4 (forward-auth broken, exposure `ECONNREFUSED`). Fix: allocator runs before the stack build.
+- **Allocator wrote a bare one-line `.env`** instead of seeding from `.env.example`, so every app lost its defaults permanently (`saveServiceEnv` prefers an existing `.env`).
+- **First fix for that was wrong**: seeding inside the write branch overwrote the port just allocated. Restructured into three passes — seed all, collect claimed ports, allocate. Re-verified: 36 ports, 0 missing, no duplicates.
 
-The Authelia forward-auth rewrite and the `exposure_npm_api_url` seeding both
-read an allocated port (`AUTHELIA_PORT`, `NPM_ADMIN_PORT`) — and both ran
-*before* the allocator. On this host that was invisible, because the values
-already existed. On a fresh install neither file exists yet, so both would have
-silently fallen back to the hardcoded default; if the allocator then moved that
-port, the results are exactly the two failures already documented in §59.3/§59.4
-— forward-auth broken on every protected site, and every exposure failing with
-`ECONNREFUSED`.
-
-Fixed by moving the allocator to run before the stack build, ahead of every
-consumer.
-
-### 61.2 The allocator threw away each app's `.env.example`
-
-`set_app_env_var` seeds a missing `.env` by copying `.env.example`. The
-allocator did not — it created a bare one-line file holding only the port. On a
-fresh clone **no app has a `.env`**, so every app would have lost the defaults
-and documentation its example carries. And permanently: `saveServiceEnv` prefers
-an existing `.env` over the example, so nothing would ever restore it.
-
-### 61.3 The fix for 61.2 was itself wrong, and only a real run showed it
-
-Seeding was added inside the write branch — *after* the "is this already set?"
-check. So for an app whose example pins a port, the allocator decided a port,
-then the copy overwrote it with the example's value, and the two disagreed:
-
-```
-==> authelia: AUTHELIA_PORT=10101 (default 10100 was taken)
-    …while apps/authelia/.env said AUTHELIA_PORT=10100
-```
-
-A log that confidently reports a port the file does not contain is worse than
-no log. Restructured into three explicit passes — **seed all, then collect
-claimed ports, then allocate** — so every read happens after every write that
-could affect it.
-
-Re-verified on a stripped copy: 36 managed ports, **0 missing**, no duplicates,
-example comments preserved, and only a genuinely-occupied port reported as
-moved.
-
-**Worth generalising:** both 61.1 and 61.3 are the same mistake — a read
-happening before the write that determines it. Bash blocks and loop passes make
-that easy to get wrong and invisible on a host where the values already exist.
-A fresh-tree run is the only thing that surfaces it.
-
-### 61.4 Checked and clean
-
-- **No hardcoded domain** in any tracked template. `authelia/configuration.yml`
-  (7 `BASE_DOMAIN` refs) and `netbird/management.json.example` (8) are fully
-  templated; zero `tx-home-utils` references outside `plan.md`.
-- **`host.docker.internal`** — mapped via `extra_hosts: host-gateway` for the
-  backend and resolving (`10.201.0.1` here). Every exposure upstream depends on
-  it, and it is not host-specific.
-- **Core ports** no longer collide with NPM (§60.4).
-- **The allocator seeds and allocates correctly from an empty tree.**
-
-### 61.5 Still untested, and only a real VPS can settle it
-
-- The **prompts** — nothing here has exercised the interactive path.
-- **cloudflared install + `cloudflared service install`** on a machine that has
-  neither.
-- **Tunnel and DNS creation from nothing**, rather than reusing this host's.
-- **Tailscale joining a tailnet from a fresh container**, and whether Funnel is
-  already enabled for the tailnet (it is now, from this host — a genuinely new
-  account would see the enablement prompt).
-- **Resource headroom.** The full stack is heavy; a small VPS may not hold every
-  app at once. Nothing checks this or warns.
+Lesson: all of these are a read before the write that determines it. Only a fresh-tree run shows it. Checked clean: no hardcoded domain in templates, `host.docker.internal` via `host-gateway`, no core port collision with NPM. Left for a real VPS: interactive prompts, cloudflared install, tunnel/DNS from nothing, Tailscale on a new tailnet, resource headroom (nothing warns).
 
 ## 62. Plan: ITFlow, MeshCentral, and email for the domain
 
@@ -2167,59 +2059,9 @@ genuinely valuable workflow cannot avoid a credential.
 
 ## 65. ITFlow shipped
 
-`apps/itflow/` + registry entry, deployed and verified. Nothing novel was
-needed — it is an ordinary HTTP app plus a database, which is the point: the
-existing exposure, port-allocation and secret-generation machinery covered it
-with no new mechanisms.
+(Compacted 2026-10-14.) `apps/itflow/`: `itfloworg/itflow:latest` on 10420 + `mariadb:10.11`. No new mechanism needed. `ITFLOW_DB_PASSWORD` hidden generated secret; `ITFLOW_URL` follows the public hostname (reset links, portal); random MariaDB root password; `./data/app` persisted because the image downloads and self-updates its source there. Verified live through `startService` (setup wizard 302, crond running).
 
-### 65.1 What it looks like
-
-- `itfloworg/itflow:latest` (official) on **10420**, `mariadb:10.11` alongside,
-  both on their own bridge network.
-- `hiddenGeneratedSecrets: ['ITFLOW_DB_PASSWORD']` — internal to the compose
-  project, so nothing to ask the user.
-- `exposureEnvKeys.url: ['ITFLOW_URL']` + `managedEnvKeys` — ITFlow builds
-  password-reset links, ticket-reply URLs and the client portal address from
-  it, so it must follow the public hostname and is shown read-only.
-- `MARIADB_RANDOM_ROOT_PASSWORD` — the root password is never needed from
-  outside, and a random one is one fewer secret to store.
-- `./data/app` is persisted deliberately: the image downloads the application
-  source there on first boot and updates it in place, so a fresh volume means a
-  full re-download and loses upgrade state.
-
-### 65.2 Verified live
-
-```
-itflow-itflow-1      Up   0.0.0.0:10420->8080/tcp
-itflow-itflow-db-1   Up   (healthy)
-
-http://localhost:10420  ->  302        (setup wizard)
-crond processes: 1
-/etc/crontabs/apache: * * * * * /usr/bin/php84 …/cron/cron.php
-```
-
-Started through `startService`, not `docker compose` — so the managed-config
-path ran (§59.6's lesson applied rather than re-learned).
-
-### 65.3 Two deliberate omissions
-
-**No `mailEnvKeys`**, with a comment in the registry saying why. ITFlow has no
-env-var support for SMTP or IMAP (§62.1); adding the keys would look like it
-worked and quietly do nothing. Its mail settings are copied into its own UI
-from the dashboard's Settings → Email.
-
-**No cron sidecar.** The image runs `crond` itself and `cron/cron.php` is a
-dispatcher — confirmed running in the live container. The user must still
-enable cron *inside* ITFlow (Settings → Notifications), documented in
-`app-credentials.md` along with the caveat that the healthcheck probes only
-httpd, so a dead crond leaves the container reporting healthy while every
-scheduled job stops.
-
-### 65.4 Left to the user
-
-Claim the setup wizard **before exposing it** — the standing rule for wizard
-apps, and it matters more here since ITFlow holds client documentation and
-credentials. Then turn on exposure with **Authelia required**.
+Deliberately omitted: `mailEnvKeys` (ITFlow has no SMTP env vars, §62.1 — keys would silently do nothing) and a cron sidecar (image runs `crond` itself; user enables cron in ITFlow settings; healthcheck probes only httpd, so a dead crond stays "healthy" — documented in `app-credentials.md`). User claims the wizard before exposure, then exposes behind Authelia.
 
 ## 66. App-data backups, the Duplicati era: from "nothing is backed up" to a proven restore (former §66–§68, §70–§75, §79, §86, §88–§90, compacted 2026-09-18)
 
@@ -4598,88 +4440,17 @@ shows `npm_host_id 42, status provisioned`.
 
 ## 100. `backup_target_folder` blank — dashboard now shows the folder actually in use
 
-Small README item (Backups): the backup-destination card left the Google Drive
-"Folder" field empty until the operator typed something, even though a blank
-setting is not "no folder" — `toDuplicatiUrl()` has always fallen back to
-`homelab-backups`, so backups on this host land there right now. The empty box
-just made an in-use setting unreadable.
-
-**Fix**: named the fallback — `DEFAULT_BACKUP_FOLDER = 'homelab-backups'` in
-`backupTarget.ts`, replacing the inline string literal in `toDuplicatiUrl()` —
-and `GET /api/settings/backup-target` now returns
-`values[folder] || DEFAULT_BACKUP_FOLDER` instead of `?? null`. The settings
-form already patches `folder` from that response and shows the field only for
-`googledrive`, so the box now displays `homelab-backups`, and the operator's
-next save persists it as an explicit value.
-
-Not touched: the DB is left as-is for an unset folder (no backfill migration) —
-the effective value is computed on read, and any save writes it through. A test
-in `backupTarget.test.ts` ties `DEFAULT_BACKUP_FOLDER` to the string
-`toDuplicatiUrl()` actually emits, so the displayed default can't drift from the
-one a backup uses. Backend typecheck + full suite (264/264) clean. Not exercised
-against the live backend: the change is a read-path display fallback with no
-effect on backup execution or the target URL already in use.
+(Compacted 2026-10-14.) Blank folder setting already meant `homelab-backups` in `toDuplicatiUrl()`, but the card showed an empty box. Added `DEFAULT_BACKUP_FOLDER` in `backupTarget.ts`; `GET /api/settings/backup-target` returns it when unset; next save persists it. No backfill migration. A test ties the constant to what `toDuplicatiUrl()` emits.
 
 ## 101. `mailEnvKeys` retrofit — four apps wired to the global mailbox, Uptime Kuma can't be
 
-§75.6 carry-over: n8n, BookStack, Paperless, Vikunja and Uptime Kuma were all
-listed as "global mail settings exist but the app doesn't consume them yet."
-Checked each against what it actually supports.
+(Compacted 2026-10-14.) §75.6 carry-over.
 
-**Uptime Kuma has no SMTP environment variables at all.** An email alert is a
-row in its SQLite `notification` table, created in the UI — there is no env
-var, no config file, only an undocumented Socket.IO API. This is the ITFlow
-situation (§62.1): wiring `mailEnvKeys` would look like it worked and silently
-do nothing. Decision (asked): skip it, document why. It now carries a `NOTE:
-deliberately no mailEnvKeys` comment in `services.ts`, a `docs/app-credentials.md`
-entry under a new "Global mail settings — who inherits them" section, and is
-dropped from the README item. The DB-seed route (a `homeAssistantHacs.ts`-shaped
-module upserting the notification row) was considered and rejected: it couples
-us to Uptime Kuma's internal schema and only gets you half a feature without
-also wiring the notification to every monitor.
+- **Uptime Kuma skipped** (asked): no SMTP env vars; email alerts are SQLite rows made in its UI. Rejected seeding the `notification` table — couples to internal schema and still leaves monitors unwired. `NOTE: deliberately no mailEnvKeys` in `services.ts`; documented in `app-credentials.md`.
+- **n8n, Paperless, Vikunja** encode encryption as per-mode booleans (n8n defaults both SSL and STARTTLS `true`). New primitive `smtpEncryptionFlags` on `ServiceMailEnvKeys`: `mailEnv.ts` applies only the configured mode's entry, so app defaults cannot leak. **BookStack** fits `smtpEncryptionMap` (`tls`/`null`).
+- Compose fallbacks inert (`N8N_EMAIL_MODE=""`, `VIKUNJA_MAILER_ENABLED=false`), so no mail config = old behaviour. Paperless IMAP intake left per-account.
 
-**The other four do support env-var SMTP**, but three of them express
-encryption as several booleans whose values differ per mode, which the
-existing `mailEnvKeys` shape (`smtpEncryptionMap` = one named scheme,
-`smtpTlsBoolean` = one boolean true for both tls and ssl) can't represent:
-
-- **n8n** — `N8N_SMTP_SSL` (implicit 465) and `N8N_SMTP_STARTTLS` (587), *both
-  default `true`* in n8n, which is wrong for almost every server.
-- **Paperless** — Django's `PAPERLESS_EMAIL_USE_TLS` / `PAPERLESS_EMAIL_USE_SSL`,
-  mutually exclusive.
-- **Vikunja** — `VIKUNJA_MAILER_FORCESSL`, true only for implicit TLS.
-
-Added one primitive for it: `smtpEncryptionFlags?: Partial<Record<'tls' |
-'ssl' | 'none', Record<string, string>>>` on `ServiceMailEnvKeys` —
-`mailEnv.ts` applies the entry for the configured mode and only that entry, so
-an app's permissive defaults can't leak through. BookStack needs none of this:
-its Symfony mailer takes only `tls` or `null`, so `smtpEncryptionMap: { tls:
-'tls', ssl: 'tls', none: 'null' }` (port 465 implies implicit TLS on its own).
-
-Per-app wiring in `services.ts` + `${…:-default}` refs added to each compose
-file (`environment:` block) + `.env.example` notes:
-
-| App | Turns on with | Encryption |
-|---|---|---|
-| BookStack | `BOOKSTACK_MAIL_DRIVER=smtp` | `MAIL_ENCRYPTION` via map |
-| n8n | `N8N_EMAIL_MODE=smtp` | `N8N_SMTP_SSL` + `N8N_SMTP_STARTTLS` per mode |
-| Paperless | (any host set) | `USE_TLS` + `USE_SSL` per mode |
-| Vikunja | `VIKUNJA_MAILER_ENABLED=true` | `FORCESSL` per mode |
-
-Compose fallbacks are inert (`N8N_EMAIL_MODE=""`, `VIKUNJA_MAILER_ENABLED=false`,
-empty hosts) so an install with no global mail settings behaves exactly as
-before. Paperless' IMAP document-intake is deliberately untouched — that stays
-a per-account setting in its own UI.
-
-**Verified**: backend typecheck + full suite (270, +7 new in `mailEnv.test.ts`
-asserting the exact env each app derives across tls/ssl/none, the
-unconfigured→`{}` fallback, and Uptime Kuma declaring no keys). `docker compose
-config` on all four real compose files, with and without the overrides the
-live mail config (`mail.portoinf.com:587`, STARTTLS) would produce — the vars
-resolve into each `environment:` block correctly and the files stay valid.
-**Not done**: starting each app and confirming a real message sends — the four
-apps are running with their pre-change env and pick this up on their next
-dashboard restart ("restart to apply", same as exposure).
+Verified with `mailEnv.test.ts` (+7) and `docker compose config` on all four. Real send not tested; apps pick it up on next restart.
 
 ## 102. §75.2 closed: the schedule card now shows what Duplicati actually holds
 
@@ -4762,33 +4533,7 @@ nothing-dumped failure). Frontend `test:ci` (22) + `build` clean.
 
 ## 104. §99.1 hardened: a partial NPM create no longer orphans the host
 
-The failure mode from §99: NPM writes the proxy-host row, its nginx reload
-fails, and its API returns an error anyway. `createProxyHost` threw, the caller
-never recorded the id, and the host sat untracked — `ensureProxyHost` then
-refused to touch it ("already exists and is not managed by this service"),
-disable's `if (npmHostId)` guard skipped the delete, and only a manual deletion
-in NPM's own UI could clear it.
-
-**Fix.** `ensureProxyHost` (`npmClient.ts`) now wraps the create: on failure it
-re-queries by domain, and if the host is there after all it throws a typed
-`NpmProxyHostPartialCreateError` carrying the recovered id. `provisionHostname`
-(`exposure.ts`) catches that type and records the id on the `failed` row
-(`npm_host_id = COALESCE($3, npm_host_id)` already merges it), so the host is
-tracked from then on: a retry matches `expectedHostId` and goes down the
-update/reconcile path, and a disable has an id to delete. If the re-query finds
-nothing — a genuine create failure — the original error propagates unchanged.
-
-Rollback-by-delete was rejected: NPM's delete goes through the same nginx
-reload that just failed, so it would fail too. Recording the id and letting the
-normal reconcile path fix it once the underlying issue clears is the robust
-choice.
-
-Not reproducible on the live stack — the trigger (§99's duplicate-directive
-bug) is fixed, and deliberately breaking NPM's nginx config to force a partial
-create is not worth it. Covered by unit tests instead: 2 in `npmClient.test.ts`
-(recover the id when the host turns up on re-query; re-throw the original when
-it does not) and 1 in `exposure.test.ts` (the recovered id lands on the failed
-`service_exposure` row). Backend typecheck + full suite 292/292.
+(Compacted 2026-10-14.) NPM can write the proxy-host row, fail its nginx reload, and still return an error; the id was never recorded and the host was stuck "not managed by this service". `ensureProxyHost` (`npmClient.ts`) now re-queries by domain on failure and throws `NpmProxyHostPartialCreateError` with the recovered id; `provisionHostname` records it on the `failed` row, so retry and disable work. Rejected rollback-by-delete: delete goes through the same failing nginx reload. Unit-tested only (trigger already fixed in §99; breaking NPM on purpose not worth it).
 
 ## 105. Recovery mode's localhost gate is unreachable on this deployment
 
@@ -5149,35 +4894,9 @@ independent.
 
 ## 113. §112.1 done — login page hides the setup prompt once an admin exists
 
-`login.component.html` showed *"First time here? Create the initial
-administrator account"* (link to `/setup`) unconditionally. On an
-internet-facing login page that reads as open self-registration, even though
-`/setup` redirects away once an admin exists.
+(Compacted 2026-10-14.) Login always showed "Create the initial administrator account", which reads as open sign-up on a public page. `AuthService.isSetupRequired()` (fails closed to `false`) now gates it with `*ngIf`. Guest guard already redirects when setup is needed, so this mostly covers the guard's fail-open path. Verified live: `setupRequired:false`, prompt gone.
 
-- `AuthService.isSetupRequired()` — public wrapper over the existing private
-  `checkSetupRequired()` (`GET /auth/setup-status`, fails closed to `false`).
-- `LoginComponent` implements `OnInit`, probes it, stores `setupRequired`
-  (default `false` so nothing flashes before the response).
-- The prompt is `*ngIf="setupRequired"`.
-- Specs: prompt absent when `setupRequired` is false, present (with the link
-  text) when true. `login.component.spec.ts` spy gains `isSetupRequired`
-  returning `of(false)` by default.
-
-In practice the guest guard already redirects to `/setup` whenever setup is
-required, so on `/login` this is nearly always false — the `*ngIf` makes the
-intent explicit and covers the guard's fail-open path.
-
-Frontend `test:ci` (24 specs) and `build` pass. Frontend container rebuilt;
-`/api/auth/setup-status` on the live host returns `{"setupRequired":false}`,
-so the prompt no longer renders.
-
-### 113.1 §112.3 confirmed
-
-@mat confirmed: a running-but-unexposed app **should** be left off the Home
-Page. The README item loses its "confirm first" caveat; building it still
-means reworking the CLAUDE.md "every app on the Home Page" convention and the
-registry-wide `services.test.ts` label check, and it rides on §112.2's
-generated `services.yaml`.
+**113.1** — @mat confirmed (§112.3): a running but unexposed app stays off the Home Page.
 
 ## 114. Design — Homepage's service list is backend-generated (§112.2/.3/.4)
 
@@ -5990,133 +5709,15 @@ Note: `cscli bouncers list` grows an alias per container IP
 
 ## 125. XFF-spoofing hardening at NPM — the ban check no longer trusts $remote_addr
 
-§124.5 left this open: with enforcement live, the Lua bouncer called
-`cs.Allow(ngx.var.remote_addr)`, and `$remote_addr` is forgeable from the LAN.
-NPM's own `nginx.conf` declares `set_real_ip_from 10.0.0.0/8; 172.16.0.0/12;
-192.168.0.0/16;` with `real_ip_header X-Real-IP; real_ip_recursive on;`, so a
-client connecting straight to NPM from any RFC1918 address is a trusted proxy:
-it sends `X-Real-IP: <anything>` and nginx rewrites `$remote_addr` to it. A
-banned LAN host dodges its ban; any LAN host can get an arbitrary IP 403'd.
+(Compacted 2026-10-14.) §124.5 gap: the Lua bouncer checked `ngx.var.remote_addr`, and NPM's baked-in `set_real_ip_from` trusts all RFC1918, so any LAN host could send `X-Real-IP` to dodge its own ban or get another IP 403'd.
 
-Verified on the real stack — the request matrix below is the point of the
-section, not the diff.
+**Rejected:** narrowing `set_real_ip_from` — it is additive and set in the image's `nginx.conf` before our include; overriding `real_ip_*` in `http_top.conf` is the §99 duplicate-directive trap; per-server override still trusts the LAN peer.
 
-### 125.1 Why the README's framing ("tighten `set_real_ip_from`") could not work
+**Landed** (`buildNpmBouncerBlock`, `crowdsecConfig.ts`): a `geo $realip_remote_addr` block marks peers in Docker's own ranges (`127/8`, `10.201/16`, `172.17/16`, `172.31/16`) as internal; only for those is `CF-Connecting-IP` trusted (tunnel traffic is re-originated by `docker-proxy` from inside Docker). All other peers are judged by the raw TCP peer. Does not touch `real_ip_*`. Residual: a LAN numbered inside those Docker ranges weakens it.
 
-`set_real_ip_from` is **additive** and nginx has no directive to remove an entry
-from the trusted set. NPM's RFC1918 trust is baked into the image's
-`/etc/nginx/nginx.conf`, `include`d *before* our `http_top.conf` drop-in. So no
-custom include — the only sanctioned hook — can narrow it. Overriding
-`real_ip_header` / `real_ip_recursive` in `http_top.conf` is the §99 minefield
-(same http-scope, duplicate directive → `nginx -t` fails → every proxy-host
-write wedges). Overriding them per-server via `server_proxy.conf` parses, but
-still leaves the LAN peer trusted, so the forged header still wins. The trust
-list is the root cause and it is immovable from where we're allowed to write.
+**Dead end:** first cut trusted only `host.docker.internal` (`10.201.0.1`); real `docker-proxy` peer was `10.201.17.1` and changes with network attach order. Replaced by the CIDR `geo`.
 
-### 125.2 What landed instead
-
-The bouncer stops reading `$remote_addr` and reads a value it derives itself,
-in its own marker-fenced block (`buildNpmBouncerBlock`, `crowdsecConfig.ts`):
-
-```
-geo $realip_remote_addr $crowdsec_peer_is_internal {
-        default  0;
-        127.0.0.0/8  1;
-        10.201.0.0/16  1;
-        172.17.0.0/16  1;
-        172.31.0.0/16  1;
-}
-map $crowdsec_peer_is_internal $crowdsec_client_ip {
-        default  $realip_remote_addr;
-        "1"      $http_cf_connecting_ip;
-}
-```
-
-and `access_by_lua_block` does `cs.Allow(ngx.var.crowdsec_client_ip)` with a
-fallback to `remote_addr` if that comes out empty.
-
-- `$realip_remote_addr` is the **raw TCP peer**, before any real_ip rewrite. It
-  cannot be forged without owning the connection.
-- With `userland-proxy` on (this host's default), a request that arrived
-  through cloudflared — a host process hitting the published port — is
-  re-originated by `docker-proxy` from **inside Docker's address space**
-  (observed here as `10.201.17.1`, a per-app-network gateway). A LAN client
-  DNAT'd straight through keeps its real `192.168.x` / `10.x` address. So
-  "peer ∈ Docker's ranges" is a sound proxy for "came via the tunnel", and
-  only then is `CF-Connecting-IP` (set by Cloudflare's edge) trusted to name
-  the client. Every other peer is taken at face value.
-- The ranges are Docker's, not whole RFC1918 blocks: `10.201.0.0/16` +
-  `172.31.0.0/16` are the pool bases `setup_server.sh` writes to
-  `daemon.json`, `172.17/16` is `docker0`, `127/8` is a local health check /
-  curl. A home/office LAN in `192.168.x` or `10.0.x` never matches. (Residual:
-  a site that numbered its LAN inside `10.201/16` or `172.17|31/16` would
-  weaken this — noted, not fixed; even then the header must be *present* to
-  matter, and browsers don't send `CF-Connecting-IP`.)
-
-Why `geo` and not `map` with the peer directly: `map` keys are exact-match or
-regex only, `geo` does CIDR. Both are http-scope, both parse fine alongside
-NPM's own config — this does **not** touch `real_ip_header` /
-`real_ip_recursive` / `set_real_ip_from`, so it is not the §99 hazard.
-
-### 125.3 A dead end that got built and reverted first
-
-The first cut pinned a single trusted peer — `getHostGatewayIp()` →
-`host.docker.internal` → `10.201.0.1` — as a `map $realip_remote_addr` key.
-It rendered, `nginx -t` passed, and the LAN-spoof case tested clean… but the
-**gateway path** (`CF-Connecting-IP` from a host-origin request) returned 200
-where 403 was expected. The peer for a `docker-proxy`-forwarded connection on
-this host is `10.201.17.1` (a per-app-network gateway), **not** `10.201.0.1`
-(the backend's own bridge). `host.docker.internal` from the backend resolves to
-the wrong gateway for this purpose, and which one `docker-proxy` uses depends on
-network attach order and renumbers on recreate (§124.4 saw the same drift with
-`nginx@10.201.17.x`). Replaced with the CIDR `geo` block, which is correct
-regardless of which gateway wins.
-
-### 125.4 Verified (real stack)
-
-Enforcement on; backend rebuilt from the new code; NPM re-rendered + restarted
-(`[Crowdsec] Initialisation done`, `nginx -t` successful inside the running
-container — the §99 gate).
-
-**A — LAN-equivalent direct client** (alpine container on `npm-net`, peer
-`172.22.0.4`, not in the trusted ranges):
-
-| case | result |
-|---|---|
-| clean, plain | 200 |
-| real peer banned, plain | 403 |
-| + `X-Real-IP: 8.8.8.8` (unbanned) | **403** — spoof ignored |
-| + `X-Forwarded-For: 8.8.8.8` | **403** |
-| + `CF-Connecting-IP: 8.8.8.8` | **403** |
-| peer clean, `8.8.8.8` banned, `X-Real-IP: 8.8.8.8` | **200** — can't frame another IP |
-
-Under the old code, row 3 returned 200 (the bypass §124.5 describes).
-
-**B — gateway path** (host `curl localhost:80` → `docker-proxy`, peer in
-`10.201.0.0/16`):
-
-| case | result |
-|---|---|
-| clean, plain | 200 |
-| `CF-Connecting-IP: 203.0.113.99` (banned) | 403 — trusted peer names the client |
-| `CF-Connecting-IP: 1.1.1.1` (unbanned) | 200 |
-| no CF header, plain (peer not banned) | 200 — falls back to `remote_addr` |
-
-349 backend tests pass; typecheck clean. `crowdsecConfig.test.ts` gains cases
-for the `geo`/`map` pair, the "Docker ranges only, never a whole RFC1918 block"
-assertion, and the empty-`$crowdsec_client_ip` fallback.
-
-### 125.5 Not done here
-
-- **Access-log spoofing.** `$remote_addr` in NPM's logs is still forgeable by a
-  LAN client, so CrowdSec's *detection* parse of those logs (§110/§117) can
-  still be fed a framed IP. Separate pipeline from enforcement; its own follow-
-  up if it ever matters.
-- **The `real_ip` trust list itself** is unchanged — narrowing it needs an
-  `nginx.conf` override (custom image / entrypoint, against §0 principle 2) or
-  a network-layer change (bind NPM's `:80`/`:443` off the LAN, which
-  split-horizon DNS clients depend on). Neither is worth it now that the ban
-  check is independent of it.
+Verified live with a request matrix: LAN client with forged `X-Real-IP` / `X-Forwarded-For` / `CF-Connecting-IP` stays 403 when banned and cannot frame another IP; gateway path honours `CF-Connecting-IP`. Not done: NPM access-log `$remote_addr` is still forgeable for CrowdSec detection; the trust list itself is unchanged (needs a custom image or network change — not worth it).
 
 ## 126. §105 closed: `./start.sh recover` resets a locked-out admin
 
@@ -6833,41 +6434,7 @@ scoped to three things) stays its own open item (§131.6). TODO item deleted.
 
 ## 139. §131.2 — hide OnlyOffice from the Home Page (2026-09-03)
 
-The "running + exposed → Home Page tile" rule (§112.3) gave OnlyOffice a tile,
-but nobody opens OnlyOffice directly — its exposure exists only so a remote
-browser can load the editor Nextcloud embeds. Infrastructure, not a
-destination.
-
-### 139.1 What landed
-
-- **`hideFromHomePage?: boolean`** on `ServiceDefinition` (`types/index.ts`).
-  Chose a registry flag over a `homepage.*` label sentinel: the decision
-  ("this is infra") is a registry-level fact like `dependsOn`, and the compose
-  file is read-only to the backend anyway.
-- `onlyoffice` in `services.ts` sets `hideFromHomePage: true`.
-- `collectHomepageTiles` (`services/homepageConfig.ts`) skips a service whose
-  registry entry has the flag, right after the existing "the Home Page never
-  lists itself" skip — before the exposure lookup, so a flagged app is out
-  whether or not it is exposed.
-- The `homepage.*` labels stay **mandatory** for it: `services.test.ts`'s
-  registry-wide label check is unchanged and still iterates every entry, plus
-  a focused case asserts `onlyoffice.hideFromHomePage === true` and that it
-  still carries the labels.
-- Tests: +1 in `homepageConfig.test.ts` (a flagged app that is running and
-  provisioned-exposed produces no tile), +1 in `services.test.ts`.
-- Doc: the flag is described in CLAUDE.md's Home Page convention bullet.
-
-### 139.2 Verified (real stack)
-
-Backend rebuilt (`docker compose up -d --build backend`, no root teardown).
-`apps/home-page/data/services.yaml` before the change carried an `OnlyOffice`
-tile under Productivity (the app is running and exposed at
-`onlyoffice.tx-home-utils.com`). Ran `regenerateHomepageServices()` in the
-backend container afterwards: 31 tiles → 30, `grep -i onlyoffice` on the file
-now empty, Productivity group otherwise intact. Homepage hot-reloads the file,
-so the public page drops the tile with no restart.
-
-380 backend tests pass (+2); typecheck clean. Frontend untouched.
+(Compacted 2026-10-14.) OnlyOffice is exposed only for Nextcloud's embedded editor, not as a destination. Added registry flag `hideFromHomePage?: boolean` (chosen over a label sentinel: it is a registry fact, and compose is read-only to the backend). `collectHomepageTiles` skips flagged apps before the exposure lookup; `homepage.*` labels stay mandatory. Verified live: 31 tiles to 30.
 
 ## 140. §131.1 slice 3 — Backups on its own route (2026-09-03)
 
@@ -7038,39 +6605,7 @@ backend, now serving `/api/version` → `0.3.1`; no root teardown. Awaiting
 
 ## 142. Renamed the GitHub repo to `business-lab` (2026-09-03)
 
-@mat asked for the repo rename outright, ahead of the rest of the §84.2
-rebrand. `gh repo rename business-lab` — GitHub keeps a redirect from the old
-`kiko2306/homelab-management` URL and `gh` updated `origin` in place
-(`https://github.com/kiko2306/business-lab.git`); `git ls-remote` confirms
-fetch/push still work.
-
-Updated the in-repo references that named the repository or its clone
-directory:
-
-- `README.md` — the "(repository still `homelab-management`)" parenthetical
-  now reads `business-lab`, and the quick-start / `cd` target is
-  `business-lab`.
-- `docs/raspberry-pi.md` — same `cd` target.
-- `CLAUDE.md` and `.claude/hooks/bash-guards.sh` — the "repo is public
-  (`kiko2306/…`)" identity strings.
-- `setup_test/README.md` — the clone URL and the `~/homelab-management`
-  checkout dir it creates (left `/home/mat/www/homelab-management`, which is
-  this box's existing working copy, untouched).
-
-**Deliberately not touched** — this is the repo name only, not §84.2 tiers 2/3:
-
-- The compose project name / `com.docker.compose.project=homelab-management`
-  (`start.sh:147`), the `homelab-net` network, `image: homelab-backend|frontend`,
-  and the `homelab-*` npm package names — Tier 2, recreates the management
-  stack, still slated for the §83 maintenance window.
-- Backend marker strings (`crowdsecConfig.ts`, `exposureConfigFiles.ts`) and
-  `ALERT_TEST_SCENARIO = 'homelab-management/alert-test'` (`n8nWorkflows.ts`,
-  asserted in `alertTest.test.ts`) — internal identifiers, Tier 2/3.
-- `plan.md` history (§84.2, §84.4 and older sections name the old repo) —
-  never rewritten; this section is the forward record.
-
-CI needed no change (`actions/checkout` is repo-agnostic; no hardcoded name in
-`.github/`).
+(Compacted 2026-10-14.) `gh repo rename business-lab`; GitHub redirects the old URL, `origin` updated. In-repo name/clone-dir references updated (README, `docs/raspberry-pi.md`, CLAUDE.md, `bash-guards.sh`, `setup_test/README.md`). Deliberately left for §84.2 tiers 2/3: compose project name, `homelab-net`, image and npm package names, backend marker strings, `ALERT_TEST_SCENARIO`. Old plan.md sections never rewritten.
 
 ## 143. §131.1 slice 4 — Exposure & networking on its own route (2026-09-03)
 
@@ -7235,81 +6770,9 @@ icon assets (a separate item) and the new "Updates & version control" area
 
 ## 146. Official icons for Pantry, Price Compare and Kitchen (§131.1, 2026-09-03)
 
-All three are custom apps with no upstream project to borrow an icon from;
-their `homepage.icon` labels pointed at generic MDI glyphs
-(`mdi-fridge-outline.png`, `mdi-cart-outline.png`,
-`mdi-silverware-fork-knife.png`). Now each has its own logo, shipped as the
-app's favicon and as a file the Home Page serves. (The README item named
-Pantry and Price Compare; Kitchen — `apps/kitchen-switcher/` — is the same
-case and @mat flagged it in the same pass.)
+(Compacted 2026-10-14.) Hand-drawn SVG favicons (blue `#3d7bfd` badge + white mark: jar, euro sign, "K") in each app's `public/` or `html/`, linked from `index.html`. Copies in `apps/home-page/data/icons/`, referenced as `homepage.icon: /icons/<name>.svg`.
 
-### 146.1 The icons
-
-Hand-drawn SVGs, one `<rect>` badge (`#3d7bfd`, the accent all three apps
-already use) plus a white mark:
-
-- **Pantry** — `apps/pantry/app/public/favicon.svg`: a storage jar (lid +
-  body) with a two-line label window. Pantry had no favicon at all before.
-- **Price Compare** — `apps/price-compare/app/public/favicon.svg`: an open-"C"
-  euro sign built from an arc + two bars. Matches the euro-on-blue raster
-  icons the app already ships (`favicon.ico`, `icon-192/512.png`), so its PWA
-  icons stay consistent and were left as-is.
-- **Kitchen** — `apps/kitchen-switcher/html/favicon.svg`: a bold "K" (stem +
-  two round-capped diagonal arms). Matches the white-K-on-blue raster icons
-  that app already ships.
-
-Each `index.html` gained `<link rel="icon" type="image/svg+xml"
-href="favicon.svg">` (Price Compare / Kitchen keep their existing icon lines
-after it as fallback).
-
-### 146.2 Serving them to the Home Page
-
-Homepage resolves a bare `name.png` against its bundled dashboard-icons set;
-a **custom** local icon is referenced as `/icons/<file>` and served from
-`public/icons/`. Two facts made this more than a label change:
-
-- The icon files must live somewhere Homepage can serve. Copied to
-  `apps/home-page/data/icons/{pantry,price-compare,kitchen}.svg` (that tree is
-  checked in — only the three generated YAMLs are gitignored). They are
-  duplicates of each app's `favicon.svg`; the compose comment says so.
-- **Next.js 16 (standalone) snapshots `public/` at boot** — a file bind-mounted
-  or copied in after the server starts 404s. gethomepage's entrypoint does
-  *not* copy `config/icons` anywhere. So `apps/home-page/docker-compose.yml`
-  got a second mount, `./data/icons:/app/public/icons:ro`, and the container
-  must be recreated (not just restarted) for a *new* icon file to show — an
-  existing one changing in place is fine.
-- Because the mount forces a homepage recreate, do it through the **dashboard**
-  (or the managed executor) — a bare `docker compose up -d homepage` from the
-  app dir skips `buildExposureEnvOverrides`, so `HOMEPAGE_ALLOWED_HOSTS` comes
-  back with only `localhost` + the LAN IP and gethomepage answers every
-  `tx-home-utils.com` / `homepage.tx-home-utils.com` request with
-  `{"error":"Host validation failed"}` (§92). Hit during this work; fixed by
-  recreating with `HOMEPAGE_ALLOWED_HOSTS` set to
-  `localhost:10190,<lan-ip>:10190,homepage.<domain>,<domain>` in the shell,
-  which is exactly what the managed path injects.
-
-`homepage.icon` is now `/icons/{pantry,price-compare,kitchen}.svg`.
-`homepageConfig.ts` passes it through verbatim (confirmed: `parseHomepageLabels`
-keeps the leading slash), so no backend code changed. Zero `mdi-` icons remain
-in `services.yaml`.
-
-### 146.3 Proven on the live stack
-
-- `curl https://homepage.tx-home-utils.com/icons/{pantry,price-compare,kitchen}.svg`
-  → 200, `Content-Type: image/svg+xml`, after `--force-recreate` of the
-  homepage container (each new file needs a fresh boot snapshot).
-- Backend restarted → `services.yaml` regenerated with all three
-  `icon: /icons/*.svg`; Homepage's `/api/services` echoes them; apex and
-  `homepage.<domain>` both still 200.
-- Pantry and Price Compare rebuilt (`COPY public` bakes the favicon at build
-  time); Kitchen bind-mounts `./html`, so its `favicon.svg` served with no
-  rebuild. Each app serves `/favicon.svg` (200) and links it in `<head>`.
-
-### 146.4 No version bump
-
-Touches `apps/**` and docs only — nothing under `backend/src` or
-`frontend/src`, so the dashboard version is unchanged (the require-version-bump
-hook agrees).
+Gotchas: Next.js standalone snapshots `public/` at boot, so Homepage needs mount `./data/icons:/app/public/icons:ro` and a recreate for each **new** icon file. Recreate homepage through the dashboard — a bare `docker compose up` skips `buildExposureEnvOverrides`, and `HOMEPAGE_ALLOWED_HOSTS` loses the public hosts (`Host validation failed`, §92). Verified live: all three icons 200. No version bump (no `backend/src` / `frontend/src`).
 
 ## 147. Plan — Homepage's palette in the dashboard, and a resource strip on the menu (2026-09-03)
 
@@ -7367,67 +6830,11 @@ polls.
 
 ## 148. §147 done — slate palette, and a resource strip in the header (2026-09-03)
 
-Both parts of §147 in one pass, per @mat's call. Feature bump 0.6.0 → 0.7.0.
+(Compacted 2026-10-14.) 0.6.0 to 0.7.0.
 
-### 148.1 Palette → Tailwind slate (§147.1)
-
-`frontend/src/styles.css` `[data-bs-theme='dark']` only. The ad-hoc hexes
-became slate ramp values — the scale gethomepage runs.
-
-**First cut used slate-950 (`#020617`) for the canvas; @mat: "background
-doesn't match".** gethomepage's dark page background is `--bg-color` =
-`--color-800` = **`#1e293b`** (its slate stops at 900 — there is no 950), and
-its tiles are a barely-there `white/5` lift on top. So the canvas is now
-`#1e293b` exactly, and the dashboard's one card colour is a deliberate step
-above it (`#26303f`) — the dashboard keeps a stronger raised-card look (border
-+ two-layer shadow, §136.3) than gethomepage's flat tiles, but the *page*
-they sit on is the same colour.
-
-| token | was | now |
-|---|---|---|
-| `--app-canvas` / `--bs-body-bg` | `#0a0d12` | `#1e293b` (800, = gethomepage bg) |
-| `--app-surface*` / `--bs-card-bg` / `-cap-bg` | `#1b2230` | `#26303f` (one step up) |
-| `--bs-body-color` | `#e6e9ef` | `#e2e8f0` (200) |
-| `--bs-border-color` / `--bs-card-border-color` | `#394456` | `#334155` (700) |
-| `--bs-tertiary-bg` | `#232b3a` | `#0f172a` (900) |
-| `--bs-secondary-bg` | `#2c3648` | `#334155` (700) |
-| `--bs-secondary-color` | `#cbd5e1` | `#cbd5e1` (300, unchanged) |
-
-`--bs-primary` (blue) is untouched — gethomepage is monochrome but the
-dashboard has real actions that need to pop. Provisional, @mat iterates.
-
-### 148.2 CPU % in `/api/health` (§147.2 backend)
-
-`GET /api/health` gains `cpu: { percentUsed }`. `readCpuPercent()` in
-`routes/health.ts` diffs `os.cpus()` cumulative idle/total ticks against a
-module-level snapshot from the previous call — so a 30s-spaced poll gets the
-30s average for free. If too little time has passed (calls close together, or
-the first call after boot) it takes a fresh 150ms sample instead. **Not
-thresholded** — it does not feed `status`, so a transient CPU spike can't
-flip the box to "degraded"; the header strip colours it client-side.
-`health.test.ts` only covers `parseDfOutput`, so nothing there changed.
-
-### 148.3 The header strip (§147.2 frontend)
-
-`layout/shell/resource-strip.component.*` — `<app-resource-strip>`, mounted in
-`shell.component.html` between the brand and the nav. Three compact meters
-(CPU / RAM / DISK), each label + 52px bar + `NN%`, `tabular-nums`. Polls
-`operations.getHealth()` on mount then every 30s (`timer(0, 30000)` +
-`switchMap` + `takeUntilDestroyed`); a failed poll leaves the last numbers up,
-and nothing renders before the first success. Colours: CPU amber ≥ 75 / red ≥
-90 (fixed); RAM and DISK use `thresholds.memoryPercent` / `diskPercent` from
-the API for red and `threshold − 15` for amber; DISK shows the worst of
-`disks[]`. Below the 992px header breakpoint the strip drops to its own
-full-width row between the brand/logout row and the nav strip.
-
-### 148.4 Verified
-
-`backend`: `npm run typecheck` clean, `npm test` 380/380. `frontend`:
-`npm run build` clean (pre-existing bundle-budget + Bootstrap selector
-warnings), `npm run test:ci` 42/42. Rebuilt + redeployed backend and frontend
-(`/api/version` → `0.7.0`); no root teardown. Reviewed by @mat on
-`localhost:10001` — the canvas needed correcting from slate-950 to gethomepage's
-actual `#1e293b` (148.1); approved and pushed (`6d31755`).
+- **Palette** (`styles.css`, dark theme): Tailwind slate. First cut used slate-950 for the canvas; @mat said it did not match. gethomepage's background is `#1e293b` (slate-800, no 950), so canvas = `#1e293b`, cards one step up `#26303f`. `--bs-primary` blue kept so actions stand out.
+- **`GET /api/health` gains `cpu.percentUsed`**: diffs `os.cpus()` ticks against the previous call (fresh 150 ms sample when calls are too close). Not thresholded into `status`.
+- **`<app-resource-strip>`** in the shell header: CPU/RAM/DISK meters, polled every 30 s, last values kept on failure; RAM/DISK colours from API thresholds; own row below 992 px.
 
 ## 149. Plan — SSO slice 1: named roles that actually gate the dashboard (§131.3, 2026-09-03)
 
@@ -8357,68 +7764,13 @@ creator-chosen password.
 
 ## 162. §131.5 — Samba LAN-only SMB share added (2026-09-03)
 
-Picked from the §131.5 Infrastructure list. Adds `apps/samba/` as a managed
-app: a Windows-reachable SMB share on the LAN, generated credentials, a
-generated `smb.conf`. Minor bump 0.10.1 → 0.11.0.
+(Compacted 2026-10-14.) 0.10.1 to 0.11.0. `apps/samba/`: `dockurr/samba`, port 445 only, `./data/share:/storage`.
 
-### What landed
+- **`sambaConfig.ts`** renders `data/smb.conf` before `compose up` (wired in `composeUpWithManagedConfig`). Load-bearing: a missing file makes Docker create a directory and the entrypoint aborts. dockur uses a supplied `smb.conf` verbatim (no env merge), so the file carries everything (`force user`, `valid users`, `server min protocol = SMB2`, `map to guest = never`). `SAMBA_PASSWORD` is a normal generated secret shown in the panel.
+- **`lanOnly` registry flag**: port 445 made it look exposable; flag reports `exposable: false` and rejects exposure (SMB never goes through the tunnel, §0 principle 1).
+- Docs: ports, credentials, licences (Samba GPL-3.0 stock; wrapper MIT).
 
-- **`apps/samba/docker-compose.yml`** — `dockurr/samba:latest` (Alpine +
-  stock Samba). Publishes `${SAMBA_PORT:-445}:445` only. Mounts
-  `./data/share:/storage` for the contents and `./data/smb.conf` (read-only)
-  as the share definition. Mandatory `homepage.*` labels (group "Files")
-  even though it gets no tile. `.env.example` carries `SAMBA_PORT`,
-  `SAMBA_SHARE_NAME`, `SAMBA_USER`, `SAMBA_PASSWORD`, `SAMBA_UID/GID`.
-
-- **`backend/src/services/sambaConfig.ts`** — `applySambaConfig` renders
-  `apps/samba/data/smb.conf` from the app's `.env` (share name + account)
-  just before `docker compose up`, wired into `composeUpWithManagedConfig`
-  in the executor next to `applyKitchenConfig`. Unlike the Kitchen config
-  this is load-bearing, not best-effort: a missing `data/smb.conf` makes
-  Docker create the bind source as a *directory*, and dockur/samba's
-  entrypoint then aborts with "maps to a file that does not exist". The
-  generated file bakes in `path = /storage`, `force user`/`force group`,
-  `valid users`, `read only = no`, `server min protocol = SMB2`,
-  `map to guest = never` — dockur/samba uses a supplied `smb.conf` verbatim
-  and does *not* merge env vars into it, so everything has to be in the file.
-  The entrypoint still creates the Unix/Samba account from
-  `USER`/`PASS`/`UID`/`GID` separately, so `SAMBA_PASSWORD` stays a normal
-  `autoGeneratedSecrets` entry (generated on first start, shown in the config
-  panel so the user can read or replace it — they need it to map the drive).
-
-- **`lanOnly` flag** on `ServiceDefinition`. Samba publishes port 445, so
-  `getPublishedUpstreamPort` reports a port and the dashboard would have
-  called it exposable. `lanOnly: true` makes `routes/services.ts` report
-  `exposable: false` and `services/exposure.ts` reject enabling exposure —
-  SMB is not HTTP and never goes through the Cloudflare Tunnel / NPM (§0
-  principle 1). No Home Page tile follows for free: a tile needs a
-  provisioned exposure, which can now never happen.
-
-- **Docs**: `docs/ports.md` gains a `445 | Samba` row in the sub-10000
-  exceptions table (and a note that Samba isn't in the `10xxx` allocation
-  list); `docs/app-credentials.md` a "Generated" row; `docs/licences.md` a
-  registry row (Samba GPL-3.0 — stock, unmodified, internal use, no
-  restriction on running it; `dockurr/samba` wrapper MIT) and a note on the
-  shared `alpine` base row.
-
-### 162.1 Verified against the real stack
-
-`backend`: `npm run typecheck` clean, `npm test` 423/423 (new
-`sambaConfig.test.ts` 6, `services.test.ts` lanOnly checks). Then on
-`home-srv-01`: `docker compose -p samba up -d` with the env vars set —
-container came up, `smbd 4.23.10` using the provided config, port 445
-listening. `smbclient -L` listed the `share` disk; an authenticated
-`smbclient //localhost/share -c 'put …'` wrote a file that landed in
-`apps/samba/data/share/` owned by uid 1000 (`force user` mapping). Torn
-down and `apps/samba/data/` removed afterwards (gitignored; a real
-dashboard start recreates it).
-
-### 162.2 Not done here
-
-The "map a drive letter" vs File Browser / Nextcloud overlap question from
-the §131.5 spec is a product call, not a blocker — left for whoever scopes
-the small-office app profile. No frontend change: the new service card is
-rendered by the existing registry-driven components.
+Verified on home-srv-01 with `smbclient` list + authenticated write (file owned by uid 1000). Drive-letter vs Nextcloud overlap left as a product call.
 
 ## 163. §131.6 — README states the Free-to-Use model, drops the SaaS/tier framing (2026-09-03)
 
@@ -9664,59 +9016,9 @@ No open threads.
 
 ## 191. Periodic exposure drift reconciliation (2026-09-04)
 
-README item — `POST /exposure/verify` re-asserts one service's hostname on
-demand, but nothing did it on its own, so an NPM proxy host hand-edited to the
-wrong upstream, a Cloudflare ingress rule deleted in their dashboard, or a
-token rotated after the fact would sit broken until someone clicked Re-verify.
+(Compacted 2026-10-14.) `services/exposureReconciler.ts`: `reconcileExposureDrift()` runs `provisionServiceIfEnabled(name, 0)` over every enabled primary `service_exposure` row (secondaries ride along; orphans belong to `reconcileRemovedServices`), 2 s apart. First pass 10 min after boot (avoid cold-start noise), then every 6 h. Writes heartbeat `exposure_reconcile_last_run_at`, regenerates Home Page tiles, audit row only on failure. No settings toggle: re-asserting is always safe.
 
-### `services/exposureReconciler.ts`
-
-`reconcileExposureDrift()` — every enabled **primary** `service_exposure` row
-(`WHERE enabled = true AND service_name NOT LIKE '%:%'`; secondaries ride
-along inside `provisionServiceIfEnabled`, orphans are
-`reconcileRemovedServices`' job), run `provisionServiceIfEnabled(name, 0)` —
-the same idempotent NPM `ensureProxyHost` + Cloudflare `ensureIngressRoute`
-path the verify route uses. `userId 0` is the "system" sentinel
-`reconcileRemovedServices` already uses. A 2 s pause between services keeps it
-a trickle. Returns `{ checked, reconciled, failed: [{ service, error }] }`, or
-`null` when the registry is empty or no global exposure config is set.
-
-Bookkeeping:
-- Heartbeat setting `exposure_reconcile_last_run_at` written each pass.
-- `regenerateHomepageServices()` once at the end — a hostname flipping
-  `failed → provisioned` makes its tile linkable.
-- **Audit row only on failure** (`exposure_reconcile`, `result: 'failure'`,
-  `userId: null`) — a clean pass is a log line, not audit-log spam every 6 h.
-  A service that won't come back is also already visible as `last_error` on
-  its card, which `provisionServiceIfEnabled` records on the row.
-
-`startExposureReconciler()` (wired in `index.ts` after
-`reconcileRemovedServices`): first pass **delayed 10 min** past boot — on a
-cold start NPM/Cloudflare/the apps are still settling and each app's own start
-already provisions its exposure, so the first reconcile should be a real drift
-check, not startup noise — then `setInterval` every 6 h.
-
-No settings toggle: re-asserting an exposure is safe and always wanted where
-exposure is used, and it no-ops when nothing is exposed.
-
-### Verified
-
-- `exposureReconciler.test.ts` — 7 tests (empty registry / no global config
-  bail, clean pass shape + `userId 0`, heartbeat write, secondary/orphan
-  filtering, a `status: failed` row → `summary.failed` + audit row, a thrown
-  provisioning error caught not crashed). Backend suite 504 → 511.
-- **Live stack**: ran the compiled `reconcileExposureDrift()` in the backend
-  container — 33 hostnames checked, **33 reconciled, 0 failed** in 130 s
-  (mostly the pauses), `exposure_reconcile_last_run_at` written, no audit row.
-- **Drift correction**: PUT dozzle's NPM proxy host (id 14) to
-  `forward_port: 9999`, then `provisionServiceIfEnabled('dozzle', 0)` — NPM
-  host back to `10140`, `success: true`, `https://dozzle.tx-home-utils.com`
-  still 200 throughout.
-- Docs: `it-admin.md` (the ~6 h re-assert, `exposure_reconcile` failures,
-  Re-verify is the on-demand twin) and `webmaster.md` (a change made in the
-  Cloudflare dashboard to a managed hostname is reverted on the next pass).
-
-Minor bump 0.19.0 → 0.20.0.
+Verified live: 33/33 reconciled; a hand-broken dozzle NPM upstream (`9999`) restored. 0.19.0 to 0.20.0.
 
 ## 192. §81.5 slice 1 — Kopia as a self-configuring backup app (2026-09-04)
 
@@ -10845,36 +10147,9 @@ that's slice 4, next.
 
 ## 208. §205 follow-up: the stale-cache trap, hit for real
 
-User reported Guacamole's card showing "update available" right after §204
-pinned it to `1.6.0` — seemingly contradicting §205's claim that the pin
-would make the check go silent. Not a contradiction: ran the app's own
-`checkServiceImages('guacamole')` for real (throwaway container, Docker
-socket mounted, no code changes) and it correctly returned
-`{"outdated":[],"unknown":[]}` — the pin logic is right. The dashboard card
-was reading a **stale row**: `service_image_updates` still held the result
-from 15:34, before the pin, literally recording
-`"guacamole/guacamole:latest"` as outdated. That table only refreshes via
-the dashboard's own "Update now" action (`executor.ts`'s `updateService`)
-or a sweep that runs once every 24h (`imageUpdates.ts`) — and the pin's own
-recreate tonight was done by hand outside the dashboard (§204/§206/§207's
-verification runs), so nothing triggered a refresh.
+(Compacted 2026-10-14.) Guacamole showed "update available" after §204 pinned it. Pin logic was correct (`checkServiceImages` returned nothing outdated); the card read a stale `service_image_updates` row from before the pin. That row refreshes only on "Update now" or the 24 h sweep, and the pin was recreated by hand. Direct SQL fix was blocked, correctly (hand fix is diagnostic, not fix). User clicked "Update now" instead.
 
-Tried writing the corrected row directly via SQL to fix it immediately —
-blocked by the auto-mode classifier, correctly: that's exactly the
-"fixing something by hand is a diagnostic, never a fix" trap (a hand-edit to
-live DB state that isn't the code doing it, and would evaporate on the next
-real check anyway). Asked the user instead: they'll click "Update now" on
-Guacamole's card themselves, which is safe and idempotent for an
-already-current pinned tag (re-pulls the same digest, recreates, refreshes
-the check row) — no dashboard code change needed, this was a cache-timing
-artifact of manual verification, not a bug.
-
-**Worth remembering**: any time an app's image is recreated by hand outside
-the dashboard (as every live-verification step in §204/§206/§207 did), its
-`service_image_updates` row goes stale until the next sweep or an
-"Update now" click — expected, not a regression, but worth checking for
-before reporting "verified live" as fully clean next time this pattern
-comes up.
+Lesson: any hand recreate outside the dashboard leaves `service_image_updates` stale until the next sweep or "Update now". Check before calling a live verify clean.
 
 ## 209. Removed the per-app Update button — managed-app images now only move via a self-update batch
 
@@ -11200,52 +10475,14 @@ Default stays the un-batched loop.
 
 ## 214. §210.1's six no-comment image pins resolved
 
-Six pins the §210.1 survey flagged with no rationale. Researched each
-against upstream docs/release notes and wrote the reason in, or floated the
-tag where none held up:
+(Compacted 2026-10-14.) Reason written into each compose comment, or tag floated:
 
-- `postgres:16-alpine` (guacamole-db, nextcloud-db, nocodb-db) — kept.
-  Nextcloud's admin docs put 16 at the top of its officially-supported
-  range; NocoDB officially supports Postgres up to 16 too. Guacamole itself
-  doesn't gate a version, so its comment says it's kept in lockstep with the
-  other two rather than running a third major for no reason.
-- `mysql:8.0` (npm-db) — kept. NPM's own setup docs recommend MySQL 8 over
-  MariaDB specifically: MariaDB's JSON column type doesn't match NPM's
-  migration schema and throws parse errors on init, a long-standing class of
-  upstream issue. Also fixed `docs/licences.md`'s note, which had this
-  backwards ("could standardise on MariaDB").
-- `docker.io/valkey/valkey:9-alpine` (immich-redis, paperless-redis) — kept.
-  Matches Immich's own upstream `docker-compose.yml` (pins the same
-  `valkey:9`) and paperless-ngx's own bundled compose, which is moving its
-  default broker to Valkey 9 too.
-- `louislam/uptime-kuma:1` — kept. v2 is a breaking major: a one-time DB
-  migration that can take hours on a large history, Alpine images dropped,
-  minimum Node 20.4, changed internal API shapes. Worth doing on purpose,
-  not as a silent `:latest` drift.
-- `alpine:3` (beszel-init) — kept, comment added. Lowest stakes of the six
-  (one-shot init container); `:3` and `:latest` track the same release line
-  since Alpine hasn't cut a major since 2015, so this was never really a
-  meaningful pin either way — noted that instead of over-explaining it.
-- `mariadb:10.11` (itflow-db) — **floated to `:latest`**. No version
-  requirement found anywhere in ITFlow's install docs or install script
-  beyond "MariaDB, not MySQL" (already satisfied); 10.11 had no discoverable
-  reason. Now matches bookstack-db (`lscr.io/linuxserver/mariadb:latest`)
-  elsewhere in the repo. Also fixed the same stale `docs/licences.md` row,
-  which listed ITFlow and BookStack under one `mariadb:10.11` image even
-  though BookStack actually runs the LinuxServer image.
-
-### Verified on the live stack
-
-`itflow-db`'s schema was empty (dump before the change showed no
-`CREATE TABLE` statements — the installer wizard hadn't been run), so this
-was a clean version bump, not a data migration. Pulled `mariadb:latest`
-(12.3.3), recreated `itflow-db` against the existing `./data/db` — came up
-`healthy` immediately. Restarted `itflow` — Apache came back with no DB
-connection error, `GET /` still redirects to the install wizard as before.
-No other pin's *tag* changed (comment-only), so nothing else needed a live
-recreate.
-
-Docs + compose only — no version bump (matches §181, §108, §210).
+- `postgres:16-alpine` (guacamole, nextcloud, nocodb DBs) — kept; top of Nextcloud's and NocoDB's supported range, Guacamole kept in step.
+- `mysql:8.0` (npm-db) — kept; MariaDB's JSON type breaks NPM migrations. Fixed `licences.md`, which said the opposite.
+- `valkey:9-alpine` (immich, paperless) — kept; matches upstream composes.
+- `uptime-kuma:1` — kept; v2 is a breaking major with a long DB migration. Do it on purpose.
+- `alpine:3` (beszel-init) — kept; same line as `latest` anyway.
+- `mariadb:10.11` (itflow-db) — **floated to `latest`**; no requirement found. DB was empty, recreate came up healthy.
 
 ## 215. `docs/sales-catalogue.md` written (§131.6, §166, §202)
 
@@ -11392,67 +10629,13 @@ Docs only — no version bump.
 
 ## 218. Which dashboard actions deserve a diagram — surveyed, three drawn (§202, §203)
 
-The README item: the dashboard has on the order of 40 backend actions
-(counted the actual route handlers across `backend/src/routes/`: 16 in
-`services.ts`, 9 each in `auth.ts`/`backup.ts`, 4 each in `recovery.ts`/
-`users.ts`/`health.ts`, 17 in `settings.ts`, 3 in `selfUpdate.ts`, 2 in
-`audit.ts`, 1 in `network.ts` — 69 routes total, most of them thin
-single-service CRUD). §202 decided a diagram earns its place only where the
-multi-service handoff is genuinely hard to hold in your head from the code
-alone — not for a single-service action, however long its handler is.
+(Compacted 2026-10-14.) 69 backend routes surveyed. §202 rule: draw only multi-system handoffs that are hard to hold in your head. Drawn (`docs/*.drawio`, hand-authored mxGraph XML, first-draft layout):
 
-### Surveyed and drawn (docs/*.drawio, app.diagrams.net XML)
+- `exposure-provisioning.drawio` — NPM then Cloudflare (reverse on teardown), state saved between hops.
+- `self-update-walk.drawio` — the action that recreates its own backend; run state lives in Postgres and is reconciled on next boot.
+- `backup-restore-roundtrip.drawio` — dump before snapshot; restore is a different list/restore/poll flow.
 
-- **`docs/exposure-provisioning.drawio`** — `provisionServiceIfEnabled`
-  (`services/exposure.ts`). Three external systems in a specific order that
-  matters (NPM before Cloudflare; reversed on teardown), state persisted to
-  Postgres between every hop so a crash mid-sequence is recoverable, and it
-  runs on every service start with exposure enabled — the highest-traffic
-  complex path in the app.
-- **`docs/self-update-walk.drawio`** — `triggerSelfUpdate` /
-  `runSelfUpdateSequence` (`services/selfUpdate.ts`). The one action that
-  recreates the very backend container running it — everything after the
-  detached, unref'd final `compose up -d --build backend` happens in a
-  process that no longer exists, which is why run state lives in Postgres
-  and a dangling row is reconciled on the next boot. The step most likely to
-  confuse a reader who assumes normal request/response control flow.
-- **`docs/backup-restore-roundtrip.drawio`** — `runScheduledBackupCheck` +
-  the Kopia client (`services/backup.ts`, `backupScheduler.ts`,
-  `kopiaClient.ts`). Ordering matters here too (dump before snapshot, or
-  every backup is a generation stale) and it spans the management DB, every
-  installed app's own DB container, and Kopia's HTTP API — plus the restore
-  half is a separate, differently-shaped flow (list → restore → poll) worth
-  showing on the same diagram for contrast.
-
-### Surveyed and not drawn
-
-- **Authelia/Guacamole user sync** (`autheliaSync.ts`, `guacamoleSync.ts`,
-  fired from the users routes) — considered and set aside. The Authelia half
-  is a single file write with no round trip at all (Authelia's own
-  file-watcher reloads it out of band); the Guacamole half is a real HTTP
-  API dance (login → list → create/disable → logout) but touches exactly one
-  external system, not the two-or-three-system spread that made the three
-  above worth drawing. Borderline; revisit if it grows.
-- **Start/stop with `dependsOn` resolution, per-app backup/dump/restore,
-  network scan, config-generation actions** (Samba/CrowdSec/kitchen-switcher/
-  Nextcloud↔OnlyOffice/HomeAssistant HACS) — each touches at most one
-  external system (Docker, or one app's own config file) with no ordering
-  hazard across systems. Long handlers, not hard-to-hold-in-your-head ones.
-- **Every `settings.ts`/`users.ts`/`recovery.ts`/`health.ts`/`audit.ts`
-  route** — single-service CRUD against Postgres, plus at most one
-  connectivity-test call. Textbook, not diagram material.
-
-### Not done here
-
-`jgraph/drawio` stays not self-hosted (§202 already decided this — the file
-format needs no server, only live co-editing would, and nothing here wants
-that). The three `.drawio` files are plain XML, hand-authored to valid
-mxGraph structure and opened with `app.diagrams.net` or the desktop app for
-any visual cleanup — layout is mechanical (evenly spaced actors, numbered
-arrows top to bottom) rather than hand-tuned, so treat them as a correct
-first draft, not a finished polish pass.
-
-Docs only — no version bump.
+Not drawn: Authelia/Guacamole user sync (one external system each — borderline, revisit if it grows), start/stop, per-app backup, network scan, config generators, and all CRUD routes. draw.io stays not self-hosted (§202).
 
 ## 219. Shared file tree design pass (§202) — decided per app, one piece done live
 
@@ -11855,84 +11038,13 @@ permission questions only, per the box's own no-guarantees rule) — no
 
 ## 225. Paperless's one-way drop box onto the shared file tree (§219, §224)
 
-The other open piece of §219: Paperless's `consume/` isn't a symmetric
-shared folder like File Browser/Samba's, it's a one-way inbox that ingests
-and deletes whatever lands there — so the fit decided in §219 was a
-dedicated `to-paperless/` subfolder of the shared tree, bind-mounted into
-`consume/`.
+(Compacted 2026-10-14.) Paperless `consume/` ingests and deletes, so it gets a dedicated `to-paperless/` subfolder of the shared tree, bind-mounted as `consume/`. New `paperlessDropbox.ts` creates it with mode `0777` before every Paperless start (not `chown`: Paperless uid 1000 and Nextcloud uid 33 both need write). Old `./data/consume` left unused.
 
-### What shipped
-
-- `apps/paperless/compose.yaml`: `consume/`'s bind now points at
-  `../file-browser/data/files/to-paperless` instead of `./data/consume` —
-  same cross-app relative-mount trick Samba already uses for the same tree.
-- `backend/src/services/paperlessDropbox.ts` (new): `ensurePaperlessDropbox`
-  creates that subfolder and `chmod`s it `0777` before every Paperless start,
-  wired into `executor.ts` next to `applySambaConfig`/`ensureKopiaRepoDir` —
-  same "must exist before `compose up`" placement. `0777`, not a `chown`,
-  because whichever app's container gets there first (Paperless is uid 1000,
-  matching File Browser's tree already; Nextcloud's `www-data` from §224 is
-  uid 33) needs write access without the backend having to predict a uid —
-  the same reasoning as `filebrowser-init`'s `chmod -R o+rwX /srv` from §224.
-- Old `./data/consume` left in place, unused — same call as §219 made for
-  Samba's now-unused `./data/share`.
-
-### Verified live on `tx-home-utils.com`
-
-Recreated `paperless-ngx` (base + managed compose fragment, so the ClamAV
-pre-consume wiring from §81.7 stayed intact) and confirmed the full pipeline
-through the new mount, not just the mount itself:
-
-- A malformed hand-built PDF dropped into
-  `file-browser/data/files/to-paperless/` was picked up, ran through the
-  ClamAV pre-consume hook (passed), then failed at PDF parsing — proving the
-  watch → scan → consume chain fires correctly, and that a failed
-  consumption leaves the original in place rather than silently eating it.
-- A real PDF (`reportlab`, built in a throwaway `alpine` container) dropped
-  the same way was consumed successfully within ~10s and the original
-  deleted from `to-paperless/` — the intended round trip. Removed the test
-  document from Paperless's DB afterward (`manage.py shell`).
-
-Did not rebuild/recreate the `backend` container to exercise
-`ensurePaperlessDropbox` through a real dashboard-triggered start — that
-risks the running management stack for a function that's trivial
-(mkdir + chmod), unit-tested, and whose Docker-facing half (the mount,
-the permission fix, the actual consume pipeline) is exactly what the
-manual proof above exercised.
-
-Touches `backend/src` — version bumped to 0.30.1 (`scripts/bump-version.sh`).
+Verified live: malformed PDF passed ClamAV, failed parse, original kept; real PDF consumed in ~10 s and removed. Backend not recreated to test the helper (trivial, unit-tested). 0.30.1. (Path later moved under Nextcloud, §310/§389.)
 
 ## 226. Nextcloud's background jobs — cron sidecar added (§224)
 
-§224 found `backgroundjobs_mode: cron` set but nothing ever running it — no
-sidecar existed and the image's own `/cron.sh` wasn't running in the app
-container. Filed as its own README item rather than folded into §224
-because it's an independent fix with its own live proof.
-
-### What shipped
-
-`apps/nextcloud/docker-compose.yml`: a `nextcloud-cron` service — same
-image, `entrypoint: /cron.sh`, same DB env and `./data/app` volume as the
-`nextcloud` service, `depends_on: nextcloud: condition: service_healthy`.
-This is upstream's own documented pattern (the image ships `/cron.sh`
-specifically for this), not a custom script.
-
-### Verified live on `tx-home-utils.com`
-
-- `docker compose up -d nextcloud-cron` started cleanly alongside the
-  existing `nextcloud`/`nextcloud-db` containers.
-- Inside the sidecar, `busybox crond` is running and
-  `/var/spool/cron/crontabs/www-data` holds the image's own
-  `*/5 * * * * php -f /var/www/html/cron.php` entry (nothing custom to
-  maintain).
-- `occ config:app:get core lastcron` (run against the `nextcloud`
-  container, which is what actually executes the job) read 2026-09-02 —
-  stale, confirming cron genuinely never ran before this. After waiting
-  for a tick, it moved to a live-second timestamp (4s old at check time),
-  confirming cron.php now runs on schedule end to end, not just that the
-  sidecar process exists.
-
-No `backend/src`/`frontend/src` touched — compose-only, no version bump.
+(Compacted 2026-10-14.) `backgroundjobs_mode: cron` was set but nothing ran it. Added `nextcloud-cron` service: same image, `entrypoint: /cron.sh` (upstream's pattern), same volume/env, waits for `nextcloud` healthy. Verified live: `lastcron` moved from 2026-09-02 to a live timestamp. Compose only.
 
 ## 227. §216/§217's trust-the-proxy group — Stirling-PDF and Uptime Kuma done, Beszel/File Browser flagged
 
@@ -12188,27 +11300,7 @@ of the raw `docker run` lines.
 
 ## 235. `secret-scan.sh` — a second net for secrets outside `.env` (2026-09-04)
 
-`bash-guards.sh` blocks reading/writing real `.env` files, but nothing
-caught a secret pasted somewhere else — a script, a compose override, a
-fixture — before it lands in this public repo. CLAUDE.md and the standing
-session instructions already ask for a manual double-check of staged diffs
-before every commit; that's a real, repeated reasoning step this automates
-away the same way `require-version-bump.sh` did for the version-bump check.
-
-Added `.claude/hooks/secret-scan.sh`, wired as a third `PreToolUse`/`git
-commit` guard alongside `bash-guards.sh` and `require-version-bump.sh`. It
-greps the commit's added lines (staged + `commit -a` unstaged, `*.md`
-excluded) for a narrow set of high-confidence secret formats — PEM private
-key headers, AWS access key IDs, Google API keys, GitHub tokens, Slack
-tokens — deliberately not broader patterns like generic JWTs or hex hashes,
-which would cry wolf on ordinary code and get worked around.
-
-Verified: a synthetic `AKIA...` key in a throwaway repo is denied; this
-repo's entire commit history (`git log --all -p`) has zero matches, so the
-guard starts silent on real usage. It is a second net, not a replacement for
-looking at `git diff --cached` — deliberately narrow patterns will miss most
-real secrets (generic API tokens, passwords, connection strings have no
-recognizable shape).
+(Compacted 2026-10-14.) `.claude/hooks/secret-scan.sh`, a third `git commit` guard. Scans added lines (staged and `commit -a`, `*.md` excluded) for high-confidence shapes only: PEM private key, AWS key ID, Google API key, GitHub and Slack tokens. Rejected broad patterns (JWT, hex) — false alarms get worked around. Whole history: zero matches. Not a replacement for reading `git diff --cached`.
 
 ## 236. `beszelSync.ts` built — Beszel SSO account provisioning (2026-09-06)
 
@@ -12844,32 +11936,7 @@ bump.
 
 ## 251. Doc pass — reconcile it-admin.md / app-credentials.md with the current Authelia model (§210.2, §223, §247)
 
-Reconciling `docs/` after §246–§250. Two real fixes, both about how Authelia
-gating is described:
-
-- **`it-admin.md` "Exposure" bullet** still told the operator to toggle
-  "Publicly expose this service" **and** "Require Authelia login" ("leave the
-  second on unless the app has its own solid auth"). That per-app toggle was
-  removed at §210.2 — `skipAutheliaProtection` is a fixed per-app property
-  (`types/index.ts`, `isAutheliaProtectionRequired` in `services.ts`), set
-  only on `homepage` and `authelia`. `webmaster.md` and `first-run.md`
-  already describe it correctly; `it-admin.md` was the straggler. Rewrote it
-  to match and to point at `app-credentials.md` for the apps that skip their
-  *own* login behind Authelia.
-- **`app-credentials.md` "No login of their own"** now also names the apps
-  that *have* a login but skip it behind Authelia via header trust —
-  Guacamole (`HTTP_AUTH_HEADER`) and Paperless-ngx
-  (`PAPERLESS_ENABLE_HTTP_REMOTE_USER`, §247), with Beszel noted as wired
-  (`TRUSTED_AUTH_HEADER`) but still password-auth-enabled until proven live
-  (README `@mat` item). Previously this was only in Guacamole's own row and
-  the new Paperless row, never stated as a category.
-
-Checked and found fine: §246's B2 support — `recovery-troubleshooting.md`
-already lists "S3-compatible bucket" as a Kopia destination kind, which
-covers B2. §248/§249/§250 were internal decisions with nothing operator-
-facing to update.
-
-Docs only — no code, no version bump.
+(Compacted 2026-10-14.) `it-admin.md` still described the per-app "Require Authelia login" toggle removed in §210.2; rewritten (`skipAutheliaProtection` is fixed per app). `app-credentials.md` now names apps that skip their own login behind Authelia via header trust (Guacamole, Paperless; Beszel wired but unproven). Docs only.
 
 ## 252. Tunnel-wide 502: `exposure_npm_api_url` pinned to a stale LAN IP
 
@@ -13370,39 +12437,7 @@ Frontend build passes; HTML-only, no tests.
 
 ## 260. §64 pre-built n8n workflows — spike delivered, candidate table parked (2026-09-07)
 
-Closed the README item. The spike §64 asked for — a way to get a
-backend-rendered workflow JSON into n8n's main process, which has no native
-"import from a directory" — was built in §118.3 and settled in §248:
-`apps/n8n/docker-compose.yml`'s `n8n-workflows-init` runs
-`import:workflow` → `update:workflow --id=<id> --active=true` →
-`publish:workflow` over `apps/n8n/workflows/*.json` on every n8n start;
-`services/n8nWorkflows.ts` renders those files from stored settings. One
-managed workflow ships today (the CrowdSec alert relay).
-
-**Why nothing more gets built now.** §64.1's candidate table doesn't survive
-contact with the current roster:
-
-- *Backup failed → ntfy* — Duplicati is gone (§196 era); dead row.
-- *CrowdSec decision → ntfy* — already shipped.
-- *Certificate expiring → ntfy (NPM API)* — needs an NPM admin credential,
-  which is exactly what §64.2 says a shipped workflow should avoid.
-- *Service down → ntfy (Uptime Kuma)* — Kuma posts to ntfy natively; n8n only
-  adds quiet-hours/severity routing, not enough to justify managed JSON.
-- *Disk health → ntfy (Beszel)* — Beszel has its own alerting.
-- *Document added → Paperless* — Paperless has native post-consume hooks.
-- *New ticket → ntfy (ITFlow)* — ITFlow isn't in the roster (§62.1).
-
-Every row is dead, credential-gated, or duplicates a native feature. §64.3's
-open question — "do these belong to n8n at all, or should the dashboard grow a
-generic notifications feature?" — is left unanswered on purpose: no candidate
-is compelling enough to force the call.
-
-**Still live, unblocked by this:** the import path is ready for whatever
-genuinely needs it next — §84.3 P4 (n8n glue: `/content` drafts → Postiz) and
-the CrowdSec-alert workflow's own §118.4 smarts. Those add workflows when a
-real need exists, not a speculative pile.
-
-Docs/plan only — no code, no version bump.
+(Compacted 2026-10-14.) Import spike already done (§118.3, §248): `n8n-workflows-init` imports, activates and publishes `apps/n8n/workflows/*.json` rendered by `n8nWorkflows.ts`. One workflow ships (CrowdSec alert relay). Every other §64.1 candidate is dead (Duplicati gone, ITFlow then absent), needs an NPM admin credential (§64.2 says avoid), or duplicates a native feature (Kuma, Beszel, Paperless). §64.3 "n8n or dashboard notifications?" left open. Add workflows when a real need appears (§84.3 P4, §118.4).
 
 ## 261. §84 P4 — parked: blocked on Postiz exposure + a connected account (2026-09-07)
 
@@ -16233,46 +15268,12 @@ compose-file-but-no-entry dir is left alone.
 
 ## 317. removedAppCleanup: two bugs found by the live §316 deploy (2026-09-09)
 
-Deployed §316 to the host and removed Forgejo + File Browser for real. The
-self-update ran clean (~16 min; the build phase is still the slow part — §300
-territory), the new backend booted with `reconcileRemovedAppProjects`, and it
-**half-worked**:
+(Compacted 2026-10-14.) Removing Forgejo and File Browser live: containers, networks, `.env` and override went; `data/` stayed with `EACCES`.
 
-- ✅ both projects' containers and networks torn down (fileless
-  `docker compose -p <name> down` does work — its progress prints to stderr,
-  so an empty stdout is not "nothing happened", which the §316 log line
-  misread);
-- ✅ `.env` and the managed `docker-compose.override.yml` removed;
-- ❌ `apps/forgejo/data/` and `apps/file-browser/data/` left on disk —
-  `EACCES: permission denied` unlinking `filebrowser.db` / `rmdir .../git/.ssh`.
+- **Root-owned data, non-root backend.** `removeAppDir()` tries `fs.rm`, then falls back to a throwaway `busybox rm -rf` container (same pattern as HA config in `exposureConfigFiles.ts`) and checks the dir is gone.
+- **Matched dir names against registry keys.** `homepage` lives in `apps/home-page/`; a mismatched dir without a compose file would have been deleted. Safe set now built from `getProjectName(key)`.
 
-### Bug 1 — the backend is non-root, the leftover data is root
-
-Container `data/` trees are written by the app's own (root) container;
-`fs.rm` from the backend's non-root `appuser` can't touch them. Fix:
-`removeAppDir()` tries `fs.rm` first (fine for a purely-gitignored dir nothing
-ever ran), and on failure escalates to `docker run --rm --network none -v
-$APPS_DIR:$APPS_DIR busybox rm -rf <dir>` — the same throwaway-root-container
-pattern `exposureConfigFiles.ts` uses for HA's root-owned config. Verifies the
-dir is gone afterward.
-
-### Bug 2 — matched dir names against registry *keys*
-
-`selectOrphanAppDirs` compared `apps/<dir>` names to `Object.keys(SERVICES)`.
-A few services live in a differently-named dir — `homepage` →
-`apps/home-page/` — so `home-page` looked orphaned. It was spared only by
-still having a compose file (logged the spurious "compose file but no registry
-entry" warning). A dir with that kind of name mismatch and *no* compose file
-would have been wrongly deleted. Fix: build the safe set from
-`getProjectName(key)` for every service (the `composePath` dir basename), not
-the keys. New test case covers `home-page` vs `homepage`.
-
-### Host state
-
-`sudo rm -rf apps/forgejo apps/file-browser` on the host cleared the two
-leftovers by hand (5.5M + 52K). The fix makes it automatic next time. 685
-backend tests + typecheck pass. Version 0.58.0 → 0.58.1. Not re-proven live —
-next app removal on the host is the check.
+Note: fileless `compose -p down` prints to stderr; empty stdout is not "nothing happened". Leftovers removed by hand once. 0.58.1. Next real removal is the live check.
 
 ## 318. Guacamole: reached direct over the overlay with its own login; SSO machinery removed (§200, §223, §288, 2026-09-09)
 
@@ -16327,27 +15328,7 @@ removed header trust, which had no live route anyway.
 
 ## 319. §300 closed — RAM headroom left as-is, ClamAV stays on-demand (2026-09-09)
 
-Two @mat decisions from the §300 memory-baseline work, both resolved. No code.
-
-**Self-update RAM headroom (§131.4, §198, §199, §290–§299): leave as-is.** The
-§300–§309 baseline shrink plus the §301 removals did the job — `home-srv-01` on
-2026-09-09 reads 8 GiB used / 6 GiB available / **swap 0 of 3 used**, container
-RSS ~6.9 GiB (down from the 9.7 GiB / 90 %-full-swap starting point in §300).
-Recovery from a SIGKILL mid-swap is automatic since the §299 watchdog. This is
-the no-guarantees dev/test box; the only remaining symptom is a rare ~1–2 min
-auto-recovered blip during a *full* self-update. Buying RAM for a disposable
-box to remove that is not worth it. Real sizing headroom is P10's problem — a
-separate per-client deployment on its own hardware (16 GiB spec, §84.7).
-
-**Phase D — D4 ClamAV: keep on-demand scanning.** The 870 MiB live RSS is the
-resident signature database — irreducible under any policy. `apps/clamav/
-docker-compose.yml` runs only `clamd` + `freshclam`; Nextcloud's antivirus app
-and Paperless call clamd's TCP socket (`10450`) for **targeted, on-demand
-scans**. There is no `clamonacc`, no watched mount, no cron — it is already the
-lean "scan on request" model. "On-access" would mean *new* wiring (clamonacc +
-a mounted path to watch) for more constant CPU churn and no real gain on a
-14 GiB box. D1/D2/D3 (Postiz, Metabase, MSSQL) were already resolved by the
-§301a–d removals.
+(Compacted 2026-10-14.) Two @mat decisions, no code. **Self-update RAM:** after §300–§309 and §301 removals the host sits at swap 0/3 GiB, container RSS ~6.9 GiB (from 9.7). §299 watchdog recovers a mid-swap SIGKILL. A rare 1–2 min blip on a disposable box does not justify more RAM; client sizing is P10 (16 GiB, §84.7). **ClamAV:** 870 MiB is the signature DB, irreducible. Already on-demand (Nextcloud and Paperless call clamd on 10450; no clamonacc). On-access would add wiring and CPU for no gain.
 
 ## 320. MeshCentral removed (§264, §301e, 2026-09-09)
 
@@ -16849,26 +15830,7 @@ Backend 652 tests (+4), tsc clean. Minor bump → 0.62.0.
 
 ## 333. §331 slice 2 — remove the per-app exposure write API (2026-09-09)
 
-With exposure automatic (§332) the write endpoints have no caller:
-
-- Deleted `PUT /api/services/:name/exposure` and
-  `POST /api/services/:name/exposure/verify` from `routes/services.ts`, and
-  the now-orphaned imports (`upsertServiceExposureConfig`,
-  `deprovisionServiceExposure`, `provisionServiceIfEnabled`,
-  `syncAutheliaAccessControlSafe`, `syncAutheliaOidcClientsSafe`,
-  `regenerateHomepageServices` — all only used by those two handlers; the
-  Authelia/homepage syncs still run from the exposure reconciler and each
-  service start).
-- Deleted `upsertServiceExposureConfig` from `exposure.ts`, the
-  `serviceExposureUpdate` Joi schema, and the `ServiceExposureInput` type.
-- `GET /api/services/:name/exposure` stays for now — slice 3 removes it with
-  its frontend caller.
-- `apps:expose` capability left defined (backend `capabilities.ts` +
-  `database.ts` seed) but no longer gates anything; the frontend drops it from
-  the grant UI in slice 3. Not worth a `user_capabilities` migration.
-
-`deprovisionServiceExposure` stays exported — `ensureAutoExposure` and
-`reconcileRemovedServices` use it. Backend 647 tests, tsc clean. Patch → 0.62.1.
+(Compacted 2026-10-14.) Exposure is automatic (§332), so deleted `PUT /api/services/:name/exposure`, `POST …/exposure/verify`, `upsertServiceExposureConfig`, its Joi schema and input type. GET stayed until slice 3. `apps:expose` capability left defined but inert (no migration worth it). `deprovisionServiceExposure` stays (used by `ensureAutoExposure`, `reconcileRemovedServices`). 0.62.1.
 
 ## 334. §331 slice 3 — strip the per-app exposure toggle from the UI (2026-09-09)
 
@@ -16922,27 +15884,7 @@ two infra panels isn't worth it.
 
 ## 336. §331 slice 5 — docs for auto-exposure (2026-09-09)
 
-Docs-only, closing §331.
-
-- `CLAUDE.md` Conventions — new bullet: exposure is automatic, no toggle, no
-  `PUT …/exposure`; `ensureAutoExposure` keeps `service_exposure.enabled` in
-  step from `getExposability`; `lanOnly`/`overlayOnly` stay off the tunnel;
-  CF token + tunnel config on the Settings page. Home Page bullet reworded
-  ("a non-exposable app has no tile").
-- `docs/it-admin.md`, `docs/first-run.md` — the "turn on Publicly expose this
-  service" step is gone; every exposable app is published on its next start.
-- `docs/webmaster.md` — the DNS/ingress paragraph reworded to "created
-  automatically for every exposable app"; the "OnlyOffice: expose it, or keep
-  Nextcloud LAN-only" decision table dropped (OnlyOffice is always exposed
-  now), keeping only the "why IP-restriction isn't needed" rationale.
-- `README.md` — quick-start note; the §331 TODO block removed (all five slices
-  landed).
-- `docs/app-credentials.md` — "claim it before exposing it" → "before
-  inviting other Authelia users" (an app is exposed the moment it starts, but
-  behind Authelia); dropped the stale "turning exposure off removes
-  immich.json" clause.
-
-No code, no version bump. §331 complete: exposure is automatic end to end.
+(Compacted 2026-10-14.) CLAUDE.md gained the "exposure is automatic" convention; `it-admin.md`, `first-run.md`, `webmaster.md`, README and `app-credentials.md` drop the expose toggle (apps publish on next start, behind Authelia; "claim before inviting other users"). OnlyOffice decision table dropped. §331 complete.
 
 ## 337. §331 follow-up — ClamAV flagged lanOnly (2026-09-09)
 
@@ -18448,28 +17390,7 @@ fresh clone.
 
 ## 373. Homebox removed — ITFlow is the one asset tracker (§301e closed, 2026-09-10)
 
-§301e's last open thread. Decided: keep ITFlow, drop Homebox. Homebox's whole
-feature set — assets, locations, warranty expiry, purchase records,
-maintenance logs, QR labels — is a subset of ITFlow's asset module, and
-ITFlow additionally ties assets to clients and users and carries the rest of
-the MSP job (helpdesk, invoicing, docs vault, domain/SSL expiry, contracts).
-Running both means a second, thinner asset database. No per-deployment profile
-switch — just one app.
-
-Removed: `apps/homebox/`, the `homebox` registry entry (OIDC client config
-included), the redundant Homebox case in `exposureEnv.test.ts` (the Mealie
-case right after it covers the same `oidcClient.appEnv` path), and rows in
-`docs/ports.md` (`10440` freed), `docs/app-credentials.md`,
-`docs/sales-catalogue.md`, `docs/licences.md`, `step-by-step.md`. Comments in
-`autheliaOidcClients.ts` / `immichConfig.ts` / `types/index.ts` /
-`nginx-proxy-manager/snippets/proxy.conf` that used Homebox as an OIDC-app
-example repointed to Mealie / generalised.
-
-Deployed-host teardown is automatic: `git pull` drops the tracked compose
-file, leaving `apps/homebox/` with gitignored `.env` + `data/` and no compose
-→ `removedAppCleanup.ts` tears down the project and dir, and
-`reconcileRemovedServices` drops its NPM host / DNS / tunnel ingress.
-Backend + frontend checks green.
+(Compacted 2026-10-14.) Homebox's features are a subset of ITFlow's asset module, which also ties assets to clients. One app, no profile switch. Removed app, registry entry (with OIDC client), its redundant test case, and doc rows (port 10440 freed); comments using it as the OIDC example repointed to Mealie. Host teardown is automatic via `removedAppCleanup.ts` and `reconcileRemovedServices`.
 
 ## 374. setup_server.sh package probe fixed — no more apt-get update every run (§366, 2026-09-10)
 
@@ -18488,23 +17409,7 @@ which is the normal case on a re-run. `bash -n` clean.
 
 ## 375. Startup log popup no longer freezes on a chatty first boot (§371 side-finding, 2026-09-11)
 
-Root cause wasn't unbounded log storage — `pushStartupLine` already ring-buffers
-to 600 lines and the popup renders a single `<pre>{{ startupLogText() }}`, not
-a per-line `*ngFor`. It was event *frequency*: each `EventSource` `'log'`
-message ran inside Angular's zone, so a burst of hundreds of lines (Twenty's
-migrations) queued a full change-detection pass **and** an `AfterViewChecked`
-`scrollTop = scrollHeight` reflow per line, all synchronous on the main
-thread.
-
-Fix in `service-card.component.ts`: the `'log'` listener is now registered via
-`NgZone.runOutsideAngular`, pushing into a plain buffer (`queueStartupLine`)
-instead of touching component state directly. A single `setTimeout` (120 ms)
-flushes the buffer through `NgZone.run()` in one batch, so the DOM updates a
-few times a second regardless of burst size. `teardownStartupLogs` clears the
-pending timer/buffer alongside the existing cleanup. Two new tests in
-`service-card.component.spec.ts` (`fakeAsync`/`tick`) cover the buffering and
-teardown. Frontend build + `test:ci` (55/55) green; not a Docker/exposure
-change, so no host verification needed.
+(Compacted 2026-10-14.) Not unbounded storage (ring buffer of 600, one `<pre>`). Each SSE `'log'` event ran change detection plus a scroll reflow. `service-card.component.ts` now listens outside the Angular zone, buffers lines, and flushes every 120 ms via `NgZone.run()`; teardown clears the timer. Two `fakeAsync` tests.
 
 ## 376. Documented `netbird up --disable-dns` for a Pi-hole host (§368, 2026-09-11)
 
@@ -18862,63 +17767,11 @@ clean and the node registers tagged.
 
 ## 388. §367 verified live end to end — OAuth client closes the recurring-expiry item (2026-09-11)
 
-Deployed §387's fix, restarted Tailscale. Clean this time — no crash-loop:
-
-```
-tags=tag:businesslab, host="businesslab-signal"
-active login: businesslab-signal.tail122b53.ts.net
-machineAuthorized=true, Hostinfo.IngressEnabled changed to true
-```
-
-`tailscale funnel status` inside the container: `Funnel on` at
-`https://businesslab-signal.tail122b53.ts.net`, proxying to the signal
-server (`10.201.19.1:10252`) — unchanged target, `TS_HOSTNAME` pin held
-through the re-enrollment as designed. `curl` against the public Funnel
-hostname: `405` — the same known-healthy signature for the signal gRPC
-server established in §53/§330. NetBird traffic already flowing
-("received a proxy request for plaintext gRPC" in the tailscale log before
-the check even started).
-
-§367 closed: `TAILSCALE_AUTH_KEY` is now an OAuth-client-issued key
-(`tag:businesslab`, `auth_keys` write scope) that does not expire, ending
-the 90-day reusable-key rotation this item existed to fix. Two real bugs
-found and fixed getting here — the ACL's Funnel grant only covering
-`autogroup:member` (not the tagged node, §367 ACL edit) and containerboot's
-`--advertise-tags` requirement for an OAuth key (§387) — both now permanent
-fixes, not one-off workarounds.
+(Compacted 2026-10-14.) After §387, Tailscale enrolled cleanly as `tag:businesslab`, `businesslab-signal` hostname held, Funnel on, public URL answers `405` (healthy signal signature, §53/§330). `TAILSCALE_AUTH_KEY` is now a non-expiring OAuth-client key, ending 90-day rotation. Two real fixes on the way: ACL Funnel grant must include the tag; containerboot needs `--advertise-tags` for OAuth keys.
 
 ## 389. §310 closed — no data left to move, round-trip re-proven live (2026-09-11)
 
-Checked the host before touching anything: `apps/file-browser/data/files/`
-**does not exist any more** — `ls`/`du` both `No such file or directory`.
-§310's premise ("the deployed host has real data at the old path") no
-longer holds; either it was already migrated by hand at some point, or the
-directory was cleaned up separately. Either way, there was nothing to `mv`.
-
-`apps/nextcloud/data/shared/` — the current, correct location — exists,
-owned `mat:docker`, `drwxrwsrwx`, with `to-paperless/` already present
-(created by `paperlessDropbox.ts` as designed). Samba's compose confirmed
-bound to `../nextcloud/data/shared:/storage`, matching §310's intent.
-
-Re-ran §219's actual live check against the current path instead of just
-trusting the compose files:
-
-- Wrote a file straight into `apps/nextcloud/data/shared/` — visible
-  simultaneously inside the `nextcloud` container (`/shared/…`, uid 1000)
-  and the `samba` container (`/storage/…`, user `labshare`) — same
-  underlying bind, both apps agree.
-- Wrote a file into `to-paperless/` — Paperless's consumer picked it up in
-  seconds, ran the ClamAV pre-consume script (exit 0), and fully consumed
-  it (`document_id: 1`), removing it from the drop box. Confirms the
-  Paperless leg *and* the §219 ClamAV pre-consume wiring together, live.
-
-Test artifacts cleaned up except the resulting Paperless document itself
-(`roundtrip-test`, id 1) — left for @mat to delete from Paperless's own UI
-rather than reaching into their document store via API unasked.
-
-§310 closed. README item deleted — nothing left to do; the round-trip this
-item existed to re-prove now has fresh, live confirmation instead of resting
-on the original 2026-09-09 proof.
+(Compacted 2026-10-14.) `apps/file-browser/data/files/` no longer existed on the host, so nothing to move. `apps/nextcloud/data/shared/` exists with `to-paperless/`; Samba binds it. Re-proved live: a file is visible in both Nextcloud and Samba; a file in `to-paperless/` passed ClamAV and was consumed. Test document `roundtrip-test` left for @mat to delete.
 
 ## 390. P10 — turnkey build spec drafted (§84.7)
 
@@ -19305,81 +18158,9 @@ change to Authelia's access rules. Not pursued.
 ## 403. HSTS closed the last gap: every plain proxy host gets its own
      advanced_config (§402.1's README follow-up)
 
-§402.1 found HSTS only reached Authelia-protected and gRPC hosts — the ~9
-apps with `skipAutheliaProtection: true` (NocoDB, Stirling-PDF, ...) got no
-`advanced_config` at all, so NPM rendered its own stock `location /`
-(`conf.d/include/proxy.conf`), whose own `add_header X-Served-By` silently
-shadows the inherited HSTS block for every one of them.
+(Compacted 2026-10-14.) Hosts with `skipAutheliaProtection` had no `advanced_config`, so NPM's stock `location /` `add_header` shadowed HSTS. New `buildPlainAdvancedConfig(websocket)` in `npmClient.ts`: `location /` via `/snippets/proxy.conf` (already proven; superset of stock headers, only `X-Forwarded-Scheme` dropped, nothing reads it), plus `Upgrade`/`Connection` when websocket. `allow_websocket_upgrade` now always `false` (duplicate directive would fail reload, §99). Payload and `needsUpdate` share one `computeAdvancedConfig()`.
 
-**Fix**: `npmClient.ts` gains a third `advanced_config` shape,
-`buildPlainAdvancedConfig(websocket)` — a `location /` through
-`/snippets/proxy.conf` (the same file the Authelia and gRPC blocks already
-use, already proven live, already declaring no `add_header` of its own),
-with `Upgrade`/`Connection` added only when that specific app wants
-websockets (mirroring what NPM's own `allow_websocket_upgrade` flag used to
-do for these hosts). `allow_websocket_upgrade` on the host payload is now
-unconditionally `false` for every host, not just Authelia/gRPC ones — with
-every host carrying its own advanced_config now, leaving it on would
-duplicate whatever that config already sets and fail nginx's reload (§99).
-
-Also de-duplicated: `buildProxyHostPayload`'s and `ensureProxyHost`'s
-`needsUpdate` check each carried their own copy of the
-grpc/Authelia/plain `advanced_config` ternary — pulled into one
-`computeAdvancedConfig()` both call, so a future change to one path can't
-land in only one of the two places.
-
-**Compared `/snippets/proxy.conf` against NPM's stock
-`conf.d/include/proxy.conf`** before trusting it for these hosts: the
-dashboard's own snippet is a superset for every header that matters
-(`Host`, `X-Forwarded-Proto` — hardcoded `https`, correct for this
-architecture, unlike stock's `$x_forwarded_scheme` — `X-Forwarded-For`,
-`X-Real-IP`) plus `proxy_http_version 1.1`, timeouts and buffering stock
-doesn't set at all. The only thing dropped is `X-Forwarded-Scheme`, which
-nothing here reads. `proxy_pass $forward_scheme://$server:$port;` (no
-`$request_uri` suffix, unlike stock) is exactly what `AUTHELIA_ADVANCED_CONFIG`
-already uses for the entire Authelia-protected fleet — nginx passes the
-original URI through unchanged when `proxy_pass`'s target has no URI part,
-so this is a proven-equivalent form, not a new behavior.
-
-**Blast radius, called out plainly**: this changes the generated NPM config
-for every currently-`skipAutheliaProtection` host, not just future ones —
-the exposure reconciler (on next start or the ~6h sweep) will `PUT` a new
-`advanced_config` + `allow_websocket_upgrade: false` for each. Each one
-individually reuses the exact snippet already proven live for every
-Authelia/gRPC host, so the risk is bounded, but this is still "every plain
-app's proxy host gets rewritten" — flagging it here rather than only in the
-commit message, per plan.md's own "what was tried and rejected" discipline
-even when nothing was rejected, just risk carried forward into live
-verification.
-
-9 new/updated tests in `npmClient.test.ts` (the new plain-advanced_config
-shape, the websocket-conditional Upgrade/Connection lines, the falsy-
-websocket coercion carried into the new path, and a dedicated "migrates a
-pre-§402.1 host" case exercising the exact `allow_websocket_upgrade: true,
-advanced_config: ''` shape every one of the ~9 affected hosts is in right
-now). Backend typecheck clean, 784/784 pass. Minor bump.
-
-**Not yet verified against the live host** — staying on `dev` until a
-service with `skipAutheliaProtection: true` (NocoDB is the obvious one,
-already used as the §402.1 repro) is restarted and `curl -I` against its
-public hostname shows the header, with no regression to its own login flow
-or (for one that needs it) its websocket connection.
-
-**Verified live.** Deployed, restarted NocoDB. Its generated
-`proxy_host/*.conf` now carries `location / { include /snippets/proxy.conf;
-proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection
-"upgrade"; proxy_pass $forward_scheme://$server:$port; }` in place of the
-old empty advanced_config, and `curl -I
-https://nocodb.tx-home-utils.com` returns a normal `200` (own login page
-intact) with `strict-transport-security: max-age=15552000;
-includeSubDomains` present. Turns out `websocket` isn't actually a per-app
-value at the exposure layer — `exposure.ts`'s `ALLOW_WEBSOCKET_UPGRADE` is
-a single `true` constant passed for every app — so every one of the other
-`skipAutheliaProtection` hosts (itflow, home-assistant, homepage, docuseal,
-kimai, twenty) takes the exact same `buildPlainAdvancedConfig(true)` path
-NocoDB just proved live; nothing app-specific left to verify separately.
-Merged to `main` already (deployed ahead of verification, same pattern
-§402.1 used); no further action needed.
+Blast radius: every plain host's NPM config rewritten on next reconcile. Verified live on NocoDB: 200, own login intact, HSTS present. `ALLOW_WEBSOCKET_UPGRADE` is one constant for all apps, so the other plain hosts take the same path.
 
 ## 404. NetBird routing peer, so a remote client reaches the whole LAN
 
@@ -19959,64 +18740,12 @@ original question named directly. `dev`/`beta` → `main` next.
 
 ## 409. Audited every app's config panel for fields that shouldn't be there
 
-Follow-up to §408: "check the other apps [for] what can be hidden from the
-user and what really needs to be in settings," with an explicit "keep UI
-to a minimal as needed." Delegated the cross-file survey (read
-`appEnv.ts`'s actual hidden/masked logic, then every app's compose file
-against the registry) to an Explore agent rather than eyeballing 36 apps
-by hand; verified its two findings against the real files before acting —
-both held up.
+(Compacted 2026-10-14.) Follow-up to §408 ("keep UI minimal").
 
-**Finding 1 — two fields that lie, not just clutter.** `KIMAI_ADMIN_EMAIL`
-and `NOCODB_ADMIN_EMAIL` render as plain editable text (neither matches
-`SECRET_KEY_PATTERN`, neither was in any hidden/managed list), but
-`adminSeedEnv.ts` overrides both with the Authelia admin's email on every
-`docker compose up`, merged into the shell environment and never
-persisted. Anything typed into that field is silently discarded on the
-next start. `VAULTWARDEN_DOMAIN` has the equivalent-shaped problem solved
-correctly already (`managedEnvKeys`) — but checked the frontend template
-before reusing it here: the managed-field caption is hardcoded to
-"Set automatically from this service's exposure settings," specific to
-the exposure system `managedValue` is actually sourced from
-(`buildExposureEnvOverrides`). Reusing `managedEnvKeys` for an
-admin-seed-sourced value would show a read-only row with a caption that's
-simply wrong for it. Used `hiddenGeneratedSecrets` instead — the value
-`ensureGeneratedSecrets` fills a blank one with (random hex) is inert
-dead weight (adminSeedEnv's override always wins at `up` time regardless
-of what's in `.env`), same as every other hidden secret already works.
+- **Fields that lie:** `KIMAI_ADMIN_EMAIL`, `NOCODB_ADMIN_EMAIL` were editable but `adminSeedEnv.ts` overrides them every start. Rejected `managedEnvKeys` (its caption says "from exposure settings", wrong here). Used `hiddenGeneratedSecrets` (random fill is harmless dead weight).
+- **`*_DB_USER` / `*_DB_NAME` in 12 apps** were editable; changing them after init breaks the DB connection. `hiddenGeneratedSecrets` would be a real bug here (random user would not match the initialized volume). New `hiddenEnvKeys`: hidden, never auto-filled, compose `:-default` applies.
 
-**Finding 2 — a whole class of fields the existing "hide DB internals"
-pass missed.** `*_DB_USER`/`*_DB_NAME` across 12 apps (nginx-proxy-
-manager, itflow, bookstack, n8n, paperless, guacamole, twenty, miniflux,
-nextcloud, immich, kimai, nocodb) sit right beside their already-hidden
-`*_DB_PASSWORD` siblings but render as plain editable text — meaningless
-to a human, and editing one post-init doesn't rotate anything on the DB
-side (the volume was already initialized with the compose default), so a
-change here just breaks the app's own DB connection. **Reusing
-`hiddenGeneratedSecrets` here would have been a real bug, not just
-overkill**: that mechanism auto-fills a blank field with a random value,
-and a random `BOOKSTACK_DB_USER` wouldn't match the actual MariaDB user
-the volume already has — an active break, unlike Finding 1's harmless
-dead-weight email.
-
-Added a new, narrower field instead: `hiddenEnvKeys` (`types/index.ts`,
-wired into `appEnv.ts`'s `loadStatus`) — hidden from the panel exactly
-like `hiddenGeneratedSecrets`, but deliberately excluded from the
-`autoGeneratedSecrets` random-fill list. Nothing to fill in, nothing to
-show, leave it unset and let the compose file's own `:-default` do its
-job. Applied to all 12 apps' `*_DB_USER`/`*_DB_NAME` pairs.
-
-5 new tests in `appEnv.test.ts`: `hiddenEnvKeys` fields render `hidden:
-true` and `required: false`, and `ensureGeneratedSecrets` never touches
-them (the actual regression Finding 2 is guarding against — a random
-fill would silently break a bundled DB connection). Backend typecheck
-clean, 815/815 pass. UI-only/registry change — hiding a field from the
-panel doesn't touch what `docker compose up` substitutes (the compose
-file's own `:-default` is unchanged either way), so the blast radius of
-a naming mistake here is "still shows in the UI," not a broken app;
-treated as verified by the test suite rather than requiring a fresh live
-host check, unlike the Docker/exposure/networking changes earlier this
-session. Minor bump.
+5 tests in `appEnv.test.ts`. UI-only change, so no live check.
 
 ## 410. A real remote-work session surfaced two live bugs and a genuine gap — a second, collision-proof address
 
@@ -21731,70 +20460,9 @@ guarded against.
 
 ## 431. The fixed-IP prompt is now pre-answerable — the last of the three
 
-README TODO item left open since §422 did the other two
-(`SETUP_FREE_PORT_53`, `SETUP_NOPASSWD_SUDO`). The fixed-IP prompt was
-deliberately excluded then: it needs four values, not a yes/no, and the
-existing interactive path's safety net (`netplan try`'s auto-revert) has no
-terminal to confirm on in an unattended run.
+(Compacted 2026-10-14.) Follows §422. `SETUP_FIXED_IP_IFACE` / `_ADDR` / `_GATEWAY` / `_DNS` in `start.config`, all four or refuse (no guessing from `ip route`). `netplan generate` validates; the unattended path **never** runs `netplan try`/`apply` — file applies on next boot, so a wrong gateway cannot cut off the session. Outer gate widened; interactive path untouched.
 
-**Design, matching the TODO item's own suggestion rather than reopening the
-question**: `SETUP_FIXED_IP_IFACE`/`_ADDR`/`_GATEWAY`/`_DNS` in
-`start.config`, all four required together — a partial set is a stated
-mistake, not a signal to guess the rest from `ip route`/`resolv.conf` the
-way the interactive prompt's own defaults do. `netplan generate` validates
-the file before trusting it. Crucially, the unattended path **never calls
-`netplan try` or `netplan apply`** — it writes the file and stops, taking
-effect on the next boot, which an unattended install already gets. That
-sidesteps the actual risk (a wrong gateway/DNS cutting off the session used
-to fix it) entirely rather than trying to replace `try`'s human-in-the-loop
-confirmation with something automated.
-
-`setup_server.sh`'s existing outer gate (`[ -t 0 ] && command -v
-netplan`) became `command -v netplan && { [ -t 0 ] || any SETUP_FIXED_IP_*
-set }`, with the branch inside split three ways: file already exists
-(unchanged — reports and leaves it alone regardless of which path got it
-there), interactive (byte-for-byte the existing prompt flow, untouched), or
-this new unattended branch. The existing interactive path was not
-restructured beyond the outer gate — same reasoning as §422's other two,
-minimal diff over a script whose failure mode is "wrong values on a host
-reached over SSH."
-
-New `scripts/test-fixed-ip.sh`, mirroring `test-vg-expansion.sh`'s own
-established shape for this exact class of script (extract the block by its
-boundary comment, not line number, so an edit to `setup_server.sh` can't
-silently leave the test exercising stale lines) but far lighter — no
-`--privileged`, no real LVM, since this block only ever writes a YAML file
-and shells out to `netplan generate`. A stub `netplan` in the container's
-own `PATH` answers `generate` only, and fails loudly (exit 99, "called with
-unexpected subcommand") if the unattended path ever reaches for `try` — the
-regression this whole design exists to prevent, made into an actual
-assertion rather than something to eyeball in a diff. `FIXED_IP_FILE` is
-redirected into the container's own `/work/netplan/` (sed on the extracted
-copy, not an env-var override — the real script assigns it unconditionally)
-so nothing here can touch a real `/etc/netplan` even outside the container.
-5 scenarios, 9 assertions: silent no-op with nothing set, the full
-happy path (file content, correct comma-spaced DNS list, "not applied
-live" in the output), a partial set refused with no file written, a
-`netplan generate` rejection cleaning up after itself, and an
-already-configured host left untouched even with `SETUP_FIXED_IP_*` set.
-All pass.
-
-`bash -n` and a containerized `shellcheck -x` both clean on the whole of
-`setup_server.sh` (the three pre-existing SC2015/SC2001 style notes are all
-well outside this block, unchanged). Docs updated: `start.config.example`
-gained the four keys with the same "why" `setup_server.sh`'s own comment
-carries; `first-run.md`'s prompt table and its "what's pre-answerable"
-paragraph both updated — the fixed-IP row now says what happens differently
-when pre-answered (written-not-applied) instead of just linking to this
-TODO item.
-
-Not a Docker/exposure/networking change to the *running* stack — it's
-`setup_server.sh`, exercised only on a fresh, not-yet-provisioned host, and
-`home-srv-01` already has its fixed IP set (the "already configured, left
-alone" branch is what it would hit regardless of what's in `start.config`).
-Verified via the containerized test above rather than against the live
-host — there is no live host this specific code path is meant to run
-against a second time.
+`scripts/test-fixed-ip.sh` extracts the block by boundary comment, stubs `netplan` (exit 99 on anything but `generate`), redirects the file path: 5 scenarios, 9 assertions pass. `shellcheck` clean. Docs: `start.config.example`, `first-run.md`. Not live-tested; home-srv-01 already has a fixed IP.
 
 ## 432. Scheduled backups were silently dropping itflow's and kimai's database dumps
 
@@ -22186,29 +20854,9 @@ never actually worked.
 
 ## 439. Users-page frontend fixes were never deployed to home-srv-01
 
-Three consecutive frontend-only commits (the SSO app-access grid layout, the
-long-hostname overflow-into-next-column fix, the app filter box) were each
-verified with `ng build` plus a screenshot against the throwaway
-`docker-compose.test.yml` stack — real proof the code worked, but not proof
-it had *shipped*. None of the three rebuilt or redeployed the actual
-`frontend` container on `home-srv-01`; only the Twenty backend work in
-§438/§438.1 triggered a `git pull` + rebuild there, and that rebuild only
-touched `backend`. The user caught it by screenshotting the live dashboard
-and seeing the pre-fix overflow bug still present.
+(Compacted 2026-10-14.) Three frontend-only commits were verified with `ng build` and screenshots on the throwaway test stack, but the real `frontend` container on home-srv-01 was never rebuilt (only `backend` was, for §438). The user saw the old overflow bug live. Fixed by pulling `beta` and rebuilding `frontend`; served `main-*.js` hash confirmed.
 
-Fixed by pulling `beta` (now at the filter-box commit) and rebuilding
-`frontend` on `home-srv-01`; confirmed via the served `main-*.js` chunk hash
-matching the just-built bundle.
-
-**The gap, restated so it doesn't repeat**: "verified" for a frontend change
-means built and rendered, same as a backend change means typechecked and
-tested — neither is "deployed" on its own. `docs/development-guide.md`'s
-verification loop deploys after *any* commit meant to land; a screenshot
-against a local throwaway stack is verification of the *code*, not of what
-`home-srv-01` is currently serving. Worth checking specifically after a run
-of docs/frontend/backend-only commits in a row, since the deploy step is
-easy to fold into "only backend changed" reasoning that was true for the
-commit before it but not the one after.
+Lesson: build plus screenshot verifies the code, not what the host serves. Check after a run of single-side commits.
 
 ## 440. Scrutiny bumped to v0.9.4-omnibus
 
@@ -22578,23 +21226,7 @@ will log the error and, while Uptime Kuma disagrees, restart nothing.
 
 ## 445. Diagnosed "no internet on phone when connected to NetBird" — upstream Android bug, not our config
 
-User report, not a code change. Ruled out exit-node/full-tunnel routing first: the
-phone's NetBird app (Recursos tab) shows only the two scoped LAN resources
-(`192.168.1.0/24`, `10.177.1.0/24` alias range) toggled on, both provisioned
-by `netbirdRoutingPeer.ts` (§404/§405) — no `0.0.0.0/0` resource, so NetBird
-shouldn't touch internet-bound traffic at all. Ruled out DNS next: a raw-IP
-request (`1.1.1.1`) while connected still hit `ERR_TIMEOUT`, not just domain
-lookups, so it's not a resolver problem like §368/§411 were on the server side.
-
-That combination — scoped LAN routes only, still loses all other connectivity
-once connected — matches [netbirdio/android-client#96](https://github.com/netbirdio/android-client/issues/96)
-exactly (same resource shape, same symptom), open and unfixed upstream as of
-this session. Confirmed this is the Android client app itself, not something
-misconfigured in `apps/netbird-vpn/` or `netbirdRoutingPeer.ts`.
-
-README item added to recheck that issue periodically and delete the item once
-it's closed upstream (or an app update happens to fix it for us). No code
-changed; nothing to verify against the live stack.
+(Compacted 2026-10-14.) Phone has only the two scoped LAN resources (`192.168.1.0/24`, `10.177.1.0/24`), no `0.0.0.0/0`, so not full-tunnel. Raw IP `1.1.1.1` also times out, so not DNS. Matches [netbirdio/android-client#96](https://github.com/netbirdio/android-client/issues/96), open upstream. Not our config. README item tracks the upstream issue.
 
 ## 446. Named the upgrade trigger on Scrutiny's `privileged: true` ponytail marker
 
@@ -22722,27 +21354,7 @@ attempts, not anything running in Docker.
 
 ## 451. NetBird checked — 0.78.1 -> 0.78.2, safe patch, first real use of §449/§450
 
-`check if netbird can be safely updated`, applying the §449/§450 workflow for
-real for the first time. `apps/netbird-vpn/docker-compose.yml` runs 5 images,
-all on `:latest`: `netbirdio/netbird` (client, used twice — `netbird-client`
-and `netbird-lan-alias`), `management`, `signal`, `relay`, and `dashboard`
-(a separately-versioned project, already tracking its own `latest`).
-
-Confirmed via the Docker Registry v2 API directly (`registry-1.docker.io`,
-anonymous pull token — `hub.docker.com`'s web API was still rate-limiting
-this session's IP from the §448/§449 digest-matching work) that the running
-digest for `netbird`/`management`/`signal`/`relay` matches tag `0.78.1`
-exactly, and `latest` on all four now resolves to `0.78.2` — so a pull picks
-up all four together, no partial-version skew. `0.78.2`'s GitHub release
-notes: a Windows tray deadlock fix (irrelevant, no Windows here) and a
-wireguard-go bump — no breaking changes, patch-level. Judged safe.
-
-Bumped the date comment (no tag to bump — still `:latest` by design, §449).
-Since the file already carried today's date from the original rollout, a
-bare date wouldn't have produced a diff for classifyDeploy to see, so the
-line now also names what was checked/found: `(0.78.1 -> 0.78.2, patch,
-safe)`. `require-image-date-bump.sh` was a no-op here (no `image:` line
-changed) — correctly, since it only guards that case.
+(Compacted 2026-10-14.) Registry v2 API (Hub web API was rate-limiting) showed running digests = `0.78.1` and `latest` = `0.78.2` for client, management, signal and relay together — no version skew. Release notes: Windows tray fix, wireguard-go bump. Safe. Images stay `:latest` (§449); date comment now names what was checked (`0.78.1 -> 0.78.2, patch, safe`) so the diff is visible to classifyDeploy.
 
 ## 452. Consolidated the two pin badges + Unpin button into one hover version-info badge; deleted Unpin
 
@@ -22812,39 +21424,7 @@ hostname). 0.104.0 (minor — new user-visible capability).
 
 ## 454. LAN/overlay links use the Docker host's real LAN IP, not the dashboard's own hostname
 
-User: §453's lanOnly/overlayOnly link was wrong — it reused
-`window.location.hostname`, which is the dashboard's *own* public subdomain
-when reached over the Cloudflare tunnel. Cloudflare/NPM only forward
-80/443, so `https://dashboard.example.com:10450` was never actually
-reachable; it needs the Docker host's real LAN IP instead.
-
-`networkScan.ts` already resolves this exact value for NetBird's routing
-peer (`getLanCidr()` — "a.b.c.d/nn", a host address, not yet masked to a
-network address) via a throwaway `--network host` container, because the
-backend container itself sits on the internal bridge and can't see its own
-LAN-facing interface. Added `getCachedHostLanIp()` / `startHostLanIpRefresh()`
-on top of it: strips the CIDR down to the bare IP, cached and refreshed
-every 6h (`index.ts`, alongside the other sweepers) rather than spinning up
-a container on every status poll.
-
-Threaded through as `hostLanIp` on `ServiceStatusResponse` (host-wide, not
-per-service — unlike everything else on that payload) → `service-state.
-service.ts`'s new `hostLanIp$` → `<app-service-card [hostLanIp]="...">` →
-`lanAccessUrl()`, which now prefers it over `window.location.hostname`
-(kept as the fallback for before the sweeper's first resolve completes).
-
-Fixed the same bug at its other occurrence while here:
-`apps.component.ts`'s `buildRunningAppUrl`/`groupRunningPortsByCategory`
-(the "running apps and ports" table's LAN link) had the identical
-`window.location.hostname` mistake for any non-exposed running app, not
-just lanOnly/overlayOnly ones — same root cause, same fix, threaded through
-the same `hostLanIp$`.
-
-Verified: `./scripts/check.sh backend typecheck`/`test` (924, unchanged —
-the cache getter is a one-line accessor, same untested-without-Docker
-convention as the rest of `networkScan.ts`) and `frontend test`/`build`
-(67/67, +1 new confirming `hostLanIp` wins over `window.location.hostname`
-when set). 0.104.1.
+(Compacted 2026-10-14.) §453's `lanOnly`/`overlayOnly` link used `window.location.hostname`, which is the public subdomain over the tunnel (only 80/443 forwarded). Added `getCachedHostLanIp()` / `startHostLanIpRefresh()` on top of `networkScan.ts`'s `getLanCidr()` (needs a `--network host` throwaway container), cached and refreshed every 6 h. Sent as host-wide `hostLanIp` on `ServiceStatusResponse`; `lanAccessUrl()` prefers it, hostname is the fallback. Same bug fixed in `apps.component.ts` running-ports table. 0.104.1.
 
 ## 455. Resource strip matched to gethomepage's own widget: icons, free-space text, 5s polling
 
@@ -22952,27 +21532,7 @@ as done, since it touches how the dashboard's own hostname is resolved.
 
 ## 458. §457 verified live on `beta`
 
-Deployed via SSH per the current three-tier workflow: `dev` → `beta`
-(fast-forward, both already ahead of `main`) → pulled + rebuilt
-`business-lab-backend` on `home-srv-01` → `docker compose up -d backend`.
-Backend came up clean (`docker logs`: `Homelab backend listening on port
-3000`, no errors).
-
-Confirmed without `docker exec` (no hand-inspecting a running container —
-`docker compose config backend` reads the same resolved env compose itself
-would apply): `DASHBOARD_SUBDOMAIN` is unset in this host's root `.env`
-(empty string), so the code's fallback to the new `businesslab` default
-applies — and `businesslab.tx-home-utils.com` resolves (`getent hosts`),
-unlike the old `dashboard.tx-home-utils.com` guess, which does not. Did
-**not** verify `getDashboardBaseUrl()`'s return value through the
-authenticated `/api/settings/general` route or an actual invite send — no
-dashboard credentials, same limitation noted in §455/§456. Given the DNS
-result plus the unchanged/passing test suite, that's enough to call the
-fix proven; a full end-to-end (send an invite, click the link) is a
-one-click check the user can do next time they create a user.
-
-Left on `beta`, unmerged to `main` per [[main-merge-requires-request]] —
-merge on request only.
+(Compacted 2026-10-14.) Backend rebuilt on home-srv-01, clean boot. `docker compose config backend` (not `docker exec`) showed `DASHBOARD_SUBDOMAIN` unset, so the new `businesslab` default applies; `businesslab.tx-home-utils.com` resolves, the old `dashboard.` guess does not. `getDashboardBaseUrl()` not checked through the authenticated route (no credentials); a real invite is the user's next check.
 
 ## 459. Header health poll starved the rest of the API of its rate-limit budget
 
@@ -24178,25 +22738,7 @@ restarts at 08:46 and 09:00.
 
 ## 510. Nextcloud's orphaned `/NAS` index cleared
 
-The operator removed §508's `/NAS` FTP mount in Nextcloud's UI, but its
-3,300,512 `oc_filecache` rows and its `oc_storages` row
-(`ftp::frias@192.168.1.50//`, numeric id 5) stayed behind. Nextcloud 34
-removes a storage through its mount rows (`Storage::cleanByMountId`), and
-those were already gone, so nothing found it. `occ files:cleanup` only
-clears rows whose *storage* row is missing, so it deleted 0. There's no
-`occ` command for this, and `Storage::remove()` no longer exists in 34.
-
-Done by hand, with the operator's go-ahead, as a one-off data cleanup (not
-config, so there's nothing for the backend to automate): one transaction
-deleting `oc_filecache where storage = 5` and the `oc_storages` row, after
-checking no `oc_mounts` row pointed at it. Then `vacuum full oc_filecache`.
-A plain `VACUUM` fails in that container: a parallel vacuum overflows the
-default 64 MB `/dev/shm`, so `parallel 0` is needed. Harmless for
-autovacuum, which never runs in parallel.
-
-Result: `oc_filecache` 2.2 GB → 328 kB, database 2.3 GB → 82 MB, a fresh
-`pg_dump` 910 MB → 3.5 MB. `occ status` is healthy, and `occ info:storages`
-lists only the home, admin, data and `/Shared` storages.
+(Compacted 2026-10-14.) Removing §508's `/NAS` FTP mount in the UI left 3.3 M `oc_filecache` rows and the `oc_storages` row (id 5). NC 34 removes storage via mount rows (already gone); `occ files:cleanup` only clears rows whose storage row is missing; no `occ` command; `Storage::remove()` gone. One-off data cleanup by hand with operator go-ahead (data, not config — nothing to automate): one transaction deleting both, after checking `oc_mounts`. `VACUUM FULL` needs `parallel 0` (parallel vacuum overflows 64 MB `/dev/shm`). Result: DB 2.3 GB to 82 MB, `pg_dump` 910 MB to 3.5 MB.
 
 ## 511. Review 2026-09-18 — live logs, public logins, code smells
 
@@ -25896,70 +24438,9 @@ deleted nav link itself.
 
 ## 563. Built: tag an app's card with each additional-exposure URL that differs from its main one
 
-User asked: "in the apps that the container's exposure url is not the same
-as the one the phone/remote app uses, add a tag with the url for the app."
+(Compacted 2026-10-14.) Only `additionalExposures` is a truly different hostname (NetBird Management API + Relay; homepage apex). `autheliaBypassPaths` cases are same host, different path — excluded. Immich, Vikunja, MeshCentral, Vaultwarden, ntfy clients use the browser hostname.
 
-**Which apps this actually is**: searched the registry
-(`backend/src/config/services.ts`) for anywhere a native client's URL
-already diverges from an app's main exposed hostname. Same-hostname,
-different-*path* cases (`autheliaBypassPaths` — Vaultwarden, ntfy, the
-planned Vikunja fix) don't qualify: the phone app still points at the same
-URL a browser does, just a different route under it. The one existing field
-that is genuinely a *different hostname* is `additionalExposures` — declared
-today only on `netbird-vpn` (Management API + Relay, each
-`<service>-<suffix>.<base-domain>`) and `homepage` (the bare-domain apex).
-NetBird is the textbook case: the dashboard card's URL
-(`netbird-vpn.<domain>`) is a static SPA a browser hits, but the NetBird
-mobile/desktop client has to be configured with the **Management API**
-hostname instead — a setup step a person can get wrong with no visual cue,
-since nothing in the UI showed that second URL at all. Checked Immich,
-Vikunja, MeshCentral, Vaultwarden and ntfy specifically (all have "native
-client" comments nearby) and confirmed each one's client authenticates
-against the *same* public hostname as the browser — genuinely nothing to
-add there.
-
-**Design**: `additionalExposures` entries were already provisioned into
-`service_exposure` (keyed `<service>:<suffix|apex>`, plan.md §16) but never
-read back out anywhere — no route, no type field, no frontend reference at
-all (`grep additionalExposures frontend/src` was empty before this). Added:
-
-- `getSecondaryExposureRows(serviceName)` (`services/exposure.ts`) — the
-  `SELECT … WHERE service_name LIKE '<service>:%'` query that already existed
-  inline in `provisionServiceIfEnabled`'s reconcile step, now exported so
-  `status.ts` can reuse it instead of duplicating it.
-- `resolveAdditionalExposureUrls(additionalExposures, secondaryRows)`
-  (`services/status.ts`) — pure, so it's unit-tested without a database
-  (`status.test.ts`): matches each declared entry to its live row by
-  suffix/`apex`, applying the same enabled+provisioned rule
-  `getExposedHostname` already uses for the primary hostname, so a
-  not-yet-provisioned secondary is simply omitted rather than shown null.
-- `ServiceStatusPayload.additionalExposureUrls` (`types/index.ts`, mirrored
-  in the frontend's `core/models.ts`) — `{ label, hostname }[]`, populated in
-  `getServiceStatus` only while `state === 'running'`, same as
-  `exposedHostname`.
-- `service-card.component.html` — one badge per entry, next to the existing
-  primary-URL badge, labelled from the registry's own `additionalExposures[].label`
-  (`Management API: netbird-vpn-api.<domain>`) with a title calling out that
-  it's for the phone/desktop app, not the browser link beside it.
-
-No new registry field or per-app opt-in needed — every app that already
-declares `additionalExposures` gets this for free, so it also covers
-`homepage`'s bare-domain entry (harmless: truthfully shows the Home Page is
-also reachable at the zone apex) without special-casing NetBird.
-
-**Verified against the real stack** (`tx-home-utils.com`), per CLAUDE.md:
-`./scripts/check.sh backend typecheck`; `./scripts/check.sh backend test`
-(1124 tests, including 5 new `resolveAdditionalExposureUrls` cases); a real
-frontend `npm ci && npm run build`; `./scripts/check.sh frontend test` (74/74).
-Rebuilt and restarted the dashboard's own `backend`/`frontend` containers
-(`docker compose up -d --build backend frontend` — individual services, not
-`compose down` at the root) and called `getServiceStatus` directly inside the
-running `business-lab-backend-1` container: `netbird-vpn` returned
-`exposedHostname: netbird-vpn.tx-home-utils.com` alongside
-`additionalExposureUrls: [{ label: 'Management API', hostname:
-'netbird-vpn-api.tx-home-utils.com' }, { label: 'Relay', hostname:
-'netbird-vpn-relay.tx-home-utils.com' }]` — confirming the two URLs really do
-differ, live, and that the new field resolves correctly end-to-end.
+Secondary rows were provisioned but never read back. Added exported `getSecondaryExposureRows()` (`exposure.ts`), pure `resolveAdditionalExposureUrls()` (`status.ts`, same enabled+provisioned rule as the primary), `additionalExposureUrls` on the status payload while running, and one badge per entry on the card (title says it is for the phone/desktop app). No opt-in field. Verified live: NetBird returns both secondary hostnames.
 
 ## 564. Built: Nextcloud declares its OnlyOffice dependency (§558)
 
@@ -25974,119 +24455,19 @@ passing.
 
 ## 565. Built: ntfy alert on backup failure (§552)
 
-Wired `publishAlert()` (`backend/src/utils/alertNotify.ts`) into
-`backupScheduler.ts`'s three existing failure-audit-log sites, plain calls
-with no `category` (§553, which would add that argument, hasn't landed yet):
-
-1. `runScheduledBackupCheck()`'s catch — control-plane archive threw.
-   `title: 'Backup: control-plane archive failed'`, message is the thrown
-   error's own text.
-2. `runAppDataBackupLocked()` — Kopia has no password configured yet.
-3. `runAppDataBackupLocked()` — `run.started === false` (the rclone-bridge
-   wedge investigated in §552).
-
-Both app-data branches share `title: 'Backup: app-data snapshot failed'` —
-same failure as far as an operator needs to react, different `detail` string
-in the message. `tags: ['floppy_disk']`, `priority: 4`, matching §552's plan.
-No dedup/escalation logic added — the scheduler's existing fast-retry backoff
-(`MAX_FAST_RETRIES`) already caps repeat pushes.
-
-`backupScheduler.test.ts`: added the `../utils/alertNotify` mock
-(`criticalServiceHealth.test.ts`'s pattern) and one assertion per branch in
-the existing tests that already exercise it, rather than three new tests
-duplicating their setup — `'records failure when the archive itself throws'`,
-`'records the dump outcome even when the backup engine has no password'`,
-`'records failure when the engine refused to start'`. `./scripts/check.sh
-backend test`: 1124/1124 passing. `backend typecheck`: clean.
+(Compacted 2026-10-14.) `publishAlert()` called at the three failure-audit sites in `backupScheduler.ts`: control-plane archive threw; Kopia has no password; engine refused to start (rclone-bridge wedge). Two titles (archive vs app-data snapshot), `floppy_disk`, priority 4. No dedup: `MAX_FAST_RETRIES` already caps repeats. Assertions added to the three existing tests.
 
 ## 566. Built: a separate ntfy channel per alert category (§553)
 
-Built the plan from §553. `backend/src/utils/alertNotify.ts` now owns the
-`AlertSource` union (`'crowdsec' | 'critical-service' | 'netbird' | 'backup'`,
-`ALERT_CATEGORIES`) as the source of truth — `alertTest.ts` re-exports the
-type rather than declaring it, since `alertTest.ts` now also imports
-`publishAlert` from `alertNotify.ts` (needed for the new direct-publish test
-path below) and a two-way type-only circular import wasn't worth it.
+(Compacted 2026-10-14.)
 
-One optional override settings key per category, `ntfy_topic_<category>`,
-alongside the existing `ntfy_alerts_topic` default. `getAlertNotifyConfig()`
-grows `topics: Record<AlertSource, string>` — each entry already resolved
-(override, or the default) — so no caller does its own fallback logic.
-`setAlertCategoryTopic(category, topic)` treats an empty string as "clear the
-override" (`DELETE FROM settings`), so a category with no row just falls back
-to the default on the next read — no separate unset flag needed.
-`publishAlert()` takes a required `category` arg and looks up
-`topics[category]`; its three existing callers
-(`criticalServiceHealth.ts` ×2, `netbirdRoutingPeer.ts`) plus §552's three
-`backupScheduler.ts` calls each got a one-line `category` addition.
-`n8nWorkflows.ts` and `uptimeKumaCriticalMonitors.ts` (the two *baked-in*
-consumers — they render the topic into a config file/API call rather than
-reading it live) switched from the generic `topic` to `topics.crowdsec` /
-`topics['critical-service']` respectively.
+- `alertNotify.ts` owns `AlertSource` (`crowdsec`, `critical-service`, `netbird`, `backup`); `alertTest.ts` re-exports it (avoids a circular import).
+- Optional `ntfy_topic_<category>` per category over `ntfy_alerts_topic`. `getAlertNotifyConfig()` returns resolved `topics`; empty string clears an override (row deleted). `publishAlert()` takes required `category`.
+- n8n and Uptime Kuma bake topics in, so `appsToApplyAlertSettings` restarts each only when the default or its own override changed; `netbird`/`backup` read live, never restart.
+- `PUT /api/settings/alerts` accepts a `topics` map; test endpoint accepts any category (`testDirectPublish()` — a direct publish is the real path for non-CrowdSec categories).
+- Frontend: collapsed "Per-category channels" sub-section (plain toggle, not `app-panel`). An override equal to the default shows blank — harmless, no `hasOverride` flag.
 
-**Restart granularity** (`appsToApplyAlertSettings`): replaced the old single
-`topic: boolean` with `crowdsecTopic`/`criticalServiceTopic` booleans, each
-true when *either* the default topic changed *or* that category's own
-override changed (the default still backs a category with no override, so a
-default-only change still has to re-render both). `netbird`/`backup` read
-`publishAlert()` live on every call — no restart, ever, a simplification over
-the old behaviour where any topic change restarted both n8n and uptime-kuma
-regardless of which category actually needed it.
-
-`PUT /api/settings/alerts` extends the body with an optional `topics` map
-(`{ crowdsec?: string, 'critical-service'?: string, netbird?: string, backup?:
-string }`, empty string clears that category); validates each key is a real
-category and each value is empty-or-`isValidAlertTopic`, then derives the two
-restart booleans from `hasTopic` and which categories were in the map.
-`POST /api/settings/alerts/test` now accepts any category, not just
-`'crowdsec'` — `runAlertTest()` gained `testDirectPublish()`, since
-`critical-service`/`netbird`/`backup` have no simulated-event source
-comparable to CrowdSec's n8n relay (§118.3): a direct `publishAlert()` call
-*is* the real path for them, not a simulation of it.
-
-**Frontend**: `AlertNotifySettings` gained `topics`; a new `AlertCategory`
-type in `models.ts` mirrors the backend union. Settings page's ntfy-alerts
-card gets a collapsed-by-default "Per-category channels" sub-section (plain
-▸/▾ text toggle, not `app-panel`'s SVG-chevron machinery — this is a
-sub-section inside one card, not a page-level panel, so the heavier pattern
-wasn't worth reusing) — one optional topic input + Test button per category,
-a single "Save channels" button that only sends the categories whose draft
-actually changed. A resolved category topic that equals the default renders
-as a blank input ("no override"); this is indistinguishable from a real
-override that happens to equal the default, which is harmless since the two
-behave identically — not worth a separate `hasOverride` flag on the API just
-to disambiguate a cosmetic case.
-
-**Tests**: `alertNotify.test.ts` gained `getAlertNotifyConfig` coverage
-(default-only, one-category-override, nothing-stored) with `./database`'s
-`query` mocked the way `claudeSettings.test.ts` does it, and
-`appsToApplyAlertSettings`'s cases were split into the new two-flag shape.
-`alertTest.test.ts` mocks `publishAlert` and covers all three new
-direct-publish sources plus a delivery-failure case.
-`criticalServiceHealth.test.ts` got `category: 'critical-service'`
-assertions added to its two existing `publishAlert` call-site tests.
-`./scripts/check.sh backend test`: 1133/1133 passing (was 1124).
-`backend typecheck`: clean. `frontend test:ci`: 74/74 passing.
-`frontend build`: clean (pre-existing bundle-size budget warning, unrelated).
-
-**Live verification** (rebuilt + restarted both `backend` and `frontend`
-images with the new code): confirmed `getAlertNotifyConfig()` resolves
-correctly against the real `settings` table (no override → default; a
-`netbird` override → only that category changes); `publishAlert()` delivered
-a real push to ntfy at both the default and an overridden topic; and — the
-part no unit test could reach, since it needs the real n8n workflow file on
-disk — set a live `crowdsec` category override and called
-`applyN8nWorkflows()` directly, confirmed the rendered
-`homelabCrowdsecAlertRelay.json` actually contained the override topic, then
-cleared the override and re-rendered to confirm the file was restored
-byte-for-byte to its original (default-topic) content. All test state was
-cleared afterward — no `service_exposure`/`settings` rows or app config
-files were left changed. Did not restart Uptime Kuma to prove the symmetric
-`topics['critical-service']` swap live — it talks to Kuma over a live
-websocket API rather than rendering a file, harder to cleanly revert than
-the n8n case — but it is the identical one-line code pattern proven correct
-for n8n, plus the resolution logic itself is covered by
-`alertNotify.test.ts`.
+Verified live: per-category resolution, real pushes on default and override topics, n8n workflow rendered with the override then restored byte-for-byte. Kuma swap not proven live (websocket API, hard to revert); same code pattern.
 
 ## 567. Plan: extra CrowdSec collections + CrowdSec Console enrollment
 
@@ -26524,23 +24905,7 @@ left switched, since that decision wasn't part of what was asked here.
 
 ## 575. Built: backup schedule gained a time-of-day field
 
-The schedule only had `frequency` (`daily`/`weekly`); `shouldRunScheduledBackup`
-(`backend/src/services/backupScheduler.ts`) fired as soon as the elapsed-time
-threshold passed on the hourly poll, so a backup could land at any hour. Added
-`runAtTime` ("HH:mm", default `03:00`) alongside it: a new
-`backup_schedule_run_at_time` settings row (`backend/src/services/backup.ts`),
-validated in `backend/src/middleware/validation.ts`, and a
-`matchesRunAtHour()` gate in `shouldRunScheduledBackup` that only compares the
-local *hour* (the poll is hourly, so minutes are moot) — a fast retry after a
-failure still ignores it, since waiting for a specific hour would defeat the
-point of retrying fast. Frontend: a native `<input type="time">` next to the
-existing Frequency/Keep-last fields on `backups.component.html`, no new UI
-pattern needed since none existed to reuse. `./scripts/check.sh backend test`
-(111 files, 1151 tests, three new cases for the hour gate), `typecheck`, and
-`frontend build`/`test` (74/74) all pass. No live-stack verification needed —
-this only changes when the existing scheduler fires, not anything
-Docker/exposure/networking/backup-destination related, so nothing to prove
-against `tx-home-utils.com` beyond the tests above.
+(Compacted 2026-10-14.) Backups fired whenever the elapsed threshold passed on the hourly poll. Added `runAtTime` (`HH:mm`, default `03:00`, setting `backup_schedule_run_at_time`); `matchesRunAtHour()` compares the hour only (poll is hourly). Fast retry after failure ignores it. Native `<input type="time">`. Scheduler-only, no live check.
 
 ## 576. Moved: backup destination card from Settings to Backups
 
@@ -27714,111 +26079,17 @@ existing specs do cover.
 
 ## 604. Multi-language UI: shared `components/*` — rollout complete (§597 batch 7, final)
 
-Translated the last English-only surfaces: `ServiceCardComponent` (by far
-the largest single component in the app — the per-app row on the Apps
-page, its Configuration/Backups/Admin-account settings modal, and the
-startup-logs modal), `ToastContainerComponent`, `ConfirmDialogComponent`,
-and `ResourceStripComponent` (the shell header's CPU/memory/disk meters).
-`~100` new keys, mostly under `serviceCard.*`. This closes every item on
-the multi-language UI TODO list opened at §597 — every page and every
-shared component now resolves its UI text through `TranslateService`.
-
-Two things worth recording:
-- **`ResourceStripComponent` builds its label/title strings in `toMeters()`,
-  not the template** — same shape as §603's `utils.component.ts` helpers.
-  It had no prior `| t` usage at all (unlike every other component in this
-  rollout), so this is the one component that needed `TranslateService`
-  injected without also needing `TranslatePipe`, since nothing in its
-  template calls the pipe directly.
-- **Literal values stay English, same boundary as every prior batch**:
-  `service.state`/`service.healthy`-derived CSS-class strings, the raw
-  `true`/`false` radio labels for boolean env vars (they represent literal
-  stored values, not prose), and the `lanOnly`/`overlayOnly` badge text
-  (service-flag identifiers). `ConfirmDialogComponent`'s three defaults
-  (`aria-label`, cancel text, confirm text) were translated even though no
-  current caller relies on the cancel/confirm fallbacks — `cancelText` is
-  never passed anywhere in the app today, and every `confirmText` caller
-  already supplies one — but the component's own default should not read
-  as untranslated dead code the day a caller does omit it.
-
-**Verification.** `./scripts/check.sh frontend build` (clean) and
-`./scripts/check.sh frontend test` (89/89, `service-card.component.spec.ts`
-included). Also ran `scripts/e2e-tests.sh` in full despite this batch
-touching no single page in the CLAUDE.md auth/shell/nav/Users/2FA list
-directly — `ToastContainerComponent` and `ConfirmDialogComponent` are
-mounted globally (used by the Login toast and the Users-page delete
-confirm) and `ServiceCardComponent` renders on the Apps page nav.spec.ts
-loads, so the safer call was to run the full suite: 13 passed / 3 skipped
-(the Docker-socket-only `live-stack.spec.ts` cases), including
-`two-factor.spec.ts` and both `users.spec.ts` cases.
-
-This closes out the `README.md` multi-language rollout TODO list opened at
-§597 — no more per-page/per-component translation items remain there. The
-one item that does remain (confirming the top-bar language selector by
-hand on `beta`, plan.md §598) still needs a human click-through and stays
-on the list until that happens.
+(Compacted 2026-10-14.) Translated `ServiceCardComponent` (largest), `ToastContainerComponent`, `ConfirmDialogComponent`, `ResourceStripComponent` (~100 keys, mostly `serviceCard.*`). Every page and shared component now uses `TranslateService`. `ResourceStripComponent` builds strings in `toMeters()`, so it injects the service without the pipe. Literal values stay English (state CSS classes, `true`/`false` env radios, `lanOnly`/`overlayOnly` badges). `ConfirmDialogComponent` defaults translated though no caller uses them yet. Full E2E run (global components): 13 passed, 3 skipped.
 
 ## 605. Confirmed live on `beta`: language selector, `exposureConfigFiles`, `.env` `$`-escaping
 
-User pulled `dev`→`beta` onto `tx-home-utils.com` via the dashboard's
-self-update panel and ran through three outstanding README checks.
+(Compacted 2026-10-14.) User ran three README checks after a self-update:
 
-**Language selector (§598).** Switched the top-bar EN/PT `<select>`; shell
-nav + Login page text swapped instantly with no reload, and it held across
-a refresh (`localStorage`). Pass.
+- **Language selector (§598):** EN/PT swap instant, survives refresh. Pass.
+- **`exposureConfigFiles` (§586, §594):** HA `configuration.yaml` got the marked `http:` block (`use_x_forwarded_for`, RFC1918 + `fc00::/7` trusted proxies, `ip_ban_enabled`). HA Bluetooth `NET_ADMIN` errors are a red herring (no BT caps granted, pre-existing). Pass — last unproven `run()` caller.
+- **`$`-escaping (§596):** Pi-hole password regen worked; WebDAV password with `a$USER-b` applied and Kopia reconnected. Pass.
 
-**`exposureConfigFiles` / Home Assistant (§586, §594).** User started Home
-Assistant and enabled its exposure. HA's own log showed
-`PermissionError: Missing NET_ADMIN/NET_RAW capabilities for Bluetooth
-management` and a stream of `habluetooth` scanner errors — a red herring:
-HA's Bluetooth integration failing because the compose file grants no
-Bluetooth capabilities, unrelated to exposure config and pre-existing
-(container reported `Up ... (healthy)` throughout). Read
-`apps/home-assistant/data/configuration.yaml` directly on the host after
-the exposure change and found the marked block present and correct:
-
-```yaml
-# >>> homelab-management: reverse-proxy exposure >>>
-http:
-  use_x_forwarded_for: true
-  trusted_proxies:
-    - 127.0.0.1
-    - ::1
-    - 10.0.0.0/8
-    - 172.16.0.0/12
-    - 192.168.0.0/16
-    - fc00::/7
-  ip_ban_enabled: true
-  login_attempts_threshold: 5
-# <<< homelab-management: reverse-proxy exposure <<<
-```
-
-Confirms `applyExposureConfigFiles` reaches `runShell` and writes the block
-correctly once HA is actually running and exposed. Pass — this was the last
-unproven `run()` caller from §586.
-
-**`.env` `$`-escaping (§596).** Two halves. First, a config save with no `$`
-in it: regenerated Pi-hole's `PIHOLE_WEB_PASSWORD` from its Configuration
-panel — restarted clean, admin login worked with the shown password, nothing
-double-escaped. Second, a `$` in the value: set the WebDAV backup
-destination's password to a string containing `a$USER-b` and saved. The
-destination-restart modal's first poll or two showed a raw `fetch failed` —
-traced to `checkKopiaConnection()` (`backend/src/services/kopiaClient.ts:250`)
-surfacing Node's unfiltered `TypeError: fetch failed` when it polls before
-the just-recreated Kopia container is listening yet; expected, and exactly
-why `startDestinationRestartWait()` in `backups.component.ts` polls on an
-interval rather than checking once (`backend/src/routes/settings.ts:649-654`,
-plan.md §581). Confirmed via `docker logs`: backend logged `Applied the
-backup destination and recreated Kopia` with no error, and Kopia's own log
-showed `connected to existing repository` — and the modal itself settled on
-a reconnected/success state before exhausting its retry budget. Pass.
-
-All three close out their README items. Not fixed here, and not worth a
-README item: the raw `fetch failed` string reaching the user during the
-transient polling window is a minor UX rough edge (a friendlier
-"waiting for Kopia to restart…" would read better than a leaked Node error
-message), but it self-resolves within the existing retry budget and every
-case observed ended in the correct final state.
+Minor rough edge, no README item: during Kopia restart the modal briefly shows Node's raw `fetch failed` (`checkKopiaConnection()`); polling settles to success.
 
 ## 606. Confirmed live on `beta`: real Vikunja mobile client against the Authelia bypass (§571)
 
@@ -27858,28 +26129,7 @@ README item deleted.
 
 ## 607. Built: Vikunja's client URL shown on its card
 
-§606 confirmed a real Vikunja client needs `<host>/api/v1`, not the bare
-hostname — the user asked for that to be visible on the app card rather than
-something an operator has to go find in the docs. Small, mechanical addition,
-following the exact shape `webPath`/`additionalExposureUrls` already use:
-
-- New optional `clientApiPath` on `ServiceConfig` (`backend/src/types/index.ts`)
-  and `ServiceStatus`, threaded through `status.ts` next to `webPath`.
-- Set on Vikunja's registry entry (`services.ts`): `clientApiPath: '/api/v1'`.
-- New badge on the card (`service-card.component.html`), gated on
-  `exposedHostname && clientApiPath`, same link-badge pattern as the existing
-  "open public URL" and `additionalExposureUrls` badges — labelled "App URL"
-  (`serviceCard.clientApiUrlLabel`/`clientApiUrlTitle`, both locales).
-- `docs/app-credentials.md`'s Vikunja row points at the new badge instead of
-  just describing OIDC login.
-
-No new tests — the sibling `webPath`/`additionalExposureUrls` badges have
-none either, so this stays consistent with existing coverage rather than
-introducing a one-off standard. `./scripts/check.sh backend test`
-(1184/1184) and `typecheck`, `./scripts/check.sh frontend build` (clean) and
-`test` (89/89) all pass. Not verified live yet — nothing here touches
-Docker/exposure/networking, just a registry field and a template badge, so
-no README beta-check item.
+(Compacted 2026-10-14.) §606: Vikunja clients need `<host>/api/v1`. New optional `clientApiPath` on `ServiceConfig`/`ServiceStatus` (set `/api/v1` for Vikunja), shown as an "App URL" badge when exposed. `app-credentials.md` points to it. No tests, like sibling badges.
 
 ## 608. Planned: host OS timezone should follow Settings > General's timezone
 
@@ -38857,3 +37107,12 @@ Not done, rejected:
 ## 941. TODO tidy, 2026-10-14
 
 [x] done. §824 touch targets deleted — every step passed (§923/§924 pages, §926 chip corner at 0.173.21, §934 1280px, Tally 44px under touch). §615 ntfy note: Test-greyed step passed at 0.173.21, only the NPM 403 check left.
+
+## 942. plan.md compaction pass 3 — uncited sections only (2026-10-14)
+
+[-] active. Candidates: sections numbered below 890 and over 1.2 KB that nothing cites (no `§N` or range covering N anywhere in plan.md or tracked files). §172's rule still holds: never compact a section later work builds on. Each body was rewritten to keep decisions, rejected options and lessons; headings kept identical. `scripts/plan-citations.py` checked after each batch: same 9 dangling targets as before.
+
+[x] 46 sections, 14–607; plan.md 2.33 MB to 2.25 MB.
+[ ] Last batch: §655, 664, 710, 712, 721, 723, 727, 729, 735, 736, 762, 783, 793 (~28 KB). Re-run the candidate check first — new citations may have landed.
+
+Rejected: caveman-compress of the whole file (~2.3 MB rewrite, large token cost, risk to quoted detail and anchors).
