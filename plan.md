@@ -38820,3 +38820,12 @@ Not done, rejected:
 
 [x] done. Owner's call after §935: `gemini-3.8-flash` answered "high demand" to every draft from 10:11 to 10:42 (free-tier key; Google's status page renders client-side, so no incident could be confirmed). Drafts → `gemini-3.6-flash` (still served, no shutdown announced); recipe parsing stays on `gemini-3.5-flash-lite`. Model ID is config with no unit-test surface; the §930 README beta item is the proof.
 - Proof at 0.173.23: Content → Gerar → `POST /api/social/drafts` 201, draft in pt-PT. A run at 11:47 on 0.173.21 (`gemini-3.8-flash`) had also succeeded — I first reported it as failed because I searched the log only for failure lines (success is not logged). So 3.8-flash's overload had passed by then; 3.6-flash stays (owner's call, works, less contended). Two test drafts left on the Content page for the owner to keep or delete.
+
+## 937. Mealie cannot write its database (found testing §930)
+
+[ ] todo — found, not fixed (new work, per the TODO rule).
+- Testar chave (Google) passes: `POST /api/settings/ai-keys/google/test` 200 "Google API key verified." — English on pt-PT, own README item.
+- Mealie: "Iniciar sessão com Authelia" → Authelia returns a code → Mealie log `[OIDC] Exception while creating user … attempt to write a readonly database` → `/login?direct=1`. Only two such lines in `mealie.log` (both today, mine); `mealie.db` mtime 2026-09-28 21:09 = Mealie's startup that minute = `data/` mtime. So no write has landed since.
+- Cause: `apps/mealie/data/` is 100:101 `drwxrwsr-x` (the backend's root maps to 100:101 on the host; most apps' `data/` look the same and are fine because those apps write in subdirs). Mealie runs as 911 and keeps `mealie.db` in `data/` itself; SQLite needs to create `mealie.db-journal` there. Root `touch` in the container works, which is why it is not obvious.
+- Not found: what recreated `data/` on 2026-09-28 21:09 — no matching plan/git entry. Nothing in the backend chowns `data/`; `appDumps` only `mkdir`s `_dump/`.
+- Proposed fix: Twenty's §371 pattern — pre-start `chmod 0777` of `apps/mealie/data` in `executor.ts`. Not done by hand: a manual chmod would vanish on the next fresh clone.

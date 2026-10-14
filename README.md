@@ -329,6 +329,18 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       no row of buttons overflows. At 1280px nothing looks different from before.
 - [ ] **Beta-test the translated rate-limit message (plan.md §933)** — hard to provoke by hand (200 API
       calls per 15 min); if a 429 shows up in pt-PT it reads "Demasiados pedidos em pouco tempo…".
+- [ ] **Translate the AI key test result (plan.md §937)** — Settings → Chaves de API de IA → Testar chave shows
+      the backend's English "Google API key verified." on a pt-PT page; word it in the frontend like the start/stop
+      toasts (§933).
+- [ ] **Make Mealie's data folder writable again (plan.md §937)** — Mealie cannot write its database:
+      Authelia sign-in fails with `[OIDC] Exception while creating user: (sqlite3.OperationalError) attempt
+      to write a readonly database` (seen 2026-10-14), and `mealie.db` has not changed since 2026-09-28
+      21:09. `apps/mealie/data/` is owned by 100:101 (what the backend's root maps to on the host)
+      `drwxrwsr-x`, while Mealie runs as uid 911 and SQLite must create its journal beside `mealie.db`.
+      Same class as Twenty's storage (§371): add a pre-start `chmod 0777` of `apps/mealie/data` beside
+      `ensureTwentyStorage` in `executor.ts`, test first, then restart Mealie from the dashboard and prove a
+      sign-in and a recipe import. The dashboard's Mealie AI sync writes the same DB, so recheck its
+      "AI Provider (dashboard-managed)" row afterwards.
 - [ ] **Beta-test AI drafts on the new Gemini model (plan.md §930)** — on `beta` after the update
       rebuilds the backend: Content → Gerar a rascunho with the stored Google key produces a draft
       (now `gemini-3.6-flash`, §936); Settings → Testar chave on Google succeeds; a Mealie URL import still
@@ -336,7 +348,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       0.173.21: no 404 — Google answered "This model is currently experiencing high demand" three times
       in three minutes (its message now reaches the log), and again at 10:42. Drafts then worked: 11:47 on
       `gemini-3.8-flash` (0.173.21) and 11:53 on `gemini-3.6-flash` (0.173.23), both sensible pt-PT.
-      Left: Testar chave on Google, a Mealie URL import.*
+      Testar chave on Google: "Google API key verified." (English on a pt-PT page). Left: a Mealie URL
+      import — blocked, Mealie cannot write (item above).*
 - [ ] **Beta-test the Utils critique fixes (plan.md §841)** — *2026-10-14 at 0.173.4, pt-PT laptop:
       (1) Home's Saúde do servidor sentence, four rows with Bem and "Verificado às"; (2) Enter on
       Encontrar dispositivos keeps focus on it, "A procurar…" then "Encontrados 10 dispositivos." are
