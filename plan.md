@@ -29115,35 +29115,7 @@ that isn't either done or tracked elsewhere.
 
 ## 655. Implemented: `install.ps1` for the tally shop agent
 
-Closes the README item: the four manual install steps (§636's runbook — copy
-files, edit `tally.config`, `enrol`, `sc.exe create`/`start`) collapse into
-one elevated PowerShell script, prompting for the site URL and enrolment
-code when not passed as arguments.
-
-**A script, not an MSI/WiX package.** The agent is a single internal tool
-installed by hand on a handful of shop machines, not shrink-wrapped
-software — pulling in a real installer framework for that would be the kind
-of dependency this repo's own conventions warn against adding for what a
-few lines already do. `install.ps1` does exactly the four steps the README
-already documented, in order, with one addition: re-running it against an
-already-registered service restarts it instead of failing on `sc.exe
-create`, since re-enrolling already replaces the token the server
-associates with this machine (README.md's own existing note).
-
-**Verified by parsing, not running.** `PSScriptAnalyzer`-style syntax
-checking isn't installed here, but
-`[System.Management.Automation.Language.Parser]::ParseFile` (via a
-`mcr.microsoft.com/powershell` container) confirms it's syntactically valid
-PowerShell with no errors — real verification of the one thing this
-environment *can* check, not a claim beyond it. Nothing here can run it: it
-needs Windows, an elevated shell, and a real shop's Wintouch install. Added
-to the README as the new open item in its place.
-
-### Verification
-
-`dotnet build -warnaserror` on `apps/tally/agent/` still succeeds (the new
-file is a script alongside the project, not a build input). PowerShell
-syntax parses clean. Not run.
+(Compacted 2026-10-14.) §636's four manual steps (copy files, edit `tally.config`, `enrol`, `sc.exe create`/`start`) are now one elevated PowerShell script that prompts for site URL and enrolment code. Re-running restarts an existing service (re-enrol already replaces the token). Rejected MSI/WiX: a framework for a hand-installed internal tool. Verified only by parsing (`Parser::ParseFile` in a `mcr.microsoft.com/powershell` container) and `dotnet build -warnaserror`. Not run: needs Windows and a real shop. README item tracks the real run.
 
 ## 656. Implemented: check-out billing-account assignment, scoped down from the full legacy feature
 
@@ -29727,31 +29699,7 @@ No Docker/exposure/networking/backups touched, so no README beta-test item
 
 ## 664. Fixed: §663's emoji badges swapped for real Android/Apple glyphs
 
-User asked for the actual platform icons rather than the 🤖/🍎 emoji §663
-shipped. `frontend/public/` already has a hand-authored inline-SVG
-convention (`favicon.svg`), so the fix followed it: fetched the exact
-`Android`/`Apple` path data from the [simple-icons](https://simple-icons.org)
-project (CC0 — public domain, free to embed with no attribution
-requirement) via `curl` against its GitHub repo, rather than
-hand-approximating brand-mark bezier curves from memory, and inlined both
-as `fill="currentColor"` `<svg>`s directly in `service-card.component.html`
-— no new npm dependency, no external CDN reference at runtime (this is a
-self-hosted dashboard; the fetch was a one-time authoring step, not
-something the page loads from). `currentColor` means both follow whatever
-text color the badge already resolves to under the app's permanent dark
-theme (`data-bs-theme="dark"`), with no separate light/dark handling
-needed.
-
-Sizing went in the template (`width="12" height="12"` on each `<svg>`,
-`display:inline-flex` as an inline `style` on the badge `<span>`) rather
-than a new CSS rule in the component stylesheet — a first attempt using a
-`.mobile-app-badge` class pushed `service-card.component.css` about 50–100
-bytes past Angular's 4kB per-component style budget (`angular.json`'s
-`anyComponentStyle` warning), a threshold nothing else in this change
-needed to touch.
-
-No version-relevant behavior changed beyond the glyphs themselves — same
-version bump policy as any other `frontend/src` change.
+(Compacted 2026-10-14.) Android/Apple path data fetched once from simple-icons (CC0) and inlined as `fill="currentColor"` SVGs in `service-card.component.html` — no npm dependency, no runtime CDN. Sizing in the template, not a CSS class: a `.mobile-app-badge` rule pushed the component stylesheet past Angular's 4 kB `anyComponentStyle` budget.
 
 ## 665. Fixed: BookStack OIDC login — `invalid_client` on callback (client_secret_basic vs post)
 
@@ -31082,29 +31030,7 @@ deleted; no code change.
 
 ## 710. Incident: CrowdSec banned the user's own IP via Outline's login burst
 
-User reported being locked out and asked why. Diagnosed over SSH on
-home-srv-01 (`cscli alerts inspect`, NPM's access log): their real IP
-(`2001:8a0:e3bb:9500:11fc:4faf:3c:12d9`, a Portuguese ISP) tripped
-`LePresidente/http-generic-401-bf` at 08:33 UTC — 6 POSTs returning 401
-against Outline's API (`/api/stars.list`, `userMemberships.list`,
-`collections.list`, `groupMemberships.list`, `notifications.list`,
-`documents.drafts`) in one window, which the scenario's heuristic reads as a
-password-brute-force attempt. It's really just Outline's SPA firing its
-normal batch of data calls before the browser's session was fully
-authenticated — a false positive on first sign-in, not an attack. Ties into
-the still-open Outline beta-test item (§666); worth knowing if it recurs
-during that walk.
-
-Also noted, not chased further: `cscli decisions list` showed no active
-decision for that IP even while NPM's Lua bouncer was still actively
-`denied` logging fresh 403s against it minutes later — the bouncer's local
-`lua_shared_dict crowdsec_cache` lagging behind LAPI's own state rather than
-the two staying in lockstep. User lifted the ban themselves (dashboard's
-ban-list UI, §540); confirmed clear afterward — no active decision, no
-fresh denial in the NPM log since. No code change; nothing to add to the
-README unless this recurs and turns into something worth tuning (e.g.
-excluding Outline's own hostname from that scenario, or shortening its
-bantime) — one incident isn't enough signal to build around yet.
+(Compacted 2026-10-14.) User's own IPv6 tripped `LePresidente/http-generic-401-bf`: Outline's SPA fired 6 API POSTs that returned 401 before the session was ready. False positive on first sign-in. Also seen: NPM's Lua bouncer kept denying after `cscli decisions list` showed no decision (`crowdsec_cache` lag). User lifted the ban via the ban-list UI (§540). No change; if it recurs, consider excluding Outline's hostname from that scenario or shortening bantime.
 
 ## 711. Checked OnlyOffice and Nextcloud for updates; Nextcloud 34→35 queued
 
@@ -31139,67 +31065,7 @@ opens a document afterward.
 
 ## 712. Vikunja silent SSO (§555/§572, README item): traced the remaining gap to Vikunja's own frontend, closing the item
 
-User reported the README item's exact symptom on a real browser: a cold visit
-to `https://vikunja.tx-home-utils.com/` still showed Vikunja's own
-username/password login screen, not a silent landing in the app. Re-ran
-§572's curl checks first — all still pass unchanged: bare `/` → `302` to
-`?redirectToProvider=authelia`; that URL, anonymous, → `302` to Authelia's
-real login (`rd=` pointing back at it); `/api/v1/info` unaffected. So the
-NPM/nginx side built in §571/§572 is not the problem.
-
-Went one level deeper than curl can reach: pulled Vikunja's actual served
-frontend straight off the running container (`curl localhost:10390`,
-bypassing NPM/Authelia) — the main entry HTML, its `sw.js` precache
-manifest (179 JS chunks), then every one of those chunks — and grepped for
-`redirectToProvider`. It exists in exactly one chunk, `router-*.js`:
-
-```js
-function sa(){
-  let {auth: e} = he(), t = new URLSearchParams(window.location.search);
-  if (t.has('redirectToProvider')) {
-    let n = t.get('redirectToProvider');
-    e.openidConnect.providers?.length===1 && (path is /login or /) &&
-      (n===null||n==='true'||n==='1') && ra(e.openidConnect.providers[0]);
-    let r = e.openidConnect.providers?.find(e=>e.key===n);
-    r && ra(r);
-  }
-}
-```
-
-`sa()` is invoked from Vikunja's own `checkAuth`, which runs whenever no
-valid Vikunja JWT is already in `localStorage` — i.e. on exactly the cold
-visit the README item describes. The second branch (`find by key`) is the
-one our `?redirectToProvider=authelia` is meant to hit, since Vikunja's own
-provider key is literally `authelia`. But it reads
-`auth.openidConnect.providers` from the frontend's Pinia store, which is
-only populated once `/api/v1/info` resolves — and nothing in this code
-path waits for that fetch before running. On a cold load there's no
-guarantee `checkAuth` (and therefore `sa()`) runs after that response lands;
-if it runs first, `providers` is empty, neither branch matches, and it
-falls through to the ordinary login screen with nothing visible to the user
-(only a `console.warn` in devtools, never surfaced in the UI).
-
-This reproduces the exact reported symptom and is consistent with it being
-intermittent-by-network-timing rather than always-broken (§555 itself
-logged a real successful OIDC round trip previously, e.g. when the button
-was clicked manually after the page had already settled).
-
-**Conclusion**: this is a race condition inside Vikunja's own bundled
-frontend, not anything wired up in this repo. `vikunja/vikunja:latest` ships
-a prebuilt, minified bundle with no source in this repo to patch, and
-rewriting vendor JS via an nginx `sub_filter` (the only lever this repo has
-over it) to work around a third-party startup race is the wrong shape of
-fix for what it buys: worst case, the user clicks the existing (and
-already-proven-working, §555) "Login with Authelia" button once per cold
-visit instead of it happening silently. Not chasing this further.
-
-**What's proven and stays true**: the NPM-level redirect (§571/§572) is
-correct and unaffected — deep links, `/api/v1/...`, and the anonymous
-redirect chain to Authelia's real login all still behave exactly as
-designed. Narrowed and closed the README item on that basis; if Vikunja
-fixes the client-side race upstream (or the "redirectToProvider" contract
-changes) a future version bump might make the cold-load case fully silent
-for free, but there's no code in this repo waiting on that.
+(Compacted 2026-10-14.) Cold visit still showed Vikunja's own login. §572's NPM checks all still pass (`/` redirects to `?redirectToProvider=authelia`, then to Authelia). Pulled every served JS chunk: `redirectToProvider` is handled in `router-*.js` by `sa()`, which reads `auth.openidConnect.providers` from the store — filled only after `/api/v1/info` resolves, and nothing waits for it. So it is a timing race inside Vikunja's prebuilt bundle; it fails silently (`console.warn`). Rejected rewriting vendor JS with `sub_filter`: worst case is one click on the proven "Login with Authelia" button. README item closed; an upstream fix would make it silent for free.
 
 ## 713. Outline exposed at wiki.<domain> instead of outline.<domain>
 
@@ -31484,36 +31350,9 @@ estimate in this run that did not survive contact (see §719).
 
 ## 721. One `appBaseUrl` for reaching an app from the backend container
 
-Seven modules carried an identical private helper —
+(Compacted 2026-10-14.) Fourteen copies of `http://${getHostGatewayIp()}:${port ?? fallback}` replaced by `utils/appUrl.ts` `appBaseUrl(serviceName, fallbackPort, scheme)` (`scheme` for Uptime Kuma `ws://`). Left alone: Home Assistant (host-networked, `hostNetworkPort`), NetBird management (needs `portEnvVar`), `uptimeKumaCriticalMonitors` (returns null, opposite contract).
 
-```ts
-const port = getPublishedUpstreamPort(X_SERVICE) ?? FALLBACK_PORT;
-const host = await getHostGatewayIp();
-return `http://${host}:${port}`;
-```
-
-— and seven more built the same string inline. `utils/appUrl.ts`'s
-`appBaseUrl(serviceName, fallbackPort, scheme)` replaces all fourteen; the
-`scheme` parameter earns its place on the three Uptime Kuma call sites that
-need `ws://`.
-
-**Three lookalikes deliberately left alone**: Home Assistant is host-networked,
-so its port comes from the registry's `hostNetworkPort` rather than a published
-one; NetBird's management port needs a `portEnvVar` argument, and adding a
-fourth parameter for one caller is worse than the two lines it saves; and
-`uptimeKumaCriticalMonitors`' `hostPortUrl`/`ntfyServerUrl` return **null** for
-a missing port instead of falling back, which is the opposite contract.
-
-**Where it lives is the interesting part.** It went into `utils/network.ts`
-first, next to `getHostGatewayIp` — and broke 47 tests across 8 files. The
-bootstrap suites all do `vi.mock('../utils/network', () => ({ getHostGatewayIp:
-vi.fn() }))`, so the new export vanished with the rest of the module. The fix
-was not to patch eight mock blocks: moving it to its own `utils/appUrl.ts`
-means the mocked `getHostGatewayIp` still applies to it (vitest mocks by
-module, for all importers), and every existing test passes **untouched**. It
-also keeps `utils/network.ts` a DNS-only leaf instead of making it import the
-service registry, which was an inversion this had been uneasy about anyway.
-Worth recording: the test breakage was what surfaced the layering problem.
+Placement lesson: first put in `utils/network.ts`, which broke 47 tests because suites mock that whole module. Own file means the mocked `getHostGatewayIp` still applies and no test changed; it also stops `network.ts` importing the registry.
 
 ## 722. Dead assignment in `startPolling()`
 
@@ -31525,54 +31364,13 @@ rather than before it, so it doesn't get "tidied" back to the top.
 
 ## 723. Beta test 2026-09-28: three items part-confirmed over SSH, six blocked on the pull
 
-Asked to test `beta`. The box was on `c2c2057`/`0.151.5`, eight commits behind
-`beta`'s `e5b5de1`/`0.151.13` — so the six items from this run (§714, §716,
-§717, §718, §719, §720) could not be exercised at all: the code was not there.
-Pulling is the user's action from the Update page, so this stopped and said so
-rather than pulling. **No merge to `main`.**
+(Compacted 2026-10-14.) Box was 8 commits behind `beta` (0.151.5 vs 0.151.13), so §714/§716–§720 could not be tested; pulling is the user's action. No merge to `main`. SSH halves passed:
 
-Of the older items, three have halves SSH can prove, and all three passed:
+- **§711 Nextcloud 35:** `35.0.1.1`, no maintenance, no DB upgrade pending; `/Shared` mount verifies; onlyoffice and user_saml enabled.
+- **§708 hotel:** admin, check-in, pulse healthy; hotel-core `/api/health` 200. Dashboard has one `hotel` card, not three — item reworded.
+- **§692/§693 Paperless:** Authelia admin is superuser; users in `Authelia users` group (56 permissions).
 
-**§711 (Nextcloud 34→35)** — `/status.php`: `"version":"35.0.1.1"`,
-`maintenance:false`, `needsDbUpgrade:false`, container healthy. So the major
-upgrade landed and did not stick in maintenance mode, which was the risk the
-item was written for. Spot-checks as far as `occ` proves them: the `/Shared`
-external-storage mount reports `files_external:verify` → `status: ok` and
-`/shared` lists inside the container; `onlyoffice 10.2.1` and `user_saml 8.4.0`
-are both under **Enabled**, and the OnlyOffice container is healthy.
-
-**§708 (Hotel healthchecks)** — `admin`, `check-in` and `pulse` all `healthy`,
-last probe exit code 0; hotel-core's `/api/health` answers
-`200 {"status":"ok"}` and all three frontends answer 200 on their published
-ports.
-
-**§692/§693 (Paperless provisioning)** — `mat` (the Authelia admin, confirmed
-against `users_database.yml`: in `admins`, matching email) is
-`is_superuser=True, is_staff=True`; `frias` and `miguel` are both in the
-`Authelia users` group, which carries 56 permissions. `admin` is Paperless's
-own seeded superuser, as expected. Same half §706 reached — the database state
-is right; the browser pass is still what the item needs.
-
-**What SSH cannot reach**, and why these stay open: there is no browser on this
-path, so the UI halves are unproven — whether opening a document actually
-launches the OnlyOffice editor, whether a SAML login round-trips, whether
-Paperless loads without a permission toast and hides the admin's documents from
-a non-admin. Recorded so the next pass does not re-run the database half
-believing it is the whole item.
-
-**Found while running §708**: the item asked to confirm "the dashboard's own
-health display for those three cards". There is one `hotel` entry in
-`services.ts`, health-checked by a single HTTP probe to hotel-core — one card,
-not three. The three healthy *containers* are a `docker ps` fact. The item has
-been reworded to say what is actually confirmed and what is left, so the
-remaining work is a single card on the Apps page.
-
-All three items now carry their confirmed half inline, with the date and the
-version it was checked at, and state plainly that what remains needs a browser
-— so the next pass starts from the UI checks instead of re-running `occ` and
-the Paperless shell and mistaking a green database for a passing item. §692's
-annotation says this explicitly: the bug it fixed was a UI symptom (a 403
-toast), so correct rows are necessary but not sufficient evidence.
+UI halves (OnlyOffice editor, SAML round trip, Paperless toast and document visibility) need a browser. Items annotated with the confirmed half, date and version so the next pass starts at the UI. Correct DB rows are necessary but not sufficient (§692's bug was a UI 403 toast).
 
 ## 724. Beta test of the six new items at 0.151.13: §714 passes live, §716's no-op half passes, one new bug
 
@@ -31747,49 +31545,9 @@ writing `` `apps/*, /data/` ``, which is why nobody had noticed the trap.
 
 ## 727. §726 passed its beta test: Paperless runs the relocated script and rejects EICAR
 
-Restarted Paperless on `beta` at 0.151.14. Every part of the item passes, and
-the strongest evidence came from Paperless's own log rather than ours:
+(Compacted 2026-10-14.) At 0.151.14: Paperless's own log shows the pre-consume script at the new `/usr/src/paperless/clamav/` path exit 0 and the document consumed. Reconcile clean (first since 2026-09-08). Host file `0755`, owned by backend uid 100; container mount `:ro` (write fails, so the container cannot chown it back). Scanner proven: EICAR exits 1 with `Eicar-Test-Signature FOUND`, clean file exits 0.
 
-```
-[paperless.consumer] Executing pre-consume script /usr/src/paperless/clamav/pre-consume-clamav.py
-[paperless.consumer] /usr/src/paperless/clamav/pre-consume-clamav.py exited 0
-[paperless.consumer] Document 2026-09-28 hlm-clamav-test-726 consumption finished
-```
-
-That is the real intake path invoking the script at the **new** location and
-consuming the document — which also settles the fail-closed worry, since a
-missing script would have rejected it instead.
-
-The rest, in order:
-
-- `Paperless/ClamAV intake scan reconciled` with the new script path, and **no**
-  `Failed to wire Paperless to ClamAV` — the first clean reconcile since
-  2026-09-08.
-- Host side: `apps/paperless/data/clamav/pre-consume-clamav.py`, fresh mtime,
-  mode `0755`, owned by uid 100/gid 101 (the backend's `appuser:appgroup`,
-  which the host's passwd renders as `usbmux lxd`).
-- Container side: mounted at `/usr/src/paperless/clamav` with `rw=false`, the
-  env var resolving inside it, and the file listed `-rwxr-xr-x 1 100 101`. A
-  write attempt into the mount gets `Read-only file system`, so the container
-  cannot chown it back — the property `:ro` was added for.
-- **Scanner proven, not just wired**: run against an EICAR fixture it printed
-  `REJECTED … stream: Eicar-Test-Signature FOUND` and exited **1**; against a
-  clean file, exit 0. So clamd really is reachable at `10.201.0.1:10450` from
-  the Paperless container and a hit really does abort consumption.
-
-**Method note worth keeping.** `docker exec` defaults to **root**, and testing
-`-x` as root says nothing about the uid that actually runs the script — that
-is exactly what produced §725's wrong first diagnosis ("a race"). Every
-permission check here was re-run with `-u 1000`, and the script was executed
-as that uid rather than merely stat-ed. The habit to keep: when a finding is
-about permissions, name the uid and test as it.
-
-**Two leftovers, both deliberate.** The legacy script is still at
-`data/data/pre-consume-clamav.py`, dated 2026-09-08 — the best-effort removal
-failed with the same EACCES that caused the bug, as the code comment predicts.
-It is inert: nothing references it. And the test document (`document_id 3`)
-stays in Paperless; the box is a no-guarantees dev/test box and the item asked
-for a real drop.
+Method lesson: `docker exec` defaults to root; testing `-x` as root caused §725's wrong diagnosis. For permission findings, name the uid and test as it (`-u 1000`). Leftovers: inert legacy script at `data/data/` (removal hit EACCES as predicted); test document 3.
 
 ## 728. Fixed: a hostname whose NPM host id we lost could never be re-adopted
 
@@ -31848,42 +31606,7 @@ no change to what `wiki.tx-home-utils.com` serves.
 
 ## 729. §728 passed its beta test: the row healed, and the sweep adopted nothing else
 
-Outline started on `beta` at 0.151.15, then the 10-minute exposure sweep ran on
-top of it. The §728 prediction held exactly.
-
-**The adoption**, at 14:59:21Z:
-
-```
-Adopting an existing Nginx Proxy Manager host we generated but had lost the id for
-  hostname=wiki.tx-home-utils.com hostId=48
-```
-
-and the row went `NULL | failed | "…already exists and is not managed by this
-service."` → `48 | provisioned | (none)`, with `cf_hostname_id` repopulated too,
-so the Cloudflare route came back with it rather than the row merely carrying an
-id again.
-
-**It did not rewrite the host.** `48.conf`'s mtime is `11:23:11Z`, hours before
-the adoption — so `ensureProxyHost` took the `updated: false` branch and left an
-already-correct host alone, which is what the unit test asserts and what "adopt"
-should mean. A rewrite would have produced the same visible outcome, so this is
-the check that separates "worked" from "worked for the right reason".
-
-**It fired once, across the whole estate.** Diffing all 43 exposure rows before
-and after (start *and* sweep), the only change in the table is Outline's. The
-three other rows carrying a NULL `npm_host_id` — `jellyfin`, `kopia`, `n8n` —
-are untouched. Exactly one `Adopting…` line exists in the log.
-
-**The sweep is now clean.** It had been reporting `checked 34, reconciled 33,
-failed: [outline]` every six hours since §724. At 15:09:40Z: `checked 34,
-reconciled 34`, no `failed` array at all.
-
-**Not proven live, deliberately**: the negative half — that a host whose config
-we did *not* generate is still refused. Proving it means creating a rogue proxy
-host on a real domain, which is not worth doing unprompted on a box serving
-real hostnames. It is covered by unit test on both branches (a hand-written
-`advanced_config`, and a stale id pointing at a different host). The live
-evidence is the weaker-but-real form above: 42 other rows, one adoption.
+(Compacted 2026-10-14.) At 0.151.15 the sweep logged one `Adopting an existing Nginx Proxy Manager host…` for `wiki.tx-home-utils.com` (id 48); row went `failed` to `provisioned` with `cf_hostname_id` restored. `48.conf` mtime unchanged — adopted without rewrite, the right reason. Diff of all 43 rows: only Outline changed (jellyfin, kopia, n8n NULL ids untouched). Sweep now `checked 34, reconciled 34`. Negative case (refuse a host we did not generate) unit-tested only; not faked on a box with real hostnames.
 
 ## 730. Plan — cut the fixed cost of a session: hashing, citations, navigation (2026-09-28)
 
@@ -32083,74 +31806,17 @@ was expensive, not the content, so the read is what changed.
 
 ## 735. Fixed: four citations pointed at §649.1, which never existed (§730.3)
 
-The guest-text template store is **§650**; §649 is the per-app SMTP settings
-work, and it has no subsections. Four files cited `§649.1`:
-`apps/hotel/admin/src/app/models.ts`, `apps/hotel/api/src/guestText.ts`,
-`apps/hotel/api/src/routes/guestText.ts` and
-`apps/hotel/api/src/migrations/004_guest_text.sql` — all four describe the
-guest-text store and all four now point at §650, which opens "Closes the
-README item from §629 decision #6", exactly what they claim.
+(Compacted 2026-10-14.) Four hotel guest-text files (`models.ts`, `guestText.ts`, `routes/guestText.ts`, `004_guest_text.sql`) cited §649.1; the guest-text store is §650. Repointed. It was the only real dangling citation, hidden by 13 false ones from `node_modules/` (§732). Writing about a dead citation cites it, so it is kept as a labelled anchor:
 
-Worth noting how it surfaced. This was the *only* real dangling citation in
-the repo and it had been there since §650 landed, invisible because
-`plan-citations.py` was also printing 13 false ones from `node_modules/`
-(§732) — a signal buried in its own noise. `plan-citations.py` now reports
-zero.
-
-Documenting a dead citation makes the document itself cite it, so the three
-paragraphs above (§730.3, §732, here) dangled the moment they were written.
-Rather than contorting the prose to avoid typing the number, this keeps it
-resolving the way CLAUDE.md already sanctions for compaction — a labelled
-anchor. It is not a fiction: what a reader of that number needs to know is
-precisely that it is not a section.
-
-**§649.1** — never existed. §649 is the per-app SMTP settings and has no
-subsections; the guest-text template store is §650. Kept as an anchor because
-git history, and any branch predating this, still carries the citation.
+**§649.1** — never existed. §649 is the per-app SMTP settings and has no subsections; the guest-text template store is §650. Kept as an anchor because git history, and any branch predating this, still carries the citation.
 
 ## 736. Compacted the OIDC-rollout run into §270 (§730.6)
 
-§270–§275, §278, §280 and §281 — the Authelia OIDC client group, from the
-plumbing through four wired apps to the live browser proof and the pbkdf2
-secret fix — replaced by one section at §270. Closed work: the code is the
-source of truth, and §280's live proof settled everything the individual
-slices left hedged.
+(Compacted 2026-10-14.) §270–§275, §278, §280, §281 merged into §270; §276, §277, §279 sit inside the range but are separate and stayed. Every anchor kept as a `**§N**` conclusion (§280 is cited from `proxy.conf`). `plan-citations.py` 0 before, 0 after — trustworthy only because §732 had removed its false lines.
 
-§276 (Nextcloud SAML), §277 (Forgejo) and §279 (the LAN bypass) sit *inside*
-that numeric range and are **not** part of the run; they stay exactly where
-they were. So this compacted an interleaved run, not a contiguous block — the
-script that did it matched section numbers, not line ranges.
+Sizing lesson: 572 lines out, 170 in — net 1.2 % of `plan.md`, not the ~550 estimated, because kept conclusions cost most of a section. `plan.md` size is not what costs tokens; the index was (§733).
 
-**Every anchor kept**, as `**§N**` entries carrying that section's conclusion:
-§271 (Vikunja's env-var provider config never worked — see §278), §272
-(Homebox, blocked and since removed from the roster), §273 (NocoDB dropped,
-Enterprise-only SSO), §274 (why `requirePkce`/`tokenEndpointAuthMethod` are
-per-app), §275 (Immich's config-file-vs-database wart), §278, §280, §281.
-`proxy.conf` cites §280 from code, so that one especially had to survive; it
-does, with the `X-Forwarded-Proto: https` conclusion attached.
-
-`plan-citations.py`: **0 dangling before, 0 after** — the rule is "adds no new
-lines", and it added none. That check was only trustworthy because §732 had
-just cleared 13 false lines out of it; running this compaction against the old
-baseline would have proved nothing.
-
-**Honest sizing.** 572 lines out, 170 in — **net 402 lines, 1.2 % of
-`plan.md`**, not the ~550 §730.6 estimated. The estimate was of what was
-deleted, not of what replacing it costs; keeping nine conclusions plus the
-durable constraints (Authelia replacing rather than merging slices, Immich's
-file-or-database merge, Vikunja's provider-must-be-in-a-file rule, the
-cloudflared-speaks-http scheme bug) is most of a section on its own. That is
-the honest yield of this kind of pass, and it is worth recording before anyone
-plans the next one expecting more: §730's measurements already showed
-`plan.md`'s size is not what costs tokens — the index over it was, and §733
-fixed that directly.
-
-Also fixed here, found by dogfooding §733 on this very section:
-`plan-section.sh 270 | head -2` printed a spurious "No section §270" — awk
-died of SIGPIPE when `head` closed the pipe, and the `||` fallback read that
-as "not found". Piping to `head`/`less` is the obvious way to use the thing.
-Now the existence check happens up front with `grep -q` and the awk is left to
-exit however it likes.
+Also fixed: `plan-section.sh N | head` reported "No section" (awk SIGPIPE read as not-found). Existence check now done first with `grep -q`.
 
 ## 737. §730.1's memo measured: the backend suite is 43 s → 16 s
 
@@ -32908,23 +32574,7 @@ verified by me: the reviewer's line numbers and claims; check each when picking 
 
 ## 762. §761's critique claims, checked on a running page
 
-Ran the throwaway test stack (`docker-compose.test.yml`, 44 registry apps, no Docker
-socket, so every app is stopped/unknown) and drove `/apps` with Playwright in en and pt.
-**Confirmed:** categories stay English in pt-PT (`NETWORKING & SECURITY` under a
-Portuguese UI); the ⓥ badge has only `title="Installed: latest"`, no `aria-label`;
-a disabled Start's reason is only a `title` on the disabled button (`Start Authelia
-first`), unreachable by keyboard; zero `aria-live` regions; Tab escapes the Settings
-dialog to the background (no focus trap) and focus falls to `<body>` on close; backdrop
-click closes it; the date is hard-coded `dd/MM/yyyy, HH:mm` (`apps.component.html:36`, not
-`:34`); the first view shows no apps (both panels and all 8 category groups collapsed).
-**Corrected:** heading badges peak at 5 here, not "about 10" (the ~10 needs live URLs and
-mobile links, which this stack lacks).
-**Not verifiable there:** `lanOnly`/`overlayOnly` badge text, Settings env-key labels and
-`true`/`false` radios (no app exposed a field: the stack has no `apps/` env), the failed
-and starting rows, and whether an unsaved edit is lost on backdrop click. State arrives
-over SSE (`/api/services/stream`), so a route mock could not inject an `error` row. These
-need the live box (behind Authelia) or a stack with real apps. Rejected: mocking the SSE
-stream just to see a red row, which proves nothing about the real error text.
+(Compacted 2026-10-14.) Test stack + Playwright on `/apps`, en and pt. **Confirmed:** categories stay English in pt-PT; version badge has `title` but no `aria-label`; disabled Start's reason only in `title` (keyboard can't reach it); no `aria-live`; Settings dialog has no focus trap and loses focus on close; backdrop click closes it; date hard-coded `dd/MM/yyyy, HH:mm` (`apps.component.html:36`); first view all collapsed. **Corrected:** heading badges peak at 5, not ~10. **Not verifiable there:** `lanOnly`/`overlayOnly` text, env labels, failed/starting rows, unsaved-edit loss — need live box or real apps. Rejected mocking the SSE stream to fake an error row.
 
 ## 763. Apps page: raw strings translated (first §761 P1)
 
@@ -33201,22 +32851,7 @@ already gives focus handling and Escape, and the core case used it. Not rendered
 
 ## 783. Backups dialogs: focus, Escape, one severity (§776 item 6)
 
-The three hand-rolled Backups dialogs (snapshot restore, run progress, engine restart) had
-`aria-modal` and nothing else: focus stayed on the page behind, Tab left the dialog, Escape did
-nothing. A new `ModalFocusDirective` (`components/modal-focus.directive.ts`) does what the
-service card's Settings dialog already did inline — focus in on open, Tab/Shift+Tab wrap,
-focus back to the opener on close — plus Escape, emitted as `dismiss` only while its
-`dismissible` input is true: restore while not restoring, run once `done` or errored, restart
-once done. So Escape never abandons work that is still running. Progress and restart are now
-`role="dialog"` (not alerts); only the restore keeps `alertdialog`. The snapshot restore's
-`btn-warning`/`alert-warning` are `danger`: it overwrites app data, the same act the
-settings-file restore confirms in red, and amber is for a degraded state. The progress bar has
-an accessible name, and the two inline styles the critique found (`width: 6rem`,
-`height: 0.5rem`) are classes. Tests: `modal-focus.directive.spec.ts` (focus in and back, Tab
-wrap both ways, Escape gated) and four in `backups.component.spec.ts` (Escape per dialog,
-severity, roles, progress name). Rejected: moving the service card onto the directive in the
-same commit (working code with its own tests; a later cleanup), and a shared modal component,
-since only the focus behaviour was missing. Not rendered.
+(Compacted 2026-10-14.) New `ModalFocusDirective` (`components/modal-focus.directive.ts`): focus in, Tab wrap, focus back to opener, Escape emits `dismiss` only while `dismissible` (never abandons running work). Progress and restart dialogs now `role="dialog"`; restore keeps `alertdialog` and is `danger` (overwrites data). Progress bar named; two inline styles became classes. Tests in directive and `backups.component.spec.ts`. Rejected: moving the service card onto the directive now; a shared modal component (only focus was missing).
 
 ## 784. Twenty v2.43.0 beta test closed: upgrade stable, worker OOM fixed live, login unverified
 
@@ -33693,46 +33328,7 @@ states — not done yet; this finding took the session first. Still open.
 
 ## 793. §792's original task, finished: populated Users/Backups/Content/Audit states
 
-With the WebSocket/SSE fix in, went back to what §790 actually set out to do —
-screenshot the states that need real data, on `docker-compose.test.yml`, driving
-everything through the real UI rather than seeding the database directly.
-
-**Users.** The Add User form is correctly gated behind two prerequisites before its
-submit button enables: a configured mailbox (invites are emailed) and a base domain
-(the invite link is built from it) — filled dummy values for both to get past the
-gate, same as any real first-time setup would need to. Account creation itself then
-failed cleanly on the Cloudflare-token/zone lookup §785 added (no real token on this
-stack) — expected, not chased further; the **Accounts** table already renders a real
-populated row for the seed admin (username, email, roles, `Created` date, Edit
-access/Reset password/Delete, the "you" badge with "You can't change your own roles"
-on the disabled checkboxes) without needing a second user at all.
-
-**Backups.** "Save settings file" and "Full Backup" both surfaced real, well-written
-error states rather than anything broken: a **Backing up app data** modal reporting
-"the backup engine has no password configured yet" in plain language, and a genuinely
-populated "Last app-database dump" row (14 of 44 apps' file-based dumps succeeded
-without Docker access; the Kopia snapshot step after them correctly didn't). The
-Backups page has clearly already been built to degrade informatively — nothing here
-needed fixing.
-
-**Content.** "Generate a draft" opens into a real form (Brief textarea with a good
-example placeholder, disabled Generate button until something's typed) — did not
-submit it, since that needs a real AI provider key this session has no business
-fabricating.
-
-**Audit logs.** Every action taken above (mail/exposure settings saved, the user
-invite attempt, both backup attempts) landed as real rows — Time/User/IP/Action/
-Resource/Result, colour-coded success/failure badges, Export CSV, working
-pagination ("Showing 6 of 6"). `IP` reads `—` throughout, expected on this direct
-container-to-container test path with no real client address to forward.
-
-No new defects found in any of these four — §789–§792's earlier fixes hold up under
-real data, and the parts of the app this pass touched for the first time (Users'
-Accounts table, Backups' failure modal and dump history, Content's form, the whole
-of Audit logs) were already built to the same plain-language, correctly-degrading
-standard as everything audited before them. Nothing to add to the README from this
-section; §790's two still-open items and §792's beta-test item stand as the only
-outstanding threads from this run of audits.
+(Compacted 2026-10-14.) Test stack, driven through the real UI (no DB seeding). Users: Add User needs mailbox and base domain first; create then fails on §785's Cloudflare lookup (expected, no token); seed admin row renders fully. Backups: clear "no password configured" modal, real dump row (14 of 44 apps). Content: draft form fine, not submitted (no AI key). Audit: all actions logged, `IP` shows `—` (container-to-container). No new defects; §790's two items and §792's beta item remain.
 
 ## 794. Updates page: the deferred commit-hash rewrite, finished
 
@@ -37110,9 +36706,8 @@ Not done, rejected:
 
 ## 942. plan.md compaction pass 3 — uncited sections only (2026-10-14)
 
-[-] active. Candidates: sections numbered below 890 and over 1.2 KB that nothing cites (no `§N` or range covering N anywhere in plan.md or tracked files). §172's rule still holds: never compact a section later work builds on. Each body was rewritten to keep decisions, rejected options and lessons; headings kept identical. `scripts/plan-citations.py` checked after each batch: same 9 dangling targets as before.
+[x] done. Candidates: sections numbered below 890 and over 1.2 KB that nothing cites (no `§N` or range covering N anywhere in plan.md or tracked files). §172's rule still holds: never compact a section later work builds on. Each body was rewritten to keep decisions, rejected options and lessons; headings kept identical. `scripts/plan-citations.py` checked after each batch: same 9 dangling targets as before.
 
-[x] 46 sections, 14–607; plan.md 2.33 MB to 2.25 MB.
-[ ] Last batch: §655, 664, 710, 712, 721, 723, 727, 729, 735, 736, 762, 783, 793 (~28 KB). Re-run the candidate check first — new citations may have landed.
+[x] 59 sections, §14–§793; plan.md 2.33 MB to 2.23 MB (~4.4 %). Small yield, as §736 predicted: kept conclusions cost most of a section, and plan.md size is not what costs tokens (the index is, §733).
 
 Rejected: caveman-compress of the whole file (~2.3 MB rewrite, large token cost, risk to quoted detail and anchors).
