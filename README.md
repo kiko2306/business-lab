@@ -323,13 +323,6 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       `settings:manage` sees no Find devices panel and gets 403 from `POST /api/network/scan`; with the
       box's network unplugged, a scan's failure shows beside the button; Home and Settings in pt-PT on a
       phone.
-- [ ] **Beta-test the Backups Destination boxes (plan.md §948, §949)** — *at 0.173.29 the main box
-      read "WebDAV server" / "Servidor WebDAV" with WebDAV saved, and picking Disk dropped the extra
-      entry; but picking WebDAV again under Advanced left the main box on Disk (fixed in §949).* On
-      `beta`: with WebDAV saved, the main box names it; pick Disk there, then WebDAV under "Advanced:
-      more destination kinds" — the main box follows to "WebDAV server"; pick SFTP in the main box —
-      the Advanced box no longer shows WebDAV. On a phone (iOS too) the main box lists only Disk, SMB,
-      S3, SFTP and the kind in use.
 - [ ] **Beta-test the Content critique fixes (plan.md §845, §847, §950)** — *2026-10-14 at 0.173.4, pt-PT:
       (2) adding an address with Enter announces "… adicionado." and keeps focus in the box; Remover
       asks first, names the address, and the row goes. 2026-10-14 at 0.173.29 (§950), EN laptop and
