@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.24] — 2026-10-14
+
+### Fixed
+
+- Mealie can save again: its data folder is opened to Mealie's own user before each start, so sign-ins and recipe imports no longer fail on a read-only database
+
 ## [0.173.23] — 2026-10-14
 
 ### Changed

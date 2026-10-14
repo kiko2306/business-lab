@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.23** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.24** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -332,15 +332,10 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
 - [ ] **Translate the AI key test result (plan.md §937)** — Settings → Chaves de API de IA → Testar chave shows
       the backend's English "Google API key verified." on a pt-PT page; word it in the frontend like the start/stop
       toasts (§933).
-- [ ] **Make Mealie's data folder writable again (plan.md §937)** — Mealie cannot write its database:
-      Authelia sign-in fails with `[OIDC] Exception while creating user: (sqlite3.OperationalError) attempt
-      to write a readonly database` (seen 2026-10-14), and `mealie.db` has not changed since 2026-09-28
-      21:09. `apps/mealie/data/` is owned by 100:101 (what the backend's root maps to on the host)
-      `drwxrwsr-x`, while Mealie runs as uid 911 and SQLite must create its journal beside `mealie.db`.
-      Same class as Twenty's storage (§371): add a pre-start `chmod 0777` of `apps/mealie/data` beside
-      `ensureTwentyStorage` in `executor.ts`, test first, then restart Mealie from the dashboard and prove a
-      sign-in and a recipe import. The dashboard's Mealie AI sync writes the same DB, so recheck its
-      "AI Provider (dashboard-managed)" row afterwards.
+- [ ] **Beta-test Mealie writing again (plan.md §937)** — on `beta` after the update, Parar then Iniciar
+      Mealie from Apps (the fix runs before a start). Then: "Iniciar sessão com Authelia" lands in Mealie,
+      a recipe imports by URL, and its admin AI settings show the "AI Provider (dashboard-managed)" row on
+      Google's endpoint with `gemini-3.5-flash-lite`.
 - [ ] **Beta-test AI drafts on the new Gemini model (plan.md §930)** — on `beta` after the update
       rebuilds the backend: Content → Gerar a rascunho with the stored Google key produces a draft
       (now `gemini-3.6-flash`, §936); Settings → Testar chave on Google succeeds; a Mealie URL import still

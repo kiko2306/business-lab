@@ -38823,9 +38823,10 @@ Not done, rejected:
 
 ## 937. Mealie cannot write its database (found testing §930)
 
-[ ] todo — found, not fixed (new work, per the TODO rule).
+[x] done — owner asked for the fix after the report.
 - Testar chave (Google) passes: `POST /api/settings/ai-keys/google/test` 200 "Google API key verified." — English on pt-PT, own README item.
 - Mealie: "Iniciar sessão com Authelia" → Authelia returns a code → Mealie log `[OIDC] Exception while creating user … attempt to write a readonly database` → `/login?direct=1`. Only two such lines in `mealie.log` (both today, mine); `mealie.db` mtime 2026-09-28 21:09 = Mealie's startup that minute = `data/` mtime. So no write has landed since.
 - Cause: `apps/mealie/data/` is 100:101 `drwxrwsr-x` (the backend's root maps to 100:101 on the host; most apps' `data/` look the same and are fine because those apps write in subdirs). Mealie runs as 911 and keeps `mealie.db` in `data/` itself; SQLite needs to create `mealie.db-journal` there. Root `touch` in the container works, which is why it is not obvious.
 - Not found: what recreated `data/` on 2026-09-28 21:09 — no matching plan/git entry. Nothing in the backend chowns `data/`; `appDumps` only `mkdir`s `_dump/`.
 - Proposed fix: Twenty's §371 pattern — pre-start `chmod 0777` of `apps/mealie/data` in `executor.ts`. Not done by hand: a manual chmod would vanish on the next fresh clone.
+- Fix: `twentyStorage.ts` → `writableDataDir.ts`, one map `{ twenty: 'data/storage', mealie: 'data' }`, `chmod 0777` before every start (same EPERM tolerance). Test: an existing `0775` Mealie `data/` comes out `0777`; other apps untouched; Twenty's §371 cases kept. Proof needs a Mealie stop/start on `beta` — README item.

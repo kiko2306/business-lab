@@ -25,7 +25,7 @@ import { withMaintenanceLock } from './maintenanceLock';
 import { ensureHomeAssistantHacs } from './homeAssistantHacs';
 import { reconcilePaperlessClamav, managedComposeFragmentPath } from './paperlessClamav';
 import { ensurePaperlessDropbox } from './paperlessDropbox';
-import { ensureTwentyStorage } from './twentyStorage';
+import { ensureWritableDataDir } from './writableDataDir';
 import { ensureSharedFolders } from './sharedFolders';
 import { ensureStirlingPipelines } from './stirlingPipelines';
 import { ensurePaperlessShareCopy } from './paperlessShareCopy';
@@ -293,12 +293,9 @@ async function composeUpWithManagedConfig(
   // Paperless: the post-consume script the base compose file points at must exist
   // before `compose up`, or every consume reports a failed hook.
   ensurePaperlessShareCopy(serviceName, appDir);
-  // Twenty: its `.local-storage` bind source must exist and be writable by
-  // uid 1000 before `compose up`, or the first workspace signup 500s with
-  // EACCES on mkdir (§371).
-  if (serviceName === 'twenty') {
-    ensureTwentyStorage(appDir);
-  }
+  // Twenty's storage and Mealie's data dir must be writable by the app's own
+  // uid before `compose up`, or signups / every DB write fail (§371, §937).
+  ensureWritableDataDir(serviceName, appDir);
 
   // The reconciler above may have created OR removed docker-compose.managed.yml
   // since composeArgs was resolved at the top of the start — a fresh clone's
