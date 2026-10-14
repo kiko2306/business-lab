@@ -714,6 +714,8 @@ export const en: Record<string, string> = {
   'settings.ntfy.topicInvalidHint': 'Letters, digits, hyphens and underscores only, up to 64 characters.',
   'settings.ntfy.topicHint': 'Reading a topic needs the ntfy "subscriber" login, shown in ntfy\'s Settings panel on the Apps page, so the topic name does not have to be secret.',
   'settings.ntfy.saving': 'Saving… this restarts the alert relay and CrowdSec, about 30 seconds.',
+  'settings.ai.keyWorks': 'The key works.',
+  'settings.ai.keyRefused': 'The provider refused the key: {{detail}}',
   'errors.tooManyRequests': 'Too many requests in a short time. Wait a few minutes, then try again.',
   'serviceState.done.start': '{{label}} is running.',
   'serviceState.done.stop': '{{label}} stopped.',

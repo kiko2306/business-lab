@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.24** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.25** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -329,9 +329,8 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       no row of buttons overflows. At 1280px nothing looks different from before.
 - [ ] **Beta-test the translated rate-limit message (plan.md §933)** — hard to provoke by hand (200 API
       calls per 15 min); if a 429 shows up in pt-PT it reads "Demasiados pedidos em pouco tempo…".
-- [ ] **Translate the AI key test result (plan.md §937)** — Settings → Chaves de API de IA → Testar chave shows
-      the backend's English "Google API key verified." on a pt-PT page; word it in the frontend like the start/stop
-      toasts (§933).
+- [ ] **Beta-test the AI key messages in pt-PT (plan.md §937)** — Settings → Chaves de API de IA → Google →
+      Testar chave reads "A chave funciona.".
 - [ ] **Beta-test Mealie writing again (plan.md §937)** — on `beta` after the update, Parar then Iniciar
       Mealie from Apps (the fix runs before a start). Then: "Iniciar sessão com Authelia" lands in Mealie,
       a recipe imports by URL, and its admin AI settings show the "AI Provider (dashboard-managed)" row on

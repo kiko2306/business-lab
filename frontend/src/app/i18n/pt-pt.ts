@@ -714,6 +714,8 @@ export const ptPT: Record<string, string> = {
   'settings.ntfy.topicInvalidHint': 'Apenas letras, dígitos, hífenes e sublinhados, até 64 carateres.',
   'settings.ntfy.topicHint': 'Ler um tópico exige o utilizador "subscriber" do ntfy, mostrado no painel Definições do ntfy na página Aplicações, por isso o nome do tópico não precisa de ser secreto.',
   'settings.ntfy.saving': 'A guardar… isto reinicia o encaminhamento de alertas e o CrowdSec, cerca de 30 segundos.',
+  'settings.ai.keyWorks': 'A chave funciona.',
+  'settings.ai.keyRefused': 'O fornecedor recusou a chave: {{detail}}',
   'errors.tooManyRequests': 'Demasiados pedidos em pouco tempo. Aguarde alguns minutos e tente de novo.',
   'serviceState.done.start': '{{label}} está a funcionar.',
   'serviceState.done.stop': '{{label}} parou.',

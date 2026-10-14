@@ -186,10 +186,8 @@ export class SettingsComponent implements OnInit {
             };
           }
           this.aiKeyDrafts[provider] = '';
-          this.aiKeyRowFeedback[provider] = {
-            type: 'success',
-            message: result.message ?? this.translate.t('settings.toast.aiKeySaved'),
-          };
+          // Not the backend's `message`: it is English whatever the page language (§937).
+          this.aiKeyRowFeedback[provider] = { type: 'success', message: this.translate.t('settings.toast.aiKeySaved') };
           this.toastService.success(this.translate.t('settings.toast.aiKeySaved'));
         },
         error: (error) =>
@@ -211,8 +209,12 @@ export class SettingsComponent implements OnInit {
       .testAiKey(provider, key || undefined)
       .pipe(finalize(() => (this.testingAiKeyProvider = null)))
       .subscribe({
+        // The provider's own reason for a refusal stays (it is the useful part);
+        // the lead and the success line are ours, in the page language (§937).
         next: (result) =>
-          (this.aiKeyRowFeedback[provider] = { type: result.success ? 'success' : 'danger', message: result.message }),
+          (this.aiKeyRowFeedback[provider] = result.success
+            ? { type: 'success', message: this.translate.t('settings.ai.keyWorks') }
+            : { type: 'danger', message: this.translate.t('settings.ai.keyRefused', { detail: result.message }) }),
         error: (error) =>
           (this.aiKeyRowFeedback[provider] = {
             type: 'danger',

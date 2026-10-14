@@ -38830,3 +38830,4 @@ Not done, rejected:
 - Not found: what recreated `data/` on 2026-09-28 21:09 — no matching plan/git entry. Nothing in the backend chowns `data/`; `appDumps` only `mkdir`s `_dump/`.
 - Proposed fix: Twenty's §371 pattern — pre-start `chmod 0777` of `apps/mealie/data` in `executor.ts`. Not done by hand: a manual chmod would vanish on the next fresh clone.
 - Fix: `twentyStorage.ts` → `writableDataDir.ts`, one map `{ twenty: 'data/storage', mealie: 'data' }`, `chmod 0777` before every start (same EPERM tolerance). Test: an existing `0775` Mealie `data/` comes out `0777`; other apps untouched; Twenty's §371 cases kept. Proof needs a Mealie stop/start on `beta` — README item.
+- Key row text: success → `settings.ai.keyWorks`, refusal → `settings.ai.keyRefused` keeping the provider's reason, save → `settings.toast.aiKeySaved` (was the backend's English `message`).
