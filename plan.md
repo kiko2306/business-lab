@@ -36863,3 +36863,12 @@ Rejected: rewriting the code comments in three `theme.css` files — anchors fix
 
 [x] done. One generate at 15:24 as `claude-test`: backend logged `AI provider busy while generating a social draft` `{provider: google, next: google}` at 15:24:35, then `{provider: google, next: null}` at 15:24:40, then "Generating a social draft failed" — §953's retry-then-give-up path for a box with one key, exactly as designed; the page showed its usual message and kept the brief. No draft created, nothing to clean up.
 - `gemini-3.6-flash` has now answered "high demand" from 14:13 to 15:24, after §936 had already moved drafts off `3.8-flash` for the same reason. Not moving models again: it chases Google's load. The durable fix is a second provider key (Groq's free tier) so §953 can switch — owner's call, noted on the §953 item. The Content draft steps stay open.
+
+## 960. Public Kuma monitors flap on Cloudflare MRS peak latency
+
+[x] done. [ ] beta look — README item.
+
+- Symptom: ntfy Down/Up pairs for NPM, Authelia, NetBird mgmt/relay `(public)` monitors, all `timeout of 10000ms exceeded`, evenings only (2026-10-18 ~20:30–21:45, 10-20 21:04–21:50 WEST). Containers healthy.
+- Diagnosis: origin via NPM 3 ms; WAN fine (1.1.1.1 8 ms, 0% loss, google TLS 70 ms); cloudflared on `lis04`, no reconnects, only `context canceled` (edge gave up). The `cf-ray` suffix shows the colo: **MRS** = TLS ~1 s, TTFB 3–13 s; **CDG** = 0.4 s total. Same on v4/v6. At peak, Cloudflare serves the free-plan zone from far colos. Not ours to fix.
+- Fix: `CLOUDFLARE_EDGE_RETRIES = 5` on the four edge-path monitors. Before, two back-to-back failures sent a push; intermittent failures rarely string 6 together. A real outage still alerts after ~6 min. The existing `reconciledRow` raise-only path updates live monitors; no new test (mechanism already covered, change is values).
+- Rejected: a longer Kuma `timeout` (reconcile doesn't carry it, and 13 s TTFB seen, so 20 s only shifts the edge); a paid plan / Argo (cost; dev box has no uptime promise).

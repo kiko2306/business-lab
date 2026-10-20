@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.32] — 2026-10-20
+
+### Fixed
+
+- Public Uptime Kuma monitors retry 5 times before alerting, so Cloudflare peak-hour latency stops sending Down/Up pushes
+
 ## [0.173.31] — 2026-10-14
 
 ### Fixed

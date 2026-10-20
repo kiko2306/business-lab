@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.31** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.32** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -530,6 +530,14 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       needs an app left in `error` while the page loads. Delete once seen.
 
 ### Exposure and platform
+
+- [ ] **Beta-test quieter public-monitor alerts (plan.md §960)** — on `beta`, after
+      the update restarts the backend (the exposure reconcile runs at boot).
+      Uptime Kuma → each of *Nginx Proxy Manager (public)*, *Authelia (public)*,
+      *NetBird management (public)*, *NetBird relay (public)* → Edit shows
+      **Retries 5** (*Tailscale Funnel* stays 7). Over the next evening peak
+      (~20:00–22:00 WEST), ntfy `homelab-alerts` should get no Down/Up pairs
+      for those four; Kuma's own history may still show yellow PENDING beats.
 
 - [ ] **Beta-test the Cloudflare edge WAF rule (plan.md §915)** — on `beta`, after the
       update restarts the backend (the exposure check runs at boot). Settings →

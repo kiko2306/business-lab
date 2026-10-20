@@ -187,6 +187,15 @@ export function reconciledRow(
     : edited;
 }
 
+/**
+ * Retries for the monitors that go through Cloudflare's edge. On evening peaks
+ * Cloudflare serves our free-plan zone from MRS instead of Lisbon, and TTFB
+ * there swings 3-13 s against Kuma's 10 s timeout (§960). Probes fail on and
+ * off, and every pair of back-to-back failures sent a Down/Up push. A run of
+ * 6 failures (~6 min) still flags a real outage.
+ */
+const CLOUDFLARE_EDGE_RETRIES = 5;
+
 async function desiredMonitors(): Promise<DesiredMonitor[]> {
   return [
     {
@@ -196,6 +205,7 @@ async function desiredMonitors(): Promise<DesiredMonitor[]> {
         return config ? `https://${config.baseDomain}/` : null;
       },
       notify: 'ntfy',
+      maxretries: CLOUDFLARE_EDGE_RETRIES,
     },
     {
       name: 'Authelia (public)',
@@ -204,6 +214,7 @@ async function desiredMonitors(): Promise<DesiredMonitor[]> {
         return config ? `https://authelia.${config.baseDomain}/api/health` : null;
       },
       notify: 'ntfy',
+      maxretries: CLOUDFLARE_EDGE_RETRIES,
     },
     {
       name: 'Tailscale Funnel (also NetBird signal)',
@@ -225,6 +236,7 @@ async function desiredMonitors(): Promise<DesiredMonitor[]> {
         return config ? `https://netbird-vpn-api.${config.baseDomain}/api/instance` : null;
       },
       notify: 'ntfy',
+      maxretries: CLOUDFLARE_EDGE_RETRIES,
     },
     {
       name: 'NetBird relay (public)',
@@ -233,6 +245,7 @@ async function desiredMonitors(): Promise<DesiredMonitor[]> {
         return config ? `https://netbird-vpn-relay.${config.baseDomain}/` : null;
       },
       notify: 'ntfy',
+      maxretries: CLOUDFLARE_EDGE_RETRIES,
     },
     // The alert pipeline itself (§533): CrowdSec → n8n relay → ntfy. Any one
     // of them down means security alerts stop with nothing saying so, which
