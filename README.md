@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.173.32** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.173.33** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -530,6 +530,14 @@ bump. Delete the item when its fixes land (a fix still needing a `beta` look get
       needs an app left in `error` while the page loads. Delete once seen.
 
 ### Exposure and platform
+
+- [ ] **Beta-test the edge check before a NetBird restart (plan.md §961)** — on
+      `beta`, after the update restarts the backend. During an evening
+      Cloudflare slowdown (Kuma Down/Up for the public monitors, or `curl -w
+      '%{time_total}' https://netbird-vpn-api.<domain>/api/instance` > 5 s):
+      Audit log shows **no** new `critical-service.probe-failed` rows for
+      NetBird, and `docker logs business-lab-backend-1 | grep "through the
+      edge"` shows the skip lines. NetBird containers' uptime does not reset.
 
 - [ ] **Beta-test quieter public-monitor alerts (plan.md §960)** — on `beta`, after
       the update restarts the backend (the exposure reconcile runs at boot).

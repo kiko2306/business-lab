@@ -20,6 +20,11 @@
  *   monitor for the same URL agrees it is down. If Uptime Kuma is not
  *   installed, unreachable or has no such monitor, the probe decides alone —
  *   the recovery path must not go dark just because Uptime Kuma is down too.
+ * - **Rule out the edge.** A probe through Cloudflare whose origin (the
+ *   gateway:port NPM forwards to) still answers is the edge being slow, not
+ *   the app — every evening Cloudflare served the zone from a far colo and
+ *   the NetBird URLs timed out for 5 passes while the origin answered in
+ *   3 ms (§961). A restart can't fix that, so the pass counts as reachable.
  * - **One restart per outage.** If the probe is still failing
  *   RESTART_AFTER passes after a restart, the restart didn't help — so it
  *   alerts once and stops restarting that project until every one of its
@@ -69,6 +74,8 @@ interface Probe {
   restartService: string;
   /** Resolves to the URL to probe, or null when its config isn't ready yet. */
   url(): Promise<string | null>;
+  /** The direct address NPM forwards `url` to; absent when the probe has no origin behind an edge. */
+  origin?(): Promise<string | null>;
 }
 
 interface ProjectState {
@@ -211,6 +218,18 @@ export async function getSignalHostname(): Promise<string | null> {
   }
 }
 
+/** A NetBird port published on the host — what NPM proxies the public hostname to. */
+async function netbirdOrigin(portEnvVar: string, path: string): Promise<string | null> {
+  const port = getPublishedUpstreamPort('netbird-vpn', portEnvVar);
+  return port ? `http://${await getHostGatewayIp()}:${port}${path}` : null;
+}
+
+/** True when the probe's origin answers, i.e. a failure is the edge's, not the app's. */
+async function originAnswers(probe: Probe): Promise<boolean> {
+  const url = await probe.origin?.().catch(() => null);
+  return Boolean(url) && (await runProbe(url as string)).error === null;
+}
+
 const PROBES: Probe[] = [
   {
     name: 'Tailscale Funnel (also NetBird signal)',
@@ -227,6 +246,7 @@ const PROBES: Probe[] = [
       const config = await getExposureConfig();
       return config ? `https://netbird-vpn-api.${config.baseDomain}/api/instance` : null;
     },
+    origin: () => netbirdOrigin('NETBIRD_MGMT_PORT', '/api/instance'),
   },
   {
     name: 'NetBird relay',
@@ -235,6 +255,7 @@ const PROBES: Probe[] = [
       const config = await getExposureConfig();
       return config ? `https://netbird-vpn-relay.${config.baseDomain}/` : null;
     },
+    origin: () => netbirdOrigin('NETBIRD_RELAY_PORT', '/'),
   },
 ];
 
@@ -338,7 +359,11 @@ export async function checkCriticalServices(): Promise<void> {
   for (const probe of PROBES) {
     const url = await probe.url().catch(() => null);
     if (!url) continue; // config not ready yet — nothing to check
-    const { error, detail } = await runProbe(url);
+    let { error, detail } = await runProbe(url);
+    if (error !== null && (await originAnswers(probe))) {
+      logger.info(`Critical service auto-restart: ${probe.name} fails through the edge but its origin answers — not counting it`, { url, error });
+      error = null;
+    }
     const count = error === null ? 0 : (failures.get(probe.name) ?? 0) + 1;
     failures.set(probe.name, count);
     const streak = error === null ? 0 : (streaks.get(probe.name) ?? 0) + 1;

@@ -45,7 +45,18 @@ function kumaLine(url: string, status: number) {
  * Probes all fail or all succeed; Uptime Kuma's /metrics answers with the
  * given status for every probed URL, or is unreachable when kuma is null.
  */
-function stubFetch({ probesUp, kuma, dns = false }: { probesUp: boolean; kuma: number | null; dns?: boolean }) {
+function stubFetch({
+  probesUp,
+  kuma,
+  dns = false,
+  originUp = false,
+}: {
+  probesUp: boolean;
+  kuma: number | null;
+  dns?: boolean;
+  /** The direct gateway:port address NPM forwards to answers while the public URL fails. */
+  originUp?: boolean;
+}) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
@@ -54,6 +65,9 @@ function stubFetch({ probesUp, kuma, dns = false }: { probesUp: boolean; kuma: n
         const urls = [FUNNEL_URL, 'https://netbird-vpn-api.example.com/api/instance', 'https://netbird-vpn-relay.example.com/'];
         const text = urls.map((u) => kumaLine(u, kuma)).join('\n');
         return { ok: true, status: 200, text: async () => text } as unknown as Response;
+      }
+      if (originUp && url.startsWith('http://10.201.0.1:')) {
+        return { ok: true, status: 200, body: null } as unknown as Response;
       }
       if (!probesUp) {
         const error = new TypeError('fetch failed') as TypeError & { cause?: { code: string; syscall?: string } };
@@ -160,6 +174,18 @@ describe('checkCriticalServices', () => {
     expect(restartedProjects().sort()).toEqual(['netbird-vpn', 'tailscale']);
     expect(mockedPublishAlert).toHaveBeenCalledTimes(2);
     expect(mockedPublishAlert.mock.calls.every(([a]) => a.category === 'critical-service')).toBe(true);
+  });
+
+  // §961: Cloudflare served the zone from a slow colo every evening; the
+  // public NetBird URLs timed out for 5 passes while the origin answered in
+  // 3 ms. A NetBird restart can't fix the edge, so only Tailscale (no origin
+  // to check, it *is* the path) still restarts.
+  it('never restarts or audits a NetBird probe whose origin answers', async () => {
+    stubFetch({ probesUp: false, kuma: 0, originUp: true });
+    const { checkCriticalServices } = await import('./criticalServiceHealth');
+    await passes(checkCriticalServices, 10);
+    expect(restartedProjects()).toEqual(['tailscale']);
+    expect(auditRows('critical-service.probe-failed').every((row) => row.resource?.startsWith('Tailscale'))).toBe(true);
   });
 
   // §543: ts.net's 300 s negative cache made the Funnel name fail to resolve

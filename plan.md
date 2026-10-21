@@ -36872,3 +36872,14 @@ Rejected: rewriting the code comments in three `theme.css` files — anchors fix
 - Diagnosis: origin via NPM 3 ms; WAN fine (1.1.1.1 8 ms, 0% loss, google TLS 70 ms); cloudflared on `lis04`, no reconnects, only `context canceled` (edge gave up). The `cf-ray` suffix shows the colo: **MRS** = TLS ~1 s, TTFB 3–13 s; **CDG** = 0.4 s total. Same on v4/v6. At peak, Cloudflare serves the free-plan zone from far colos. Not ours to fix.
 - Fix: `CLOUDFLARE_EDGE_RETRIES = 5` on the four edge-path monitors. Before, two back-to-back failures sent a push; intermittent failures rarely string 6 together. A real outage still alerts after ~6 min. The existing `reconciledRow` raise-only path updates live monitors; no new test (mechanism already covered, change is values).
 - Rejected: a longer Kuma `timeout` (reconcile doesn't carry it, and 13 s TTFB seen, so 20 s only shifts the edge); a paid plan / Argo (cost; dev box has no uptime promise).
+
+## 961. Health check rules out the Cloudflare edge before a NetBird restart
+
+[x] done. [ ] beta look — README item.
+
+- Review of §960: `criticalServiceHealth` probes NetBird mgmt/relay through Cloudflare with a 10 s timeout. 2026-10-20 20:23–20:31 UTC it failed NetBird management 5 passes in a row (restart threshold 3) on MRS latency alone; only Kuma reading up/pending at that moment stopped a restart. It also wrote a `probe-failed` audit row every 2 min.
+- Fix: probes get optional `origin()` — the gateway:port NPM forwards to (`NETBIRD_MGMT_PORT` `/api/instance`, `NETBIRD_RELAY_PORT` `/`). Public probe fails but origin answers → edge, not the app: pass counts as reachable, info log only, no Kuma lookup, no audit row. Tailscale has no origin (Funnel is the path), unchanged.
+- Live check from the backend container: 10250 → 200 in 104 ms, 10253 → 404 in 44 ms (any response = reachable, same as the public probe).
+- Test: `never restarts or audits a NetBird probe whose origin answers` — failed on old code (`netbird-vpn` restarted), green after. Existing tests fail every non-Kuma fetch, so origin fails too and they keep their old meaning.
+- Rejected: probing NPM itself with a Host header (backend shares no network with NPM, and NPM's :80 is bound to the host's 127.0.0.1 only); longer probe timeout (13 s TTFB seen, only moves the edge).
+- Review leftovers not done: Kuma PENDING now lasts ~6 min, so a real outage's restart can slip one 2-min pass (and the skip log says "sees it up" for pending); no test pins the four edge monitors to 5 retries.

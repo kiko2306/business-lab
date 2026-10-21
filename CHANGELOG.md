@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.173.33] — 2026-10-21
+
+### Fixed
+
+- Auto-restart no longer counts a NetBird probe that fails at Cloudflare while NetBird itself answers
+
 ## [0.173.32] — 2026-10-20
 
 ### Fixed
