@@ -21,6 +21,7 @@ import { publishAlert } from '../utils/alertNotify';
 import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import { writeAuditLog } from '../utils/audit';
 import fs from 'fs/promises';
+import logger from '../utils/logger';
 import { isDnsFailure, parseKumaMonitorStatus } from './criticalServiceHealth';
 
 const mockedGetExposureConfig = vi.mocked(getExposureConfig);
@@ -156,11 +157,24 @@ describe('checkCriticalServices', () => {
     expect(execFileMock).not.toHaveBeenCalled();
   });
 
-  it('does not treat Uptime Kuma "pending" as confirmation', async () => {
+  // §962: "pending" means Kuma's own latest check failed too. With the edge
+  // monitors on 5 retries it lasts ~6 min, so waiting for "down" would hold
+  // a real outage's restart past the 3-pass threshold.
+  it('treats Uptime Kuma "pending" as confirmation', async () => {
     stubFetch({ probesUp: false, kuma: 2 });
     const { checkCriticalServices } = await import('./criticalServiceHealth');
-    await passes(checkCriticalServices, 5);
+    await passes(checkCriticalServices, 3);
+    expect(restartedProjects().sort()).toEqual(['netbird-vpn', 'tailscale']);
+  });
+
+  it('names Kuma\'s actual verdict when it refuses a restart', async () => {
+    stubFetch({ probesUp: false, kuma: 3 });
+    const { checkCriticalServices } = await import('./criticalServiceHealth');
+    await passes(checkCriticalServices, 3);
     expect(execFileMock).not.toHaveBeenCalled();
+    const messages = vi.mocked(logger.warn).mock.calls.map(([m]) => m as string).filter((m) => m.includes('not restarting'));
+    expect(messages.length).toBeGreaterThan(0);
+    expect(messages.every((m) => m.includes('Uptime Kuma: maintenance'))).toBe(true);
   });
 
   it('restarts after 3 failures when Uptime Kuma confirms down — once per project, not once per probe', async () => {

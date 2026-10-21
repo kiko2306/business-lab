@@ -192,11 +192,12 @@ export function reconciledRow(
  * Cloudflare serves our free-plan zone from MRS instead of Lisbon, and TTFB
  * there swings 3-13 s against Kuma's 10 s timeout (§960). Probes fail on and
  * off, and every pair of back-to-back failures sent a Down/Up push. A run of
- * 6 failures (~6 min) still flags a real outage.
+ * 6 failures (~6 min) still flags a real outage. Exported for the test.
  */
-const CLOUDFLARE_EDGE_RETRIES = 5;
+export const CLOUDFLARE_EDGE_RETRIES = 5;
 
-async function desiredMonitors(): Promise<DesiredMonitor[]> {
+/** Exported for the test, which pins every edge monitor to CLOUDFLARE_EDGE_RETRIES. */
+export async function desiredMonitors(): Promise<DesiredMonitor[]> {
   return [
     {
       name: 'Nginx Proxy Manager (public)',

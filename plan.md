@@ -36883,3 +36883,12 @@ Rejected: rewriting the code comments in three `theme.css` files — anchors fix
 - Test: `never restarts or audits a NetBird probe whose origin answers` — failed on old code (`netbird-vpn` restarted), green after. Existing tests fail every non-Kuma fetch, so origin fails too and they keep their old meaning.
 - Rejected: probing NPM itself with a Host header (backend shares no network with NPM, and NPM's :80 is bound to the host's 127.0.0.1 only); longer probe timeout (13 s TTFB seen, only moves the edge).
 - Review leftovers not done: Kuma PENDING now lasts ~6 min, so a real outage's restart can slip one 2-min pass (and the skip log says "sees it up" for pending); no test pins the four edge monitors to 5 retries.
+
+## 962. Review leftovers of §960: pending confirms, honest skip log, retries pinned
+
+[x] done.
+
+- **Pending confirms a restart.** `KUMA_PENDING` (2) now counts with DOWN/null. Pending = Kuma's own latest check failed too, which is the corroboration §444 asks for; the guard was against Kuma seeing it *up*. With 5 edge retries (§960) pending lasts ~6 min, so DOWN-only held a real outage's restart one 2-min pass past `RESTART_AFTER`. Edge-only failures no longer reach this point (§961 origin check). Maintenance (3) and up (1) still refuse. Old test "does not treat pending as confirmation" flipped — no plan.md rationale for it beyond the test.
+- **Skip log names the real verdict** (`kumaVerdict(kuma)`) instead of a hardcoded "sees it up".
+- **Retries pinned:** `desiredMonitors` + `CLOUDFLARE_EDGE_RETRIES` exported; test resolves every monitor URL against a mocked base domain and requires all 4 edge ones at the constant, so a new public monitor without it fails CI.
+- Tests: 3 new/changed, red before, green after; 1573/1573.

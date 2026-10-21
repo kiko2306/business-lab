@@ -1,5 +1,15 @@
-import { describe, expect, it } from 'vitest';
-import { defaultMonitor, findExistingMonitorNames, notificationIdsFor, reconciledRow } from './uptimeKumaCriticalMonitors';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../utils/exposureSettings', () => ({ getExposureConfig: vi.fn(async () => ({ baseDomain: 'example.com' })) }));
+
+import {
+  CLOUDFLARE_EDGE_RETRIES,
+  defaultMonitor,
+  desiredMonitors,
+  findExistingMonitorNames,
+  notificationIdsFor,
+  reconciledRow,
+} from './uptimeKumaCriticalMonitors';
 
 describe('defaultMonitor', () => {
   // A transport failure is the only thing that should count as down — a real
@@ -105,5 +115,20 @@ describe('reconciledRow', () => {
   it('passes the retry count through to a new monitor', () => {
     expect(defaultMonitor('m', 'https://x/', [1], undefined, 7).maxretries).toBe(7);
     expect(defaultMonitor('m', 'https://x/', [1]).maxretries).toBe(1);
+  });
+});
+
+// §960: Cloudflare's evening latency flapped every edge monitor still on the
+// default 1 retry. A new public monitor must pick up the edge retries too.
+describe('desiredMonitors', () => {
+  it('gives every monitor that goes through Cloudflare the edge retry count', async () => {
+    const edge = [];
+    for (const monitor of await desiredMonitors()) {
+      const url = await monitor.url();
+      if (url?.includes('example.com/')) edge.push(monitor);
+    }
+    expect(edge.map((m) => m.name)).toContain('Authelia (public)');
+    expect(edge.length).toBe(4);
+    expect(edge.every((m) => m.maxretries === CLOUDFLARE_EDGE_RETRIES)).toBe(true);
   });
 });

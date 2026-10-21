@@ -17,8 +17,9 @@
  * Tailscale and dropped every real NetBird client, every 16 minutes:
  *
  * - **Corroborate before acting.** A restart only goes ahead if Uptime Kuma's
- *   monitor for the same URL agrees it is down. If Uptime Kuma is not
- *   installed, unreachable or has no such monitor, the probe decides alone —
+ *   monitor for the same URL agrees it is down or pending (its own latest
+ *   check failed too). If Uptime Kuma is not installed, unreachable or has
+ *   no such monitor, the probe decides alone —
  *   the recovery path must not go dark just because Uptime Kuma is down too.
  * - **Rule out the edge.** A probe through Cloudflare whose origin (the
  *   gateway:port NPM forwards to) still answers is the edge being slow, not
@@ -67,6 +68,10 @@ const RESTART_AFTER = 3;
 const RESTART_AFTER_DNS = 8;
 const KUMA_SERVICE = 'uptime-kuma';
 const KUMA_DOWN = 0;
+// Kuma's latest check failed and it is retrying. The edge monitors retry 5
+// times (§960), so this lasts ~6 min; waiting for DOWN would hold a real
+// outage's restart past RESTART_AFTER (§962).
+const KUMA_PENDING = 2;
 
 interface Probe {
   name: string;
@@ -317,10 +322,10 @@ async function handleProject(project: string, results: ProbeResult[]): Promise<v
   const confirmed: ProbeResult[] = [];
   for (const r of atThreshold) {
     const kuma = r.kuma;
-    if (kuma === null || kuma === KUMA_DOWN) {
+    if (kuma === null || kuma === KUMA_DOWN || kuma === KUMA_PENDING) {
       confirmed.push(r);
     } else {
-      logger.warn(`Critical service auto-restart: ${r.probe.name} fails from here but Uptime Kuma sees it up — not restarting`, {
+      logger.warn(`Critical service auto-restart: ${r.probe.name} fails from here but ${kumaVerdict(kuma)} — not restarting`, {
         url: r.url,
         kumaStatus: kuma,
         error: r.error,
