@@ -26,31 +26,19 @@ Read **one section at time, never whole**: `./scripts/plan-section.sh <N>` (or `
 
 ## Commands
 
-**No Node on this host** — everything run in container. `./scripts/check.sh <backend|frontend> <test|typecheck|build>`. It find repo root itself; mounting `$PWD` direct break, because some backend test resolve path up to repo root. `frontend test` build `business-lab-frontend-test` image on first use (plain `node:20` miss Chrome and library headless Chrome need). Rebuild that image (`docker build -t business-lab-frontend-test -f frontend/Dockerfile.test frontend`) when `frontend/package-lock.json` `puppeteer` version change — `Dockerfile.test` pin match Chrome download.
+**No Node on this host** — everything run in container: `./scripts/check.sh <backend|frontend> <test|typecheck|build>` (finds repo root itself). Run the affected workspace check before say change done; run `scripts/e2e-tests.sh` when change touch auth, shell/nav, Users page or 2FA flow. Details (test image, smoke tests, CI): `.claude/rules/commands.md`, loaded when you work in `scripts/`, `backend/`, `frontend/` or `.github/`.
 
-`./scripts/smoke-tests.sh` run on host against already-run backend. CI run backend typecheck+test, frontend test:ci+build, `apps/price-compare/app` test, and Playwright E2E (`scripts/e2e-tests.sh`); smoke test no in CI. Run affected workspace check before say change done. Run `scripts/e2e-tests.sh` when change touch auth, shell/nav, Users page or 2FA flow.
+## Session cost
 
-## Session cost: cheap by default
+Global `cost.md` applies. Project specifics:
 
-Every token in context be re-read every turn, so startup size and session length drive usage limit (`docs/session-habits.md`, plan.md §894, §909).
-
-- **One task per session**, then fresh. Prefer `/compact` over `/clear`.
-- **Delegate wide work.** `locate` agent (pinned Haiku) for "where is X / what calls Y" instead of inline Grep fan-out. `checks` agent (pinned Haiku) to run `scripts/check.sh` — green run come back three line instead of thousand. Both in `.claude/agents/`.
-- **Trim output.** Pipe log through `tail -n 40` or `grep`; read only failing line.
-- **No `cd <repo> &&` prefix.** Shell already start in repo root, and permission rule match command string from start, so that prefix turn an allowed `grep` into fresh prompt. 2221 of 14279 past Bash call carry it. Use plain command, or absolute path as argument.
+- **Delegate wide work.** `locate` agent (pinned Haiku) for "where is X / what calls Y"; `checks` agent (pinned Haiku) to run `scripts/check.sh` — green run come back three line instead of thousand. Both in `.claude/agents/`.
+- **No `cd <repo> &&` prefix.** Shell already start in repo root, and permission rule match command string from start, so that prefix turn an allowed `grep` into fresh prompt. Use plain command, or absolute path as argument.
 - **Read narrowly.** `plan-section.sh` for plan.md. SessionStart hook already list open item — no re-read README TODO to find them.
 
 ## Commits go to `dev`; `dev` → `beta` → `main`
 
-All work commit to rolling `dev` — never straight to `beta` or `main`. `dev` always safe to push: every change land there once affected workspace check pass. Live-stack verify be **not** gate for `dev`. No leave finished work uncommitted; one commit per coherent change, push as it land.
-
-Merge `dev` into `beta` only when commit truly give user something new to test there — it touch Docker/exposure/network/backup, or finish slice now reachable end-to-end. Doc/plan-only fix, or backend-only slice nothing yet expose, stay on `dev` and wait for change that make it reachable. Judgment call each time, not fixed file-path list.
-
-When commit clear that bar, merge be **only** merge and push (fast-forward when can) — no rebuild, no restart, no live-stack test, no need ask permission. User pull code onto run box themself via dashboard self-update panel (Update page, track `beta`) — that trigger be theirs, not yours. Say plain when merge land, and that README listed test still need run before `main`. Say it too when you hold commit back from `beta`.
-
-`beta` → `main` happen only when user explicit ask for `beta` test and that test pass — that ask-and-pass be go-ahead, no separate confirm. Run exactly what README item describe; one fail, report it and no merge. Never test `beta` or merge to `main` on own idea.
-
-Branch off `dev` to isolate spike or throwaway experiment; merge back into `dev`, and delete branch once it serve purpose. Check `git status` before commit — repo be public, `.env` must never be in diff.
+All work commit to rolling `dev` — never straight to `beta` or `main`. One commit per coherent change, push as it land, once the affected workspace check pass. Merge `dev` into `beta` only when the commit give user something new to test there. `beta` → `main` only when user explicit ask. Repo be public: check `git status` before commit, `.env` must never be in diff. Full rules: `.claude/rules/workflow-details.md`, loaded when you touch README, plan.md or `VERSION`.
 
 ## The working loop
 
@@ -61,42 +49,13 @@ Branch off `dev` to isolate spike or throwaway experiment; merge back into `dev`
 5. **Commit and push to `dev`** once affected check pass, then apply branch rule above.
 6. **Back to step 1** — unless item be part of pre-approved batch, then take next in batch with no re-propose.
 
-Work arrive as list rather than single task? Planning pass before step 2: append plan to `plan.md`, add each piece to README, then propose. Intent then survive session that get cut off, and build order stay user call.
-
-Proposal can ask batch approval: name several independent, already-planned item, run all through step 3-5 with no stop between. Each still get own step 4 record and own step 5 commit. Save it for item truly independent (no item output feed next); stop batch moment one outcome change what later one should do.
-
 ## TODOs live in README.md, and get deleted
 
-`README.md` TODO section be **only** place open work track — no `// TODO` comment, no second list in `plan.md`, no note in doc page.
+`README.md` TODO section be **only** place open work track. Item finish: **delete it**. New work found mid-task go in as new item, no fix in passing. Details: `.claude/rules/workflow-details.md`.
 
-Item finish: **delete it**. No tick box left behind — done work be what `plan.md` and `git log` for. Same for item that turn out wrong or no longer want; say why in commit message.
+## Layout and conventions
 
-New work found mid-task go in as new item, no fix in passing, unless truly part of change at hand.
-
-## Layout
-
-| Path | What |
-|---|---|
-| `backend/src/config/services.ts` | Service registry — allowlist of every manageable app. Add app start here. |
-| `backend/src/services/` | Business logic: compose run, exposure, backup, per-app config make. |
-| `backend/src/routes/` | Express route, thin. |
-| `frontend/src/app/` | Angular 18 standalone component, Bootstrap 5. |
-| `apps/<name>/` | One compose project per app: `docker-compose.yml`, `.env.example`, gitignored `.env` + `data/`. |
-| `docs/` | Operator doc — `ports.md`, `app-credentials.md`, `first-run.md`, `licences.md` keep current, not dream. |
-| `start.sh` | Host bootstrap: daemon config, port allocation, first run. |
-| `.claude/agents/` | `locate` and `checks`, both pinned Haiku. |
-| `plan-index.md` | Made map of `plan.md` — section title and `sed` range for each. |
-
-## Conventions
-
-- **Tests** live beside code as `*.test.ts` (vitest, backend). Cover parse/derive logic; no test Docker itself.
-- **Comments explain why, not what.** This codebase lean on them heavy — non-obvious port pin, dependency order, workaround for upstream behaviour all get sentence say what break without it. Match that.
-- **Ports** follow `docs/ports.md`: core stack `10000`–`10099`, managed app `10100`+ alphabetical in ten. Below `10000` be on purpose and documented (NPM `80`/`443`, Pi-hole `53`, Home Assistant `8123`) — allocator only manage compose default `>= 10000`.
-- **Adding an app**: compose + `.env.example` in `apps/<name>/`, `services.ts` entry, port per scheme, rows in `docs/ports.md`, `docs/app-credentials.md` **and `docs/licences.md`** (licence check mandatory; AGPL/fair-code/source-available/non-software ToS = no go in).
-- **Exposure is automatic** (`plan.md` §331). No per-app toggle, no `PUT …/exposure`; `ensureAutoExposure()` set `enabled` from `getExposability()`. `lanOnly` and `overlayOnly` stay off tunnel.
-- **Exposed running apps get a Home Page tile** from `homepageConfig.ts`; `homepage.*` compose label (`group`, `name`, `icon`, `description`, `href`) mandatory, `hideFromHomePage: true` for support-only app.
-- **Dependencies** in `services.ts`: `dependsOn` = cannot boot without (block start); `requires` = need for its job (warn only). Never declare `nginx-proxy-manager`.
-- Full rules for the last four: `docs/app-conventions.md`.
+Service registry `backend/src/config/services.ts`; business logic `backend/src/services/`; thin routes `backend/src/routes/`; Angular 18 standalone `frontend/src/app/`; one compose project per app in `apps/<name>/`; operator docs in `docs/`. Tests beside code (`*.test.ts`, vitest). Comments explain why. Adding an app, ports scheme, exposure and dependency rules: `.claude/rules/layout-conventions.md`, loaded when you work in `backend/src`, `frontend/src`, `apps/` or `docs/`.
 
 ## Never
 
@@ -108,7 +67,7 @@ New work found mid-task go in as new item, no fix in passing, unless truly part 
 
 SessionStart hook print the enforced guard each session — those refusal be rule work, so find another way rather than route around.
 
-`VERSION` be single truth source: backend read it live from bind-mount checkout and serve at `GET /version` (plan.md §343), so version-only bump deploy as bare `git pull`, no rebuild. `package.json` version field frozen — do **not** bump them. Bump with `scripts/bump-version.sh <patch|minor> <Category> "<bullet>"`, never hand-edit the three file; review its diff before commit.
+Version bump: `VERSION` be single truth source; bump only with `scripts/bump-version.sh` (never hand-edit, never bump `package.json` version). Details: `.claude/rules/workflow-details.md`.
 
 ## Agent skills
 
@@ -116,10 +75,8 @@ SessionStart hook print the enforced guard each session — those refusal be rul
 - **Triage labels** — default five-label vocabulary. `docs/agents/triage-labels.md`.
 - **Domain docs** — single-context. `docs/agents/domain.md`.
 
-## Caveman Behavior Rules
+## Conventions that replace the old caveman rules
 
-These override any conflicting rule above.
-
-- **Commits:** Execute `caveman-commit`. Max 50 chars. Lowercase. No trailing periods (e.g. `feat(api): add post route`).
-- **Plan Maintenance:** Execute `caveman-compress` on `plan.md`. No fluff word. Bracket for state: `[x] done`, `[-] active`, `[ ] todo`.
-- **Chat:** Reply in short fragment. Never say "Sure, I can help."
+- **Commits:** Conventional Commits, subject max 50 chars, lowercase, no trailing period (e.g. `feat(api): add post route`). Global `git.md` applies.
+- **plan.md:** keep entries short, no fluff; state in brackets: `[x] done`, `[-] active`, `[ ] todo`.
+- **Chat:** short fragments (global `caveman-voice.md`).
